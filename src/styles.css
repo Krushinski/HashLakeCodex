@@ -1,0 +1,207 @@
+:root {
+  color: #f5f0df;
+  background: #142f35;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  min-width: 320px;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(109, 168, 206, 0.95), rgba(240, 194, 122, 0.18) 58%),
+    #1f5961;
+}
+
+.hashlake-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.status-pill {
+  position: fixed;
+  left: clamp(12px, 2vw, 24px);
+  top: clamp(12px, 2vw, 24px);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  max-width: calc(100vw - 24px);
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 240, 201, 0.34);
+  border-radius: 8px;
+  background: rgba(12, 33, 37, 0.58);
+  color: #fff6df;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+.status-pill__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #91f2bf;
+  box-shadow: 0 0 14px rgba(145, 242, 191, 0.9);
+}
+
+.fallback-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #153239;
+  transition:
+    opacity 600ms ease,
+    visibility 600ms ease;
+}
+
+.fallback-scene--hidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fallback-scene__sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 24% 18%, rgba(255, 211, 125, 0.88), transparent 14%),
+    linear-gradient(180deg, #6da8ce 0%, #b8d6c9 47%, #326f76 48%, #12383d 100%);
+}
+
+.fallback-scene__sun {
+  position: absolute;
+  left: 18%;
+  top: 13%;
+  width: clamp(70px, 12vw, 140px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #ffd37d;
+  box-shadow:
+    0 0 44px rgba(255, 211, 125, 0.62),
+    0 0 120px rgba(255, 190, 101, 0.32);
+}
+
+.fallback-scene__mountains {
+  position: absolute;
+  right: -5vw;
+  bottom: 44%;
+  left: -5vw;
+  height: 27vh;
+  background:
+    linear-gradient(140deg, transparent 0 20%, #6f8377 21% 32%, transparent 33%),
+    linear-gradient(40deg, transparent 0 11%, #405c55 12% 25%, transparent 26%),
+    linear-gradient(130deg, transparent 0 45%, #7e9183 46% 58%, transparent 59%);
+  filter: drop-shadow(0 16px 16px rgba(12, 31, 35, 0.22));
+  opacity: 0.92;
+}
+
+.fallback-scene__lake {
+  position: absolute;
+  inset: 48% -10vw -15vh;
+  background:
+    repeating-linear-gradient(
+      175deg,
+      rgba(255, 246, 223, 0.18) 0 2px,
+      rgba(255, 246, 223, 0) 2px 18px
+    ),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 211, 125, 0.25), transparent 44%),
+    linear-gradient(180deg, #2f8392, #103941);
+  transform: skewY(-1deg);
+}
+
+.fallback-scene__boat {
+  position: absolute;
+  left: 50%;
+  bottom: 31%;
+  width: clamp(110px, 18vw, 230px);
+  height: clamp(22px, 3.4vw, 44px);
+  border-radius: 8px 54px 28px 42px;
+  background: linear-gradient(90deg, #5b3321, #9e673a 35%, #6d3f27);
+  box-shadow: 0 16px 26px rgba(7, 28, 32, 0.38);
+  transform: translateX(-50%) rotate(-1deg);
+}
+
+.fallback-scene__boat::before {
+  position: absolute;
+  left: 45%;
+  bottom: 70%;
+  width: 16%;
+  height: 165%;
+  border-radius: 999px 999px 20px 20px;
+  background: #263f49;
+  content: "";
+}
+
+.fallback-scene__message {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 246, 223, 0.32);
+  border-radius: 8px;
+  background: rgba(13, 37, 43, 0.72);
+  color: #fff6df;
+  box-shadow: 0 20px 48px rgba(4, 20, 24, 0.32);
+  backdrop-filter: blur(16px);
+}
+
+.fallback-scene__message strong {
+  font-size: clamp(18px, 4vw, 24px);
+  line-height: 1.1;
+}
+
+.fallback-scene__message span {
+  color: rgba(255, 246, 223, 0.82);
+  font-size: 14px;
+}
+
+.fallback-scene--error .fallback-scene__message {
+  border-color: rgba(255, 184, 123, 0.58);
+}
+
+@media (max-width: 640px) {
+  .status-pill {
+    min-height: 34px;
+    font-size: 12px;
+  }
+
+  .fallback-scene__message {
+    align-self: end;
+    margin-bottom: 28px;
+  }
+}

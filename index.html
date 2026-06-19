@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Hashlake, a browser-based Bitcoin lake artwork built with Three.js."
+    />
+    <title>Hashlake / Bitcoin Lake</title>
+  </head>
+  <body>
+    <div id="app" aria-label="Hashlake interactive scene"></div>
+    <div id="fallback" class="fallback-scene" role="status" aria-live="polite">
+      <div class="fallback-scene__sky">
+        <div class="fallback-scene__sun"></div>
+        <div class="fallback-scene__mountains"></div>
+        <div class="fallback-scene__lake"></div>
+        <div class="fallback-scene__boat"></div>
+      </div>
+      <div class="fallback-scene__message">
+        <strong>Hashlake is starting.</strong>
+        <span id="fallback-detail">Preparing the lake scene...</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
