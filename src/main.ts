@@ -1,5 +1,6 @@
 import "./styles.css";
 import { createHashlakeScene, webGLCanRun } from "./scene/createScene";
+import { createDebugPanel } from "./ui/debugPanel";
 
 const appElement = document.querySelector<HTMLDivElement>("#app");
 const fallbackElement = document.querySelector<HTMLDivElement>("#fallback");
@@ -43,6 +44,7 @@ const boot = () => {
       onRecoverableError: (message) => setFallback(message, true),
     });
 
+    createDebugPanel(appElement);
     scene.start();
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown renderer error";

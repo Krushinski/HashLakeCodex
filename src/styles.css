@@ -73,6 +73,350 @@ body {
   box-shadow: 0 0 14px rgba(145, 242, 191, 0.9);
 }
 
+.debug-panel-shell {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 20;
+  display: none;
+  width: min(390px, calc(100vw - 18px));
+  max-height: calc(100dvh - 12px);
+  margin: 6px;
+  overflow-y: auto;
+  color: #dce9e2;
+  scrollbar-color: rgba(118, 219, 218, 0.55) rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+}
+
+.debug-panel-shell--visible {
+  display: block;
+}
+
+.debug-panel {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(212, 233, 225, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(64, 78, 80, 0.9), rgba(15, 50, 64, 0.92)),
+    rgba(22, 40, 43, 0.9);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(18px);
+}
+
+.debug-panel__header,
+.debug-panel__actions,
+.debug-section__heading,
+.debug-bar__meta,
+.debug-dial,
+.debug-feed,
+.debug-manual__buttons {
+  display: flex;
+  align-items: center;
+}
+
+.debug-panel__header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.debug-panel__header strong {
+  display: block;
+  color: #f3f0e8;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.debug-panel__header span {
+  color: rgba(200, 218, 214, 0.68);
+  font-size: 11px;
+}
+
+.debug-panel__actions {
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.debug-fps {
+  min-width: 48px;
+  color: rgba(203, 219, 216, 0.72);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  text-align: right;
+}
+
+.debug-close {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(229, 240, 237, 0.72);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.debug-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.debug-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.debug-metric {
+  display: grid;
+  min-width: 0;
+  min-height: 32px;
+  align-content: center;
+  gap: 2px;
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.debug-metric__label {
+  overflow: hidden;
+  color: rgba(213, 224, 220, 0.64);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debug-metric__value {
+  overflow: hidden;
+  color: #edf3eb;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debug-tone-good {
+  color: #72e5b0;
+}
+
+.debug-tone-bad {
+  color: #ff806d;
+}
+
+.debug-tone-warn {
+  color: #efcc76;
+}
+
+.debug-tone-muted {
+  color: rgba(219, 231, 227, 0.72);
+}
+
+.debug-section {
+  display: grid;
+  gap: 4px;
+}
+
+.debug-section__heading {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.debug-section__heading > span {
+  color: #75dddd;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.debug-section__heading strong {
+  color: #f1f3e9;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}
+
+.debug-section__heading em {
+  color: rgba(239, 243, 233, 0.82);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.debug-storm {
+  gap: 5px;
+}
+
+.debug-storm__slider {
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  accent-color: #70d6d4;
+}
+
+.debug-bars,
+.debug-dials,
+.debug-feeds {
+  display: grid;
+  gap: 3px;
+}
+
+.debug-bar {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.58fr) minmax(110px, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-bar__meta {
+  justify-content: space-between;
+  min-width: 0;
+  color: rgba(216, 226, 222, 0.76);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.debug-bar__meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debug-bar__meta em {
+  color: rgba(204, 215, 210, 0.5);
+  font-style: normal;
+}
+
+.debug-bar__meta strong {
+  min-width: 30px;
+  color: #f4f5eb;
+  font-size: 11px;
+  text-align: right;
+}
+
+.debug-bar__track,
+.debug-dial__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(234, 246, 238, 0.12);
+}
+
+.debug-bar__track span,
+.debug-dial__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #51b7b4, #86e3d0);
+  box-shadow: 0 0 14px rgba(111, 218, 213, 0.32);
+}
+
+.debug-dial {
+  display: grid;
+  grid-template-columns: 70px minmax(90px, 1fr) 36px;
+  gap: 8px;
+  color: rgba(218, 228, 224, 0.8);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+}
+
+.debug-dial strong {
+  color: #edf5ee;
+  text-align: right;
+}
+
+.debug-feed {
+  display: grid;
+  grid-template-columns: 10px minmax(70px, 1fr) 48px 44px 68px;
+  gap: 6px;
+  color: rgba(218, 229, 224, 0.8);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.1;
+}
+
+.debug-feed__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.debug-feed__dot--ok {
+  background: #6ce8a9;
+  box-shadow: 0 0 9px rgba(108, 232, 169, 0.72);
+}
+
+.debug-feed__dot--stale {
+  background: #e6c66e;
+  box-shadow: 0 0 9px rgba(230, 198, 110, 0.62);
+}
+
+.debug-feed__dot--error,
+.debug-feed__dot--offline {
+  background: #ff7769;
+  box-shadow: 0 0 9px rgba(255, 119, 105, 0.62);
+}
+
+.debug-feed__name,
+.debug-feed__status,
+.debug-feed__source,
+.debug-feed__timer {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debug-feed__source {
+  color: rgba(209, 221, 216, 0.52);
+}
+
+.debug-feed__timer {
+  color: rgba(236, 242, 238, 0.78);
+  text-align: right;
+}
+
+.debug-manual {
+  padding-top: 2px;
+}
+
+.debug-manual__buttons {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.debug-manual__buttons button {
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid rgba(126, 217, 218, 0.32);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.075);
+  color: #f3f0e8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.debug-manual__buttons button:hover {
+  border-color: rgba(126, 217, 218, 0.64);
+  background: rgba(126, 217, 218, 0.15);
+}
+
+.debug-manual__buttons button:focus-visible,
+.debug-close:focus-visible,
+.debug-storm__slider:focus-visible {
+  outline: 2px solid #91f2bf;
+  outline-offset: 2px;
+}
+
 .fallback-scene {
   position: fixed;
   inset: 0;
@@ -198,6 +542,31 @@ body {
   .status-pill {
     min-height: 34px;
     font-size: 12px;
+  }
+
+  .debug-panel-shell {
+    width: calc(100vw - 12px);
+  }
+
+  .debug-panel {
+    padding: 12px;
+  }
+
+  .debug-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .debug-bar {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .debug-feed {
+    grid-template-columns: 10px minmax(66px, 1fr) 48px 62px;
+  }
+
+  .debug-feed__source {
+    display: none;
   }
 
   .fallback-scene__message {

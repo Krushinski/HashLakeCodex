@@ -403,7 +403,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 1</span>
+    <span>Hashlake Phase 2</span>
   `;
   return status;
 };
