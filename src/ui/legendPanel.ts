@@ -42,7 +42,7 @@ const controls = [
   ["R", "Reset camera"],
   ["C", "Cycle fixed chase preset"],
   ["Arrow keys", "Drive boat"],
-  ["Mobile pad", "Throttle, steer, anchor"],
+  ["Touch/drag", "Hold upward to throttle, angle left/right to steer"],
   ["Shift", "Boost"],
   ["Space", "Anchor/stabilize"],
   ["Enter", "Save tableau"],
@@ -52,7 +52,7 @@ const controls = [
 const notes = [
   "Live no-key public feeds drive stormIndex when available.",
   "Fog means stale or uncertain data, not necessarily bad Bitcoin conditions.",
-  "Drive Mode camera is hard locked behind the boat; input only steers the hull.",
+  "Drive Mode camera is hard locked behind the boat; touch and keys only steer the hull.",
 ];
 
 const renderLegend = () => `
