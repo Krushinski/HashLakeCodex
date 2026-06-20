@@ -430,8 +430,9 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     if (shouldEmitEvent && previousHeight !== null && blockData.height > previousHeight) {
       eventBus.emit({
         type: "newBlock",
+        blockHeight: blockData.height,
         intensity: 0.85,
-        message: "New block found.",
+        message: `New block found - #${blockData.height}`,
       });
     }
   };

@@ -74,6 +74,84 @@ body {
   box-shadow: 0 0 14px rgba(145, 242, 191, 0.9);
 }
 
+.bitcoin-pill {
+  position: fixed;
+  left: clamp(12px, 2vw, 24px);
+  bottom: clamp(12px, 2vw, 24px);
+  z-index: 17;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: min(560px, calc(100vw - 24px));
+  min-height: 32px;
+  padding: 7px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 240, 201, 0.22);
+  border-radius: 8px;
+  background: rgba(8, 26, 30, 0.7);
+  color: #fff6df;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.bitcoin-pill span,
+.bitcoin-pill strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bitcoin-pill strong {
+  color: #72e5b0;
+  font-size: 11px;
+}
+
+.bitcoin-pill__sep {
+  color: rgba(255, 246, 223, 0.42);
+}
+
+.bitcoin-pill__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.bitcoin-pill__dot--ok {
+  background: #6ce8a9;
+  box-shadow: 0 0 10px rgba(108, 232, 169, 0.76);
+}
+
+.bitcoin-pill__dot--stale {
+  background: #e6c66e;
+  box-shadow: 0 0 10px rgba(230, 198, 110, 0.66);
+}
+
+.bitcoin-pill__dot--error {
+  background: #ff7769;
+  box-shadow: 0 0 10px rgba(255, 119, 105, 0.68);
+}
+
+.bitcoin-pill--fresh .bitcoin-pill__dot--ok {
+  animation: bitcoinPillFreshDot 900ms ease-out;
+}
+
+.bitcoin-pill--fresh {
+  animation: bitcoinPillFresh 900ms ease-out;
+}
+
+.bitcoin-pill--stale strong {
+  color: #efcc76;
+}
+
+.bitcoin-pill--bad strong {
+  color: #ff806d;
+}
+
 .drive-hud {
   position: fixed;
   left: 50%;
@@ -510,6 +588,30 @@ body {
   }
 }
 
+@keyframes bitcoinPillFresh {
+  0% {
+    border-color: rgba(145, 242, 191, 0.62);
+    background: rgba(20, 64, 54, 0.78);
+    box-shadow: 0 0 24px rgba(145, 242, 191, 0.18);
+  }
+
+  100% {
+    border-color: rgba(255, 240, 201, 0.22);
+    background: rgba(8, 26, 30, 0.7);
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.24);
+  }
+}
+
+@keyframes bitcoinPillFreshDot {
+  0% {
+    transform: scale(1.45);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
 .legend-panel-shell {
   position: fixed;
   inset: 0;
@@ -846,6 +948,14 @@ body {
   .status-pill {
     min-height: 34px;
     font-size: 12px;
+  }
+
+  .bitcoin-pill {
+    right: 12px;
+    bottom: 10px;
+    gap: 5px;
+    max-width: calc(100vw - 24px);
+    font-size: 10px;
   }
 
   .debug-panel-shell {

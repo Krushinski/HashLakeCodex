@@ -10,6 +10,7 @@ export type HashlakeEvent = {
   type: HashlakeEventType;
   message?: string;
   btcAmount?: number;
+  blockHeight?: number;
   intensity?: number;
   createdAt: number;
 };

@@ -347,44 +347,67 @@ const drawMinimap = (
 
   const width = canvas.width;
   const height = canvas.height;
-  const scale = (Math.min(width, height) - 28) / (LAKE_MAP.mapRadius * 2);
-  const mapX = (x: number) => width / 2 + x * scale;
-  const mapY = (z: number) => height / 2 + z * scale;
+  const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
+  const scale = Math.min((width - 22) / (maxX - minX), (height - 20) / (maxZ - minZ));
+  const mapX = (x: number) => width / 2 + (x - (minX + maxX) / 2) * scale;
+  const mapY = (z: number) => height / 2 + (z - (minZ + maxZ) / 2) * scale;
+
+  const tracePolygon = (points: readonly { x: number; z: number }[]) => {
+    points.forEach((point, index) => {
+      const x = mapX(point.x);
+      const y = mapY(point.z);
+      if (index === 0) {
+        context.moveTo(x, y);
+      } else {
+        context.lineTo(x, y);
+      }
+    });
+    context.closePath();
+  };
+
+  const traceEllipse = (
+    center: { x: number; z: number },
+    radiusX: number,
+    radiusZ: number,
+    rotation: number,
+  ) => {
+    context.ellipse(
+      mapX(center.x),
+      mapY(center.z),
+      radiusX * scale,
+      radiusZ * scale,
+      rotation,
+      0,
+      Math.PI * 2,
+    );
+  };
 
   context.clearRect(0, 0, width, height);
   context.fillStyle = "rgba(4, 14, 18, 0.74)";
   context.fillRect(0, 0, width, height);
 
-  context.save();
-  context.translate(width / 2, height / 2);
-  context.scale(scale, scale);
-  context.lineWidth = 2 / scale;
-
   context.fillStyle = "rgba(55, 92, 62, 0.42)";
   context.strokeStyle = "rgba(153, 220, 183, 0.24)";
   context.beginPath();
-  context.arc(0, 0, LAKE_MAP.shorelineOuterRadius, 0, Math.PI * 2);
+  context.rect(7, 7, width - 14, height - 14);
   context.fill();
-  context.stroke();
 
   context.fillStyle = "rgba(36, 112, 133, 0.72)";
   context.strokeStyle = "rgba(126, 217, 218, 0.44)";
+  context.lineWidth = 1.6;
   context.beginPath();
-  context.arc(0, 0, LAKE_MAP.waterRadius, 0, Math.PI * 2);
+  tracePolygon(LAKE_MAP.outline);
   context.fill();
   context.stroke();
 
   context.fillStyle = "rgba(220, 194, 126, 0.78)";
   context.strokeStyle = "rgba(255, 246, 206, 0.36)";
   context.beginPath();
-  context.ellipse(
-    LAKE_MAP.sandbar.center.x,
-    LAKE_MAP.sandbar.center.z,
+  traceEllipse(
+    LAKE_MAP.sandbar.center,
     LAKE_MAP.sandbar.radiusX,
     LAKE_MAP.sandbar.radiusZ,
-    0.34,
-    0,
-    Math.PI * 2,
+    LAKE_MAP.sandbar.rotation,
   );
   context.fill();
   context.stroke();
@@ -392,11 +415,14 @@ const drawMinimap = (
   context.fillStyle = "rgba(111, 116, 113, 0.86)";
   context.strokeStyle = "rgba(238, 245, 238, 0.28)";
   context.beginPath();
-  context.arc(LAKE_MAP.island.center.x, LAKE_MAP.island.center.z, LAKE_MAP.island.radius, 0, Math.PI * 2);
+  traceEllipse(
+    LAKE_MAP.island.center,
+    LAKE_MAP.island.radiusX,
+    LAKE_MAP.island.radiusZ,
+    LAKE_MAP.island.rotation,
+  );
   context.fill();
   context.stroke();
-
-  context.restore();
 
   context.font = "10px Cascadia Mono, SFMono-Regular, Consolas, monospace";
   context.textAlign = "center";
@@ -781,10 +807,13 @@ export const createDebugPanel = (
         });
         weatherStore.setStormIndex(54, "Manual Whale");
       } else if (action === "block") {
+        const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
+        const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;
         eventBus.emit({
           type: "newBlock",
+          blockHeight: simulatedBlock,
           intensity: 0.85,
-          message: "New block found.",
+          message: `New block found - #${simulatedBlock}`,
         });
         weatherStore.setStormIndex(18, "Manual Block");
       } else if (action === "gust") {

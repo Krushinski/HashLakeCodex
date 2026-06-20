@@ -4,6 +4,7 @@ import { createEventBus } from "./state/eventBus";
 import { createLiveBitcoinStore } from "./state/liveBitcoinStore";
 import { createWeatherStore } from "./state/weatherEngine";
 import { createDebugPanel } from "./ui/debugPanel";
+import { createBitcoinPill } from "./ui/bitcoinPill";
 import { createEventToasts } from "./ui/eventToast";
 import { createLegendPanel } from "./ui/legendPanel";
 import { createMobileControls } from "./ui/mobileControls";
@@ -76,6 +77,7 @@ const boot = () => {
       scene.getTelemetry,
     );
     const legendPanel = createLegendPanel(appElement);
+    createBitcoinPill(appElement, liveBitcoinStore);
     createEventToasts(appElement, weatherStore, eventBus);
     createMobileControls(appElement, {
       toggleDrive: scene.toggleDriveMode,
