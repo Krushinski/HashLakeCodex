@@ -28,8 +28,8 @@ type HashlakeScene = {
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
 const BOAT_HOME = new THREE.Vector3(0, 2.2, 0);
 const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
-const DRIVE_ACCELERATION_BASE = 22;
-const DRIVE_ACCELERATION_RAMP = 48;
+const DRIVE_ACCELERATION_BASE = 23;
+const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
 const DRIVE_BOOST_MAX_SPEED = 72;
 const DRIVE_BOOST_MULTIPLIER = 1.22;
@@ -39,15 +39,15 @@ const DRIVE_ACTIVE_BRAKE_FORCE = 82;
 const DRIVE_REVERSE_SPEED = -15;
 const DRIVE_REVERSE_DELAY_THRESHOLD = 2.4;
 const DRIVE_ANCHOR_BRAKE_FORCE = 145;
-const DRIVE_TURN_RATE_LOW_SPEED = 2.35;
+const DRIVE_TURN_RATE_LOW_SPEED = 2.48;
 const DRIVE_TURN_RATE_HIGH_SPEED = 0.82;
-const DRIVE_STEER_EASE_IN = 7.8;
+const DRIVE_STEER_EASE_IN = 8.45;
 const DRIVE_STEER_EASE_OUT = 5.8;
-const DRIVE_STEER_SENSITIVITY = 1;
-const DRIVE_MAX_YAW_PER_SECOND = 1.45;
+const DRIVE_STEER_SENSITIVITY = 1.1;
+const DRIVE_MAX_YAW_PER_SECOND = 1.52;
 const DRIVE_SPEED_TURN_DAMPING = 0.58;
 const DRIVE_WATER_RESISTANCE_TURN_DAMPING = 0.86;
-const DRIVE_BOW_LIFT_SCALE = 0.13;
+const DRIVE_BOW_LIFT_SCALE = 0.15;
 const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
@@ -1103,18 +1103,18 @@ const updateDriveState = (
   driveState.inputSource = hasDesktopInput ? "desktop" : driveState.mobilePointerId === null ? "none" : "mobile";
 
   if (throttleActive) {
-    driveState.throttleHoldTime = Math.min(2.2, driveState.throttleHoldTime + delta);
+    driveState.throttleHoldTime = Math.min(2.2, driveState.throttleHoldTime + delta * 1.08);
   } else {
     driveState.throttleHoldTime = Math.max(0, driveState.throttleHoldTime - delta * 1.8);
   }
 
-  const throttleRamp = clamp(driveState.throttleHoldTime / 1.55, 0, 1);
+  const throttleRamp = clamp(driveState.throttleHoldTime / 1.44, 0, 1);
   const wakeTarget = clamp(
-    throttleRamp * 0.78 + Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED * 0.38,
+    throttleRamp * 0.72 + Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED * 0.32,
     0,
-    input.boost ? 1.18 : 1,
+    input.boost ? 1.08 : 0.92,
   );
-  driveState.wakePower += (wakeTarget - driveState.wakePower) * Math.min(1, delta * 3.5);
+  driveState.wakePower += (wakeTarget - driveState.wakePower) * Math.min(1, delta * 4.4);
 
   if (throttleActive) {
     const acceleration =
@@ -1170,7 +1170,7 @@ const updateDriveState = (
     driveState.currentSteer *
     (DRIVE_TURN_RATE_LOW_SPEED * (1 - speedRatio) + DRIVE_TURN_RATE_HIGH_SPEED * speedRatio) *
     speedSteerFactor *
-    Math.max(throttleActive ? 0.28 : 0, clamp(Math.abs(driveState.speed) / 10, 0, 1)) *
+    Math.max(throttleActive ? 0.32 : 0, clamp(Math.abs(driveState.speed) / 9.5, 0, 1)) *
     DRIVE_WATER_RESISTANCE_TURN_DAMPING;
   const yawDelta = clamp(
     turnRate * delta * (driveState.speed >= 0 ? 1 : -0.62),
@@ -1225,7 +1225,9 @@ const animateBoat = (
   driveState.boatHop = Math.max(0, driveState.boatHop - 2.7 / 60);
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
   const bowLift =
-    clamp(driveState.accelerationForce, 0, 1) * DRIVE_BOW_LIFT_SCALE + speedRatio * 0.07;
+    (clamp(driveState.accelerationForce, 0, 1) * 0.82 + driveState.throttleInput * 0.18) *
+      DRIVE_BOW_LIFT_SCALE +
+    speedRatio * 0.075;
   const turnBank = driveState.currentSteer * (0.06 + speedRatio * DRIVE_BANK_SCALE);
   boat.position.x = driveState.x;
   boat.position.z = driveState.z;
@@ -1652,34 +1654,34 @@ const emitWakeSegment = (
   const segment = wake.segments[wake.cursor];
   wake.cursor = (wake.cursor + 1) % wake.segments.length;
   const spread =
-    side === 0 ? (Math.random() - 0.5) * 1.8 : 1.8 + speedRatio * 6.4 + wakePower * 2.6;
+    side === 0 ? (Math.random() - 0.5) * 1.55 : 1.6 + speedRatio * 5.8 + wakePower * 2.1;
   const rearDistance =
     side === 0
-      ? 7.35 + Math.random() * 2.2
-      : 8.2 + speedRatio * 6.6 + Math.random() * 4.2;
+      ? 7.55 + Math.random() * 1.9
+      : 8.8 + speedRatio * 7.2 + Math.random() * 3.6;
   segment.mesh.position
-    .set(driveState.x, 0.74 + Math.random() * 0.38, driveState.z)
+    .set(driveState.x, 0.38 + Math.random() * 0.2, driveState.z)
     .addScaledVector(forward, -rearDistance)
     .addScaledVector(lateral, side * spread + (Math.random() - 0.5) * 1.9);
   segment.mesh.rotation.set(
-    (Math.random() - 0.5) * 0.35,
+    (Math.random() - 0.5) * 0.18,
     -driveState.yaw + side * (0.32 + speedRatio * 0.32) - driveState.currentSteer * 0.16,
     Math.random() * Math.PI,
   );
   segment.mesh.scale.set(1, 1, 1);
   segment.age = 0;
-  segment.lifetime = 0.78 + speedRatio * 0.78 + wakePower * 0.42;
+  segment.lifetime = 0.62 + speedRatio * 0.56 + wakePower * 0.24;
   segment.active = true;
   segment.side = side;
   segment.speedRatio = speedRatio;
-  segment.baseScale = 1.18 + speedRatio * 1.95 + wakePower * 1.46 + Math.random() * 0.44;
-  segment.heightScale = 0.72 + speedRatio * 0.72 + wakePower * 0.62 + Math.random() * 0.28;
-  segment.lengthScale = 1.18 + speedRatio * 1.68 + Math.random() * 0.88;
-  segment.driftX = forward.x * -(2.4 + speedRatio * 1.8) + lateral.x * side * (0.9 + speedRatio * 2.2);
-  segment.driftZ = forward.z * -(2.4 + speedRatio * 1.8) + lateral.z * side * (0.9 + speedRatio * 2.2);
-  segment.spin = (Math.random() - 0.5) * (2.2 + wakePower);
+  segment.baseScale = 1.08 + speedRatio * 1.42 + wakePower * 0.92 + Math.random() * 0.34;
+  segment.heightScale = 0.22 + speedRatio * 0.2 + wakePower * 0.16 + Math.random() * 0.1;
+  segment.lengthScale = 1.42 + speedRatio * 1.36 + Math.random() * 0.72;
+  segment.driftX = forward.x * -(3.1 + speedRatio * 2.15) + lateral.x * side * (1 + speedRatio * 2);
+  segment.driftZ = forward.z * -(3.1 + speedRatio * 2.15) + lateral.z * side * (1 + speedRatio * 2);
+  segment.spin = (Math.random() - 0.5) * (1.35 + wakePower * 0.6);
   segment.mesh.material.color.set(wakePower > 1 ? 0xffffff : 0xd8f5ff);
-  segment.mesh.material.opacity = 0.58 + speedRatio * 0.24 + wakePower * 0.18;
+  segment.mesh.material.opacity = 0.54 + speedRatio * 0.18 + wakePower * 0.14;
 };
 
 const animateWakeEffect = (
@@ -1690,7 +1692,7 @@ const animateWakeEffect = (
 ) => {
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
   const wakePower = clamp(driveState.wakePower, 0, 1.2);
-  const emitCadence = clamp(0.066 - wakePower * 0.036 - speedRatio * 0.02, 0.018, 0.066);
+  const emitCadence = clamp(0.074 - wakePower * 0.036 - speedRatio * 0.018, 0.024, 0.074);
   if (
     driveState.mode === "Drive" &&
     (wakePower > 0.1 || speedRatio > 0.08) &&
@@ -1712,17 +1714,17 @@ const animateWakeEffect = (
 
     segment.age += delta;
     const progress = clamp(segment.age / segment.lifetime, 0, 1);
-    const fade = (1 - progress) * (0.55 + segment.speedRatio * 0.45);
-    const widen = 1 + progress * (0.45 + segment.speedRatio * 1.15);
-    const settle = 1 - progress * 0.5;
+    const fade = (1 - progress) * (0.62 + segment.speedRatio * 0.38);
+    const widen = 1 + progress * (0.5 + segment.speedRatio * 1.05);
+    const settle = 1 - progress * 0.38;
     segment.mesh.position.x += segment.driftX * delta;
     segment.mesh.position.z += segment.driftZ * delta;
-    segment.mesh.position.y = Math.max(0.28, segment.mesh.position.y - delta * (0.2 + progress * 0.52));
-    segment.mesh.rotation.x += segment.spin * 0.42 * delta;
+    segment.mesh.position.y = 0.34 + Math.sin(segment.age * 8 + segment.side) * 0.045;
+    segment.mesh.rotation.x += segment.spin * 0.18 * delta;
     segment.mesh.rotation.z += segment.spin * delta;
     segment.mesh.scale.set(
       segment.baseScale * segment.lengthScale * widen,
-      Math.max(0.18, segment.heightScale * settle),
+      Math.max(0.08, segment.heightScale * settle),
       segment.baseScale * (0.62 + segment.speedRatio * 0.42) * widen,
     );
     segment.mesh.material.opacity = fade * 0.86;
@@ -1968,7 +1970,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 12</span>
+    <span>Hashlake Phase 13</span>
   `;
   return status;
 };
