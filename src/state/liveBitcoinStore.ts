@@ -1,4 +1,4 @@
-import type { HashlakeEventBus } from "./eventBus";
+import type { HashlakeEventBus, LargeTradeSide } from "./eventBus";
 
 export type FeedStatus = "ok" | "stale" | "error" | "offline" | "reconnecting";
 export type FeedSource = "live" | "cached" | "sim" | "none";
@@ -37,6 +37,22 @@ export type BitcoinMetrics = {
   hashrateChange: number | null;
 };
 
+export type MarketWebSocketState = {
+  status: FeedStatus;
+  lastTickAt: number | null;
+  lastHeartbeatAt: number | null;
+  message: string;
+};
+
+export type LargeTradeState = {
+  thresholdBtc: number;
+  lastDetectedAt: number | null;
+  btcAmount: number | null;
+  side: LargeTradeSide;
+  price: number | null;
+  source: "market-proxy" | "manual" | "none";
+};
+
 export type StormContributions = {
   priceTrend: number;
   network: number;
@@ -50,6 +66,8 @@ export type LiveBitcoinSnapshot = {
   feeds: Record<FeedName, FeedHealth>;
   dataMode: DataMode;
   pollingMode: PollingMode;
+  marketWebSocket: MarketWebSocketState;
+  largeTrade: LargeTradeState;
   stormIndex: number;
   staleness: number;
   contributions: StormContributions;
@@ -57,6 +75,11 @@ export type LiveBitcoinSnapshot = {
 
 export type LiveBitcoinStore = {
   getSnapshot: () => LiveBitcoinSnapshot;
+  recordManualLargeTrade: (
+    btcAmount: number,
+    side?: LargeTradeSide,
+    price?: number | null,
+  ) => void;
   start: () => void;
   stop: () => void;
   subscribe: (listener: LiveBitcoinListener) => () => void;
@@ -105,6 +128,12 @@ const HIDDEN_HEARTBEAT_MS = 5000;
 const HIDDEN_POLL_MULTIPLIER = 4;
 const MAX_BACKOFF_MULTIPLIER = 4;
 const WEBSOCKET_RETRY_MS = 30000;
+const MARKET_WEBSOCKET_RETRY_MS = 12000;
+const COINBASE_MARKET_WS_URL = "wss://advanced-trade-ws.coinbase.com";
+export const WHALE_MIN_BTC = 3;
+export const WHALE_MEDIUM_BTC = 10;
+export const WHALE_LARGE_BTC = 50;
+export const WHALE_HUGE_BTC = 300;
 
 const FEED_NAMES: FeedName[] = [
   "price",
@@ -198,6 +227,36 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const numberFrom = (value: unknown) => (typeof value === "number" ? value : null);
 
+const numberLikeFrom = (value: unknown) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const normalizeTradeSide = (value: unknown): LargeTradeSide => {
+  if (typeof value !== "string") {
+    return "unknown";
+  }
+
+  const normalized = value.toLowerCase();
+  if (normalized.includes("buy") || normalized === "bid") {
+    return "buy";
+  }
+
+  if (normalized.includes("sell") || normalized === "ask") {
+    return "sell";
+  }
+
+  return "unknown";
+};
+
 const applyCachedStatus = (feed: FeedHealth, lastSuccessAt: number) => {
   feed.lastSuccessAt = lastSuccessAt;
   feed.status = now() - lastSuccessAt > STALE_AFTER_MS ? "stale" : "ok";
@@ -280,8 +339,24 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
   const metrics: BitcoinMetrics = { ...DEFAULT_METRICS };
   const timers: number[] = [];
   let websocket: WebSocket | null = null;
+  let marketWebSocket: WebSocket | null = null;
   let latestBlockHeight: number | null = null;
   let started = false;
+  const marketWebSocketState: MarketWebSocketState = {
+    status: "offline",
+    lastTickAt: null,
+    lastHeartbeatAt: null,
+    message: "Waiting for market tape",
+  };
+  const largeTradeState: LargeTradeState = {
+    thresholdBtc: WHALE_MIN_BTC,
+    lastDetectedAt: null,
+    btcAmount: null,
+    side: "unknown",
+    price: null,
+    source: "none",
+  };
+  let lastLargeTradeEmitAt = 0;
 
   const emit = () => {
     const snapshot = getSnapshot();
@@ -487,6 +562,149 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     emit();
   };
 
+  const applyMarketTick = (priceUsd: number, priceChange24h: number | null) => {
+    const timestamp = now();
+    metrics.priceUsd = priceUsd;
+    if (priceChange24h !== null) {
+      metrics.priceChange24h = priceChange24h;
+    }
+    feeds.price.status = "ok";
+    feeds.price.source = "live";
+    feeds.price.lastSuccessAt = timestamp;
+    feeds.price.message = "Coinbase ticker";
+    feeds.market.status = "ok";
+    feeds.market.source = "live";
+    feeds.market.lastSuccessAt = timestamp;
+    feeds.market.message = "Coinbase market tape";
+    failures.price = 0;
+    failures.market = 0;
+    marketWebSocketState.status = "ok";
+    marketWebSocketState.lastTickAt = timestamp;
+    marketWebSocketState.message = "Ticker live";
+  };
+
+  const applyLargeTrade = (
+    btcAmount: number,
+    side: LargeTradeSide,
+    price: number | null,
+    source: LargeTradeState["source"],
+  ) => {
+    const timestamp = now();
+    largeTradeState.lastDetectedAt = timestamp;
+    largeTradeState.btcAmount = btcAmount;
+    largeTradeState.side = side;
+    largeTradeState.price = price;
+    largeTradeState.source = source;
+    feeds.whales.status = "ok";
+    feeds.whales.source = source === "market-proxy" ? "live" : "sim";
+    feeds.whales.lastSuccessAt = timestamp;
+    feeds.whales.message =
+      source === "market-proxy" ? "Market whale proxy" : "Manual large trade test";
+
+    if (btcAmount < WHALE_MIN_BTC || timestamp - lastLargeTradeEmitAt < 1400) {
+      return;
+    }
+
+    lastLargeTradeEmitAt = timestamp;
+    const amountLabel = `${btcAmount.toLocaleString("en-US", {
+      maximumFractionDigits: btcAmount >= 100 ? 0 : 1,
+    })} BTC`;
+    const priceLabel =
+      price === null
+        ? ""
+        : ` @ ${new Intl.NumberFormat("en-US", {
+            maximumFractionDigits: 0,
+            style: "currency",
+            currency: "USD",
+          }).format(price)}`;
+    const sideLabel =
+      btcAmount >= WHALE_HUGE_BTC
+        ? "Whale splash"
+        : side === "buy"
+          ? "Large buy"
+          : side === "sell"
+            ? "Large sell"
+            : "Large trade";
+
+    eventBus.emit({
+      type: "largeTrade",
+      btcAmount,
+      side,
+      price: price ?? undefined,
+      source: source === "none" ? undefined : source,
+      intensity: clamp(btcAmount / WHALE_LARGE_BTC, 0.25, 4),
+      message: `${sideLabel} - ${amountLabel}${priceLabel}`,
+    });
+  };
+
+  const handleMarketMessage = (raw: unknown) => {
+    const data = typeof raw === "string" ? (JSON.parse(raw) as unknown) : raw;
+    if (!isRecord(data)) {
+      return;
+    }
+
+    const channel = typeof data.channel === "string" ? data.channel : "";
+    const events = Array.isArray(data.events) ? data.events : [];
+    if (channel === "heartbeats" || channel === "subscriptions") {
+      marketWebSocketState.status = "ok";
+      marketWebSocketState.lastHeartbeatAt = now();
+      marketWebSocketState.message = channel === "heartbeats" ? "Heartbeat" : "Subscribed";
+      feeds.market.status = "ok";
+      feeds.market.source = "live";
+      feeds.market.lastSuccessAt = marketWebSocketState.lastHeartbeatAt;
+      feeds.market.message = "Coinbase heartbeat";
+      return;
+    }
+
+    events.forEach((event) => {
+      if (!isRecord(event)) {
+        return;
+      }
+
+      if (channel === "ticker" && Array.isArray(event.tickers)) {
+        event.tickers.forEach((ticker) => {
+          if (!isRecord(ticker) || ticker.product_id !== "BTC-USD") {
+            return;
+          }
+
+          const price = numberLikeFrom(ticker.price);
+          if (price === null) {
+            return;
+          }
+
+          applyMarketTick(price, numberLikeFrom(ticker.price_percent_chg_24_h));
+        });
+      }
+
+      if (channel === "market_trades" && Array.isArray(event.trades)) {
+        if (event.type === "snapshot") {
+          return;
+        }
+
+        event.trades.forEach((trade) => {
+          if (!isRecord(trade) || trade.product_id !== "BTC-USD") {
+            return;
+          }
+
+          const btcAmount = numberLikeFrom(trade.size);
+          if (btcAmount === null || btcAmount < WHALE_MIN_BTC) {
+            return;
+          }
+
+          const side = normalizeTradeSide(
+            trade.side ?? trade.taker_side ?? trade.maker_side,
+          );
+          applyLargeTrade(
+            btcAmount,
+            side,
+            numberLikeFrom(trade.price),
+            "market-proxy",
+          );
+        });
+      }
+    });
+  };
+
   const getPollingMultiplier = (names: FeedName[]) => {
     const highestFailureCount = Math.max(...names.map((name) => failures[name]));
     const backoffMultiplier =
@@ -610,6 +828,85 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     }
   };
 
+  const openMarketWebSocket = () => {
+    if (marketWebSocket) {
+      marketWebSocket.close();
+    }
+
+    try {
+      marketWebSocketState.status = "reconnecting";
+      marketWebSocketState.message = "Connecting";
+      feeds.market.status = "reconnecting";
+      feeds.market.source = "live";
+      feeds.market.message = "Coinbase market tape connecting";
+      markAttempt("market");
+      const socket = new WebSocket(COINBASE_MARKET_WS_URL);
+      marketWebSocket = socket;
+
+      socket.addEventListener("open", () => {
+        marketWebSocketState.status = "ok";
+        marketWebSocketState.lastHeartbeatAt = now();
+        marketWebSocketState.message = "Subscribing";
+        failures.market = 0;
+        const subscriptions = [
+          { type: "subscribe", product_ids: ["BTC-USD"], channel: "ticker" },
+          { type: "subscribe", product_ids: ["BTC-USD"], channel: "market_trades" },
+          { type: "subscribe", channel: "heartbeats" },
+        ];
+        subscriptions.forEach((subscription) => {
+          socket.send(JSON.stringify(subscription));
+        });
+        emit();
+      });
+
+      socket.addEventListener("message", (message) => {
+        try {
+          handleMarketMessage(String(message.data));
+          failures.market = 0;
+        } catch (error) {
+          marketWebSocketState.message =
+            error instanceof Error ? error.message : "Market message parse failed";
+        }
+        emit();
+      });
+
+      socket.addEventListener("close", () => {
+        if (marketWebSocket !== socket) {
+          return;
+        }
+
+        marketWebSocket = null;
+        failures.market = Math.min(MAX_BACKOFF_MULTIPLIER, failures.market + 1);
+        marketWebSocketState.status = "offline";
+        marketWebSocketState.message = "CoinGecko fallback active";
+        if (!feeds.market.lastSuccessAt) {
+          feeds.market.status = "offline";
+          feeds.market.source = "none";
+        }
+        feeds.market.message = "CoinGecko fallback active";
+        emit();
+        if (started) {
+          const timer = window.setTimeout(openMarketWebSocket, MARKET_WEBSOCKET_RETRY_MS);
+          timers.push(timer);
+        }
+      });
+
+      socket.addEventListener("error", () => {
+        failures.market = Math.min(MAX_BACKOFF_MULTIPLIER, failures.market + 1);
+        marketWebSocketState.status = "offline";
+        marketWebSocketState.message = "Coinbase market websocket failed";
+        feeds.market.message = "CoinGecko fallback active";
+        emit();
+      });
+    } catch (error) {
+      failures.market = Math.min(MAX_BACKOFF_MULTIPLIER, failures.market + 1);
+      marketWebSocketState.status = "offline";
+      marketWebSocketState.message =
+        error instanceof Error ? error.message : "Market websocket unavailable";
+      emit();
+    }
+  };
+
   const getSnapshot = (): LiveBitcoinSnapshot => {
     FEED_NAMES.forEach((name) => {
       feeds[name].status = statusForCurrentAge(feeds[name]);
@@ -620,6 +917,8 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
       feeds: { ...feeds },
       dataMode: getDataMode(feeds),
       pollingMode: getPollingMode(),
+      marketWebSocket: { ...marketWebSocketState },
+      largeTrade: { ...largeTradeState },
       stormIndex: scored.stormIndex,
       staleness: scored.staleness,
       contributions: scored.contributions,
@@ -630,6 +929,10 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
 
   return {
     getSnapshot,
+    recordManualLargeTrade: (btcAmount, side = "buy", price = metrics.priceUsd) => {
+      applyLargeTrade(btcAmount, side, price, "manual");
+      emit();
+    },
     start: () => {
       if (started) {
         return;
@@ -645,6 +948,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
       schedule(refreshNetwork, 4200, NETWORK_INTERVAL_MS, ["difficulty", "hashrate"]);
       runHeartbeat();
       openWebSocket();
+      openMarketWebSocket();
     },
     stop: () => {
       started = false;
@@ -653,6 +957,8 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
       timers.length = 0;
       websocket?.close();
       websocket = null;
+      marketWebSocket?.close();
+      marketWebSocket = null;
     },
     subscribe: (listener) => {
       listeners.add(listener);

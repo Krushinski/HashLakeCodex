@@ -29,6 +29,7 @@ const visualEffects = [
   "lightning",
   "sky darkness",
   "fog",
+  "market whale ripples",
   "fire weather",
   "boat instability",
   "camera shake",
@@ -52,6 +53,8 @@ const controls = [
 const notes = [
   "Live no-key public feeds drive stormIndex when available.",
   "Fog means stale or uncertain data, not necessarily bad Bitcoin conditions.",
+  "Whale splashes are market-trade proxy events, not confirmed on-chain whale alerts.",
+  "Bigger BTC trades create larger lake ripples; green is buy-side proxy, red is sell-side proxy, blue-white is neutral or unknown.",
   "Drive Mode camera is hard locked behind the boat; touch and keys only steer the hull.",
 ];
 

@@ -6,6 +6,12 @@ import type {
   LiveBitcoinSnapshot,
   LiveBitcoinStore,
 } from "../state/liveBitcoinStore";
+import {
+  WHALE_HUGE_BTC,
+  WHALE_LARGE_BTC,
+  WHALE_MEDIUM_BTC,
+  WHALE_MIN_BTC,
+} from "../state/liveBitcoinStore";
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { LAKE_MAP } from "../scene/lakeMap";
 
@@ -73,6 +79,14 @@ const metricTiles: MetricTile[] = [
   { label: "Difficulty", value: "+4.40%" },
   { label: "Hashrate dip", value: "-2.65%" },
   { label: "WebSocket", value: "live", tone: "good" },
+  { label: "Market WS", value: "offline", tone: "muted" },
+  { label: "Tick age", value: "--" },
+  { label: "Heartbeat", value: "--" },
+  { label: "Whale min", value: "3 BTC" },
+  { label: "Last trade", value: "--" },
+  { label: "Trade side", value: "--" },
+  { label: "Trade price", value: "--" },
+  { label: "Whale source", value: "proxy", tone: "muted" },
   { label: "Polling", value: "active", tone: "good" },
   { label: "Data mode", value: "LIVE", tone: "good" },
   { label: "Staleness", value: "0%", tone: "good" },
@@ -174,6 +188,16 @@ const formatCurrency = (value: number | null) => {
     style: "currency",
     currency: "USD",
   }).format(value);
+};
+
+const formatBtcAmount = (value: number | null) => {
+  if (value === null) {
+    return "--";
+  }
+
+  return `${value.toLocaleString("en-US", {
+    maximumFractionDigits: value >= 100 ? 0 : 1,
+  })} BTC`;
 };
 
 const formatPercent = (value: number | null) => {
@@ -308,6 +332,10 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="crash">Crash</button>
         <button type="button" data-debug-action="rally">Rally</button>
         <button type="button" data-debug-action="whale">Whale</button>
+        <button type="button" data-debug-action="whale-3">3 BTC</button>
+        <button type="button" data-debug-action="whale-10">10 BTC</button>
+        <button type="button" data-debug-action="whale-50">50 BTC</button>
+        <button type="button" data-debug-action="whale-300">300 BTC</button>
         <button type="button" data-debug-action="block">Block</button>
         <button type="button" data-debug-action="gust">Gust</button>
         <button type="button" data-debug-action="stale">Stale Fog</button>
@@ -689,6 +717,38 @@ export const createDebugPanel = (
           : "bad",
     );
     setMetric(
+      "Market WS",
+      snapshot.marketWebSocket.status,
+      snapshot.marketWebSocket.status === "ok"
+        ? "good"
+        : snapshot.marketWebSocket.status === "reconnecting"
+          ? "warn"
+          : "bad",
+    );
+    setMetric("Tick age", formatLastSeen(snapshot.marketWebSocket.lastTickAt));
+    setMetric("Heartbeat", formatLastSeen(snapshot.marketWebSocket.lastHeartbeatAt));
+    setMetric("Whale min", `${WHALE_MIN_BTC} BTC`);
+    setMetric("Last trade", formatBtcAmount(snapshot.largeTrade.btcAmount));
+    setMetric(
+      "Trade side",
+      snapshot.largeTrade.side,
+      snapshot.largeTrade.side === "buy"
+        ? "good"
+        : snapshot.largeTrade.side === "sell"
+          ? "bad"
+          : "muted",
+    );
+    setMetric("Trade price", formatCurrency(snapshot.largeTrade.price));
+    setMetric(
+      "Whale source",
+      snapshot.largeTrade.source === "none"
+        ? "proxy/manual"
+        : snapshot.largeTrade.source === "market-proxy"
+          ? "market proxy"
+          : snapshot.largeTrade.source,
+      snapshot.largeTrade.source === "market-proxy" ? "good" : "muted",
+    );
+    setMetric(
       "Polling",
       snapshot.pollingMode,
       snapshot.pollingMode === "active"
@@ -885,13 +945,20 @@ export const createDebugPanel = (
       } else if (action === "rally") {
         weatherStore.triggerRally();
       } else if (action === "whale") {
-        eventBus.emit({
-          type: "whale",
-          btcAmount: 14.7,
-          intensity: 1,
-          message: "Whale splash: 14.7 BTC",
-        });
+        liveBitcoinStore.recordManualLargeTrade(14.7, "buy");
         weatherStore.setStormIndex(54, "Manual Whale");
+      } else if (action === "whale-3") {
+        liveBitcoinStore.recordManualLargeTrade(WHALE_MIN_BTC, "buy");
+        weatherStore.setStormIndex(42, "Manual Large Trade");
+      } else if (action === "whale-10") {
+        liveBitcoinStore.recordManualLargeTrade(WHALE_MEDIUM_BTC, "sell");
+        weatherStore.setStormIndex(50, "Manual Large Trade");
+      } else if (action === "whale-50") {
+        liveBitcoinStore.recordManualLargeTrade(WHALE_LARGE_BTC, "buy");
+        weatherStore.setStormIndex(60, "Manual Large Trade");
+      } else if (action === "whale-300") {
+        liveBitcoinStore.recordManualLargeTrade(WHALE_HUGE_BTC, "sell");
+        weatherStore.setStormIndex(72, "Manual Whale");
       } else if (action === "block") {
         const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
         const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;

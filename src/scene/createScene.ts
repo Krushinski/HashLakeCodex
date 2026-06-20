@@ -51,6 +51,17 @@ const DRIVE_BOW_LIFT_SCALE = 0.15;
 const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
+const WAKE_BLOCK_SIZE_MIN = 0.44;
+const WAKE_BLOCK_SIZE_MAX = 1.16;
+const WAKE_VERTICAL_VELOCITY = 0.04;
+const WAKE_BACKWARD_VELOCITY = 5.6;
+const WAKE_OUTWARD_SPREAD = 3.7;
+const WAKE_LIFETIME_SECONDS = 0.72;
+const WAKE_EMISSION_RATE = 18;
+const WAKE_BOOST_MULTIPLIER = 1.32;
+const WAKE_SURFACE_Y_OFFSET = 0.32;
+const WAKE_FADE_SPEED = 1.28;
+const WAKE_MAX_ACTIVE_BLOCKS = 192;
 
 type SceneTelemetry = {
   mode: "Frame" | "Drive";
@@ -1612,7 +1623,7 @@ const createWakeEffect = (): WakeEffect => {
   group.name = "Drive wake";
   const segments: WakeSegment[] = [];
 
-  for (let index = 0; index < 144; index += 1) {
+  for (let index = 0; index < WAKE_MAX_ACTIVE_BLOCKS; index += 1) {
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshBasicMaterial({
@@ -1653,35 +1664,57 @@ const emitWakeSegment = (
   const lateral = new THREE.Vector3(-forward.z, 0, forward.x);
   const segment = wake.segments[wake.cursor];
   wake.cursor = (wake.cursor + 1) % wake.segments.length;
+  const boostIntensity =
+    driveState.throttleInput > 0 && Math.abs(driveState.speed) > DRIVE_MAX_SPEED
+      ? WAKE_BOOST_MULTIPLIER
+      : 1;
   const spread =
-    side === 0 ? (Math.random() - 0.5) * 1.55 : 1.6 + speedRatio * 5.8 + wakePower * 2.1;
+    side === 0
+      ? (Math.random() - 0.5) * WAKE_OUTWARD_SPREAD * 0.28
+      : 1.2 + speedRatio * WAKE_OUTWARD_SPREAD + wakePower * 1.25;
   const rearDistance =
     side === 0
-      ? 7.55 + Math.random() * 1.9
-      : 8.8 + speedRatio * 7.2 + Math.random() * 3.6;
+      ? 7.3 + Math.random() * 1.35
+      : 8.3 + speedRatio * WAKE_BACKWARD_VELOCITY * 1.45 + Math.random() * 2.7;
   segment.mesh.position
-    .set(driveState.x, 0.38 + Math.random() * 0.2, driveState.z)
+    .set(
+      driveState.x,
+      WAKE_SURFACE_Y_OFFSET + Math.random() * WAKE_VERTICAL_VELOCITY,
+      driveState.z,
+    )
     .addScaledVector(forward, -rearDistance)
-    .addScaledVector(lateral, side * spread + (Math.random() - 0.5) * 1.9);
+    .addScaledVector(lateral, side * spread + (Math.random() - 0.5) * 1.25);
   segment.mesh.rotation.set(
-    (Math.random() - 0.5) * 0.18,
+    (Math.random() - 0.5) * 0.08,
     -driveState.yaw + side * (0.32 + speedRatio * 0.32) - driveState.currentSteer * 0.16,
     Math.random() * Math.PI,
   );
   segment.mesh.scale.set(1, 1, 1);
   segment.age = 0;
-  segment.lifetime = 0.62 + speedRatio * 0.56 + wakePower * 0.24;
+  segment.lifetime =
+    WAKE_LIFETIME_SECONDS + speedRatio * 0.22 + wakePower * 0.12;
   segment.active = true;
   segment.side = side;
   segment.speedRatio = speedRatio;
-  segment.baseScale = 1.08 + speedRatio * 1.42 + wakePower * 0.92 + Math.random() * 0.34;
-  segment.heightScale = 0.22 + speedRatio * 0.2 + wakePower * 0.16 + Math.random() * 0.1;
-  segment.lengthScale = 1.42 + speedRatio * 1.36 + Math.random() * 0.72;
-  segment.driftX = forward.x * -(3.1 + speedRatio * 2.15) + lateral.x * side * (1 + speedRatio * 2);
-  segment.driftZ = forward.z * -(3.1 + speedRatio * 2.15) + lateral.z * side * (1 + speedRatio * 2);
-  segment.spin = (Math.random() - 0.5) * (1.35 + wakePower * 0.6);
+  segment.baseScale =
+    clamp(
+      WAKE_BLOCK_SIZE_MIN +
+        Math.random() * (WAKE_BLOCK_SIZE_MAX - WAKE_BLOCK_SIZE_MIN) +
+        wakePower * 0.28,
+      WAKE_BLOCK_SIZE_MIN,
+      WAKE_BLOCK_SIZE_MAX * boostIntensity,
+    );
+  segment.heightScale = 0.1 + Math.random() * 0.12 + wakePower * 0.05;
+  segment.lengthScale = 1.18 + speedRatio * 0.84 + Math.random() * 0.5;
+  segment.driftX =
+    forward.x * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
+    lateral.x * side * (0.8 + speedRatio * 1.75);
+  segment.driftZ =
+    forward.z * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
+    lateral.z * side * (0.8 + speedRatio * 1.75);
+  segment.spin = (Math.random() - 0.5) * (0.8 + wakePower * 0.34);
   segment.mesh.material.color.set(wakePower > 1 ? 0xffffff : 0xd8f5ff);
-  segment.mesh.material.opacity = 0.54 + speedRatio * 0.18 + wakePower * 0.14;
+  segment.mesh.material.opacity = 0.58 + speedRatio * 0.12 + wakePower * 0.1;
 };
 
 const animateWakeEffect = (
@@ -1692,7 +1725,11 @@ const animateWakeEffect = (
 ) => {
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
   const wakePower = clamp(driveState.wakePower, 0, 1.2);
-  const emitCadence = clamp(0.074 - wakePower * 0.036 - speedRatio * 0.018, 0.024, 0.074);
+  const emitCadence = clamp(
+    1 / (WAKE_EMISSION_RATE + wakePower * 18 + speedRatio * 10),
+    0.018,
+    0.068,
+  );
   if (
     driveState.mode === "Drive" &&
     (wakePower > 0.1 || speedRatio > 0.08) &&
@@ -1701,8 +1738,11 @@ const animateWakeEffect = (
     emitWakeSegment(wake, driveState, -1);
     emitWakeSegment(wake, driveState, 1);
     emitWakeSegment(wake, driveState, 0);
-    if (wakePower > 0.32) {
+    if (wakePower > 0.22) {
       emitWakeSegment(wake, driveState, 0);
+    }
+    if (driveState.throttleInput > 0.7 || speedRatio > 0.52) {
+      emitWakeSegment(wake, driveState, Math.random() > 0.5 ? 1 : -1);
     }
     wake.lastEmitAt = elapsed;
   }
@@ -1714,20 +1754,22 @@ const animateWakeEffect = (
 
     segment.age += delta;
     const progress = clamp(segment.age / segment.lifetime, 0, 1);
-    const fade = (1 - progress) * (0.62 + segment.speedRatio * 0.38);
-    const widen = 1 + progress * (0.5 + segment.speedRatio * 1.05);
-    const settle = 1 - progress * 0.38;
+    const fade = (1 - progress) ** WAKE_FADE_SPEED * (0.64 + segment.speedRatio * 0.3);
+    const widen = 1 + progress * (0.68 + segment.speedRatio * 1.2);
+    const settle = 1 - progress * 0.5;
     segment.mesh.position.x += segment.driftX * delta;
     segment.mesh.position.z += segment.driftZ * delta;
-    segment.mesh.position.y = 0.34 + Math.sin(segment.age * 8 + segment.side) * 0.045;
-    segment.mesh.rotation.x += segment.spin * 0.18 * delta;
-    segment.mesh.rotation.z += segment.spin * delta;
+    segment.mesh.position.y =
+      WAKE_SURFACE_Y_OFFSET +
+      Math.sin(segment.age * 10 + segment.side) * WAKE_VERTICAL_VELOCITY;
+    segment.mesh.rotation.x += segment.spin * 0.08 * delta;
+    segment.mesh.rotation.z += segment.spin * 0.62 * delta;
     segment.mesh.scale.set(
       segment.baseScale * segment.lengthScale * widen,
-      Math.max(0.08, segment.heightScale * settle),
-      segment.baseScale * (0.62 + segment.speedRatio * 0.42) * widen,
+      Math.max(0.045, segment.heightScale * settle),
+      segment.baseScale * (0.8 + segment.speedRatio * 0.28) * widen,
     );
-    segment.mesh.material.opacity = fade * 0.86;
+    segment.mesh.material.opacity = fade * 0.78;
 
     if (progress >= 1) {
       segment.active = false;
@@ -1970,7 +2012,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 13</span>
+    <span>Hashlake Phase 14A</span>
   `;
   return status;
 };
