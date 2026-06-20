@@ -42,6 +42,7 @@ const controls = [
   ["R", "Reset camera"],
   ["C", "Cycle drive camera"],
   ["Arrow keys", "Drive boat"],
+  ["Tap/hold", "Mobile drive target"],
   ["Shift", "Boost"],
   ["Space", "Anchor/stabilize"],
   ["Enter", "Save tableau"],
@@ -51,7 +52,7 @@ const controls = [
 const notes = [
   "Live no-key public feeds drive stormIndex when available.",
   "Fog means stale or uncertain data, not necessarily bad Bitcoin conditions.",
-  "Mobile Drive Mode is experimental and limited in this phase.",
+  "On mobile, tap or hold the lake while Drive Mode is active to send the boat there.",
 ];
 
 const renderLegend = () => `
