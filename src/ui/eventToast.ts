@@ -1,3 +1,4 @@
+import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherStore } from "../state/weatherEngine";
 
 type EventToasts = {
@@ -7,6 +8,7 @@ type EventToasts = {
 export const createEventToasts = (
   container: HTMLElement,
   weatherStore: WeatherStore,
+  eventBus: HashlakeEventBus,
 ): EventToasts => {
   const wrapper = document.createElement("div");
   wrapper.className = "event-toasts";
@@ -34,10 +36,16 @@ export const createEventToasts = (
       pushToast(event.message);
     }
   });
+  const unsubscribeEvents = eventBus.subscribe((event) => {
+    if (event.message) {
+      pushToast(event.message);
+    }
+  });
 
   return {
     destroy: () => {
       unsubscribe();
+      unsubscribeEvents();
       wrapper.remove();
     },
   };

@@ -1,3 +1,4 @@
+import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 
 type FeedStatus = "ok" | "stale" | "error" | "offline";
@@ -30,6 +31,17 @@ type BarValue = {
   max: number;
 };
 
+export type SceneTelemetry = {
+  mode: "Frame" | "Drive";
+  speed: number;
+  position: {
+    x: number;
+    z: number;
+  };
+  cameraPreset: string;
+  savedTableau: boolean;
+};
+
 const metricTiles: MetricTile[] = [
   { label: "Price", value: "$62,989" },
   { label: "24h", value: "+0.48%", tone: "good" },
@@ -43,6 +55,10 @@ const metricTiles: MetricTile[] = [
   { label: "WebSocket", value: "live", tone: "good" },
   { label: "Staleness", value: "0%", tone: "good" },
   { label: "Fire / FW", value: "0.00 / 0.00" },
+  { label: "Mode", value: "Frame", tone: "muted" },
+  { label: "Boat speed", value: "0.0" },
+  { label: "Boat pos", value: "0, 0" },
+  { label: "Camera", value: "Cinematic" },
 ];
 
 const contributionBars: BarValue[] = [
@@ -255,6 +271,8 @@ const updateFeedRows = (wrapper: HTMLElement, staleData: boolean) => {
 export const createDebugPanel = (
   container: HTMLElement,
   weatherStore: WeatherStore,
+  eventBus: HashlakeEventBus,
+  getTelemetry: () => SceneTelemetry,
 ): DebugPanel => {
   const wrapper = document.createElement("div");
   wrapper.className = "debug-panel-shell";
@@ -349,8 +367,45 @@ export const createDebugPanel = (
     }
   };
 
+  const updateTelemetry = () => {
+    const telemetry = getTelemetry();
+    const modeMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Mode"] .debug-metric__value',
+    );
+    const speedMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Boat speed"] .debug-metric__value',
+    );
+    const positionMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Boat pos"] .debug-metric__value',
+    );
+    const cameraMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Camera"] .debug-metric__value',
+    );
+
+    if (modeMetric) {
+      modeMetric.textContent = telemetry.mode;
+      modeMetric.classList.toggle("debug-tone-good", telemetry.mode === "Drive");
+      modeMetric.classList.toggle("debug-tone-muted", telemetry.mode === "Frame");
+    }
+
+    if (speedMetric) {
+      speedMetric.textContent = `${telemetry.speed.toFixed(1)} u/s`;
+    }
+
+    if (positionMetric) {
+      positionMetric.textContent = `${telemetry.position.x.toFixed(0)}, ${telemetry.position.z.toFixed(0)}`;
+    }
+
+    if (cameraMetric) {
+      cameraMetric.textContent = telemetry.savedTableau
+        ? telemetry.cameraPreset
+        : `${telemetry.cameraPreset}*`;
+    }
+  };
+
   const updateFps = (time: number) => {
     fpsFrames += 1;
+    updateTelemetry();
 
     if (time - fpsLastSample >= 500) {
       const fps = Math.round((fpsFrames * 1000) / (time - fpsLastSample));
@@ -388,8 +443,19 @@ export const createDebugPanel = (
       } else if (action === "rally") {
         weatherStore.triggerRally();
       } else if (action === "whale") {
+        eventBus.emit({
+          type: "whale",
+          btcAmount: 14.7,
+          intensity: 1,
+          message: "Whale splash: 14.7 BTC",
+        });
         weatherStore.setStormIndex(54, "Manual Whale");
       } else if (action === "block") {
+        eventBus.emit({
+          type: "newBlock",
+          intensity: 0.85,
+          message: "New block found.",
+        });
         weatherStore.setStormIndex(18, "Manual Block");
       } else if (action === "gust") {
         weatherStore.triggerGust();
@@ -404,6 +470,7 @@ export const createDebugPanel = (
   const unsubscribe = weatherStore.subscribe(renderWeather);
   window.addEventListener("keydown", handleKeydown);
   updateFeedTimers();
+  updateTelemetry();
   timerId = window.setInterval(updateFeedTimers, 1000);
   fpsFrame = window.requestAnimationFrame(updateFps);
 

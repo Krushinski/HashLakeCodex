@@ -1,3 +1,5 @@
+import type { HashlakeEventBus } from "./eventBus";
+
 export type StormStageName =
   | "Serene"
   | "Slightly Uneasy"
@@ -178,7 +180,7 @@ export const calculateWeatherSnapshot = (
   };
 };
 
-export const createWeatherStore = (): WeatherStore => {
+export const createWeatherStore = (eventBus?: HashlakeEventBus): WeatherStore => {
   let stormIndex = DEFAULT_STORM_INDEX;
   let mode = "Live";
   let staleData = false;
@@ -224,11 +226,13 @@ export const createWeatherStore = (): WeatherStore => {
     triggerCrash: () => {
       staleData = false;
       setStormIndex(86, "Manual Crash");
+      eventBus?.emit({ type: "crash" });
       emit({ name: "crash", message: "Crash event" });
     },
     triggerRally: () => {
       staleData = false;
       setStormIndex(7, "Manual Rally");
+      eventBus?.emit({ type: "rally", intensity: 0.72 });
       emit({ name: "rally", message: "Rally event" });
       emit({ name: "network-calm", message: "Network calm" });
     },
@@ -236,12 +240,14 @@ export const createWeatherStore = (): WeatherStore => {
       gustUntil = window.performance.now() + GUST_DURATION_MS;
       mode = "Manual Gust";
       stormIndex = Math.max(stormIndex, 63);
+      eventBus?.emit({ type: "gust" });
       emit({ name: "gust", message: "Gust event" });
     },
     triggerStaleFog: () => {
       staleData = true;
       mode = "Manual Stale";
       stormIndex = Math.min(stormIndex, 32);
+      eventBus?.emit({ type: "stale" });
       emit({ name: "stale", message: "Stale feed - fog rolling in" });
     },
     resumeLive: () => {

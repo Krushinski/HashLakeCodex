@@ -36,13 +36,14 @@ const visualEffects = [
 const controls = [
   ["D", "Debug"],
   ["L", "Legend"],
-  ["X", "Drive Mode, coming next"],
+  ["X", "Toggle Drive Mode"],
   ["F", "Fullscreen"],
   ["R", "Reset camera"],
-  ["Arrow keys", "Drive boat, coming next"],
-  ["Shift", "Boost, coming next"],
-  ["Space", "Anchor, coming next"],
-  ["Enter", "Save tableau, coming next"],
+  ["C", "Cycle drive camera"],
+  ["Arrow keys", "Drive boat"],
+  ["Shift", "Boost"],
+  ["Space", "Anchor/stabilize"],
+  ["Enter", "Save tableau"],
   ["Esc", "Exit/cancel"],
 ];
 

@@ -5,6 +5,7 @@ type MobileControls = {
 export const createMobileControls = (
   container: HTMLElement,
   actions: {
+    toggleDrive: () => void;
     toggleDebug: () => void;
     toggleLegend: () => void;
   },
@@ -12,6 +13,7 @@ export const createMobileControls = (
   const controls = document.createElement("div");
   controls.className = "mobile-mode-controls";
   controls.innerHTML = `
+    <button type="button" data-mobile-control="drive">Drive</button>
     <button type="button" data-mobile-control="debug">Debug</button>
     <button type="button" data-mobile-control="legend">Legend</button>
   `;
@@ -25,7 +27,9 @@ export const createMobileControls = (
       return;
     }
 
-    if (button.dataset.mobileControl === "debug") {
+    if (button.dataset.mobileControl === "drive") {
+      actions.toggleDrive();
+    } else if (button.dataset.mobileControl === "debug") {
       actions.toggleDebug();
     } else {
       actions.toggleLegend();

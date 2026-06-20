@@ -1,5 +1,6 @@
 import "./styles.css";
 import { createHashlakeScene, webGLCanRun } from "./scene/createScene";
+import { createEventBus } from "./state/eventBus";
 import { createWeatherStore } from "./state/weatherEngine";
 import { createDebugPanel } from "./ui/debugPanel";
 import { createEventToasts } from "./ui/eventToast";
@@ -41,19 +42,27 @@ const boot = () => {
 
   try {
     setFallback("Launching the realtime lake renderer...");
-    const weatherStore = createWeatherStore();
+    const eventBus = createEventBus();
+    const weatherStore = createWeatherStore(eventBus);
 
     const scene = createHashlakeScene({
       container: appElement,
       onFirstFrame: hideFallback,
       onRecoverableError: (message) => setFallback(message, true),
       weatherStore,
+      eventBus,
     });
 
-    const debugPanel = createDebugPanel(appElement, weatherStore);
+    const debugPanel = createDebugPanel(
+      appElement,
+      weatherStore,
+      eventBus,
+      scene.getTelemetry,
+    );
     const legendPanel = createLegendPanel(appElement);
-    createEventToasts(appElement, weatherStore);
+    createEventToasts(appElement, weatherStore, eventBus);
     createMobileControls(appElement, {
+      toggleDrive: scene.toggleDriveMode,
       toggleDebug: debugPanel.toggle,
       toggleLegend: legendPanel.toggle,
     });
