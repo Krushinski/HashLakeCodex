@@ -12,15 +12,22 @@
   <body>
     <div id="app" aria-label="Hashlake interactive scene"></div>
     <div id="fallback" class="fallback-scene" role="status" aria-live="polite">
-      <div class="fallback-scene__sky">
-        <div class="fallback-scene__sun"></div>
-        <div class="fallback-scene__mountains"></div>
-        <div class="fallback-scene__lake"></div>
-        <div class="fallback-scene__boat"></div>
+      <div class="fallback-scene__field">
+        <div class="fallback-scene__scanline"></div>
+        <div class="fallback-scene__horizon"></div>
+        <div class="fallback-scene__signal"></div>
+        <div class="fallback-scene__waveform">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
       </div>
       <div class="fallback-scene__message">
-        <strong>Hashlake is starting.</strong>
-        <span id="fallback-detail">Preparing the lake scene...</span>
+        <strong>Hashlake</strong>
+        <em>Initializing Bitcoin weather</em>
+        <span id="fallback-detail">Reading the chain and warming the lake...</span>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

@@ -23,6 +23,10 @@ type HashlakeScene = {
   stop: () => void;
   getTelemetry: () => SceneTelemetry;
   toggleDriveMode: () => void;
+  setMobileDriveCommand: (
+    command: "forward" | "left" | "right" | "anchor",
+    active: boolean,
+  ) => void;
 };
 
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
@@ -49,8 +53,8 @@ const DRIVE_SPEED_TURN_DAMPING = 0.58;
 const DRIVE_WATER_RESISTANCE_TURN_DAMPING = 0.86;
 const DRIVE_BOW_LIFT_SCALE = 0.13;
 const DRIVE_BANK_SCALE = 0.14;
-const DRIVE_CAMERA_DAMPING = 0.12;
-const DRIVE_CAMERA_HEADING_DAMPING = 0.08;
+const DRIVE_CAMERA_DAMPING = 0.24;
+const DRIVE_CAMERA_HEADING_DAMPING = 0.16;
 const FRAME_CAMERA_DAMPING = 0.08;
 
 type SceneTelemetry = {
@@ -61,6 +65,12 @@ type SceneTelemetry = {
     z: number;
   };
   heading: number;
+  visualHeading: number;
+  movementVector: {
+    x: number;
+    z: number;
+  };
+  steerInput: number;
   cameraPreset: string;
   nearestLocation: string;
   savedTableau: boolean;
@@ -107,9 +117,10 @@ type DriveState = {
   accelerationForce: number;
   throttleHoldTime: number;
   wakePower: number;
-  mobilePointerActive: boolean;
   mobileThrottle: boolean;
-  mobileBrake: boolean;
+  mobileLeft: boolean;
+  mobileRight: boolean;
+  mobileAnchor: boolean;
   mobileSteer: number;
 };
 
@@ -340,9 +351,10 @@ export const createHashlakeScene = ({
     accelerationForce: 0,
     throttleHoldTime: 0,
     wakePower: 0,
-    mobilePointerActive: false,
     mobileThrottle: false,
-    mobileBrake: false,
+    mobileLeft: false,
+    mobileRight: false,
+    mobileAnchor: false,
     mobileSteer: 0,
   };
   boat.position.x = driveState.x;
@@ -455,9 +467,10 @@ export const createHashlakeScene = ({
     driveState.throttleHoldTime = 0;
     driveState.wakePower = 0;
     driveState.cameraYaw = driveState.yaw;
-    driveState.mobilePointerActive = false;
     driveState.mobileThrottle = false;
-    driveState.mobileBrake = false;
+    driveState.mobileLeft = false;
+    driveState.mobileRight = false;
+    driveState.mobileAnchor = false;
     driveState.mobileSteer = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
@@ -478,9 +491,10 @@ export const createHashlakeScene = ({
     driveState.speed = 0;
     driveState.throttleHoldTime = 0;
     driveState.wakePower = 0;
-    driveState.mobilePointerActive = false;
     driveState.mobileThrottle = false;
-    driveState.mobileBrake = false;
+    driveState.mobileLeft = false;
+    driveState.mobileRight = false;
+    driveState.mobileAnchor = false;
     driveState.mobileSteer = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
@@ -510,6 +524,11 @@ export const createHashlakeScene = ({
     driveState.speed = 0;
     driveState.throttleHoldTime = 0;
     driveState.wakePower = 0;
+    driveState.mobileThrottle = false;
+    driveState.mobileLeft = false;
+    driveState.mobileRight = false;
+    driveState.mobileAnchor = false;
+    driveState.mobileSteer = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
     showDriveHud(driveHud, "Frame");
@@ -558,9 +577,10 @@ export const createHashlakeScene = ({
       driveState.speed = 0;
       driveState.throttleHoldTime = 0;
       driveState.wakePower = 0;
-      driveState.mobilePointerActive = false;
       driveState.mobileThrottle = false;
-      driveState.mobileBrake = false;
+      driveState.mobileLeft = false;
+      driveState.mobileRight = false;
+      driveState.mobileAnchor = false;
       driveState.mobileSteer = 0;
       showDriveHud(driveHud, "Frame");
       Object.keys(input).forEach((name) => {
@@ -592,22 +612,22 @@ export const createHashlakeScene = ({
   const handleKeydown = (event: KeyboardEvent) => handleKey(event, true);
   const handleKeyup = (event: KeyboardEvent) => handleKey(event, false);
 
-  const clearMobileDriveInput = () => {
-    driveState.mobilePointerActive = false;
-    driveState.mobileThrottle = false;
-    driveState.mobileBrake = false;
-    driveState.mobileSteer = 0;
-  };
+  const setMobileDriveCommand: HashlakeScene["setMobileDriveCommand"] = (
+    command,
+    active,
+  ) => {
+    if (command === "forward") {
+      driveState.mobileThrottle = active;
+    } else if (command === "left") {
+      driveState.mobileLeft = active;
+    } else if (command === "right") {
+      driveState.mobileRight = active;
+    } else {
+      driveState.mobileAnchor = active;
+    }
 
-  const setMobileDriveInput = (event: PointerEvent) => {
-    const bounds = renderer.domElement.getBoundingClientRect();
-    const localX = clamp((event.clientX - bounds.left) / Math.max(1, bounds.width), 0, 1);
-    const localY = clamp((event.clientY - bounds.top) / Math.max(1, bounds.height), 0, 1);
-    const steer = clamp((localX - 0.5) * 2.15, -1, 1);
-    driveState.mobilePointerActive = true;
-    driveState.mobileThrottle = localY < 0.82;
-    driveState.mobileBrake = localY >= 0.82;
-    driveState.mobileSteer = Math.abs(steer) < 0.16 ? 0 : steer;
+    driveState.mobileSteer =
+      Number(driveState.mobileLeft) - Number(driveState.mobileRight);
   };
 
   const handlePointerDown = (event: PointerEvent) => {
@@ -617,8 +637,7 @@ export const createHashlakeScene = ({
 
     if (driveState.mode === "Drive") {
       event.preventDefault();
-      setMobileDriveInput(event);
-      renderer.domElement.setPointerCapture(event.pointerId);
+      isPointerLooking = false;
       return;
     }
 
@@ -629,9 +648,8 @@ export const createHashlakeScene = ({
   };
 
   const handlePointerMove = (event: PointerEvent) => {
-    if (driveState.mode === "Drive" && renderer.domElement.hasPointerCapture(event.pointerId)) {
+    if (driveState.mode === "Drive") {
       event.preventDefault();
-      setMobileDriveInput(event);
       return;
     }
 
@@ -649,9 +667,6 @@ export const createHashlakeScene = ({
 
   const handlePointerUp = (event: PointerEvent) => {
     isPointerLooking = false;
-    if (driveState.mode === "Drive") {
-      clearMobileDriveInput();
-    }
     if (renderer.domElement.hasPointerCapture(event.pointerId)) {
       renderer.domElement.releasePointerCapture(event.pointerId);
     }
@@ -702,6 +717,12 @@ export const createHashlakeScene = ({
         z: driveState.z,
       },
       heading: driveState.yaw,
+      visualHeading: boat.rotation.y,
+      movementVector: {
+        x: Math.cos(driveState.yaw) * driveState.speed,
+        z: Math.sin(driveState.yaw) * driveState.speed,
+      },
+      steerInput: driveState.currentSteer,
       cameraPreset: CAMERA_PRESETS[driveState.cameraPresetIndex].name,
       nearestLocation: getNearestLocation({
         x: driveState.x,
@@ -710,6 +731,7 @@ export const createHashlakeScene = ({
       savedTableau: driveState.hasSavedTableau,
     }),
     toggleDriveMode,
+    setMobileDriveCommand,
   };
 };
 
@@ -753,7 +775,7 @@ const createWater = (): WaterSurface => {
   const geometry = createOrganicWaterGeometry();
 
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x276f86,
+    color: 0x187da5,
     roughness: 0.28,
     metalness: 0.02,
     transmission: 0,
@@ -808,7 +830,7 @@ const animateWater = (
 
 const createBoat = () => {
   const boat = new THREE.Group();
-  boat.name = "Procedural tapered speedboat placeholder";
+  boat.name = "Procedural motor skiff";
   boat.position.copy(BOAT_HOME);
   boat.scale.setScalar(0.84);
 
@@ -830,6 +852,13 @@ const createBoat = () => {
     roughness: 0.62,
     metalness: 0.08,
   });
+  const windshieldMaterial = new THREE.MeshStandardMaterial({
+    color: 0xa9d9ef,
+    roughness: 0.2,
+    metalness: 0.02,
+    transparent: true,
+    opacity: 0.68,
+  });
   const personMaterial = new THREE.MeshStandardMaterial({
     color: 0x2e3e47,
     roughness: 0.8,
@@ -839,57 +868,96 @@ const createBoat = () => {
     roughness: 0.7,
   });
 
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(12.6, 1.9, 3.7), hullMaterial);
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(12.4, 1.75, 3.65), hullMaterial);
   hull.castShadow = true;
-  hull.scale.set(1, 0.78, 1);
+  hull.scale.set(1, 0.82, 1);
   boat.add(hull);
 
-  const bow = new THREE.Mesh(new THREE.ConeGeometry(2.05, 4.8, 4), hullMaterial);
+  const lowerHull = new THREE.Mesh(new THREE.BoxGeometry(10.9, 1.1, 2.85), hullMaterial);
+  lowerHull.position.set(-0.55, -0.72, 0);
+  lowerHull.scale.set(1, 0.68, 1);
+  lowerHull.castShadow = true;
+  boat.add(lowerHull);
+
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(2.35, 5.35, 4), hullMaterial);
   bow.rotation.z = Math.PI / 2;
   bow.rotation.y = Math.PI / 4;
-  bow.position.x = 6.75;
+  bow.position.x = 6.95;
+  bow.scale.set(1.1, 0.9, 0.82);
   bow.castShadow = true;
   boat.add(bow);
 
-  const bowStripe = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 0.42), bowMarkerMaterial);
-  bowStripe.position.set(4.45, 1.1, 0);
+  const bowStripe = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 0.5), bowMarkerMaterial);
+  bowStripe.position.set(4.65, 1.12, 0);
   bowStripe.castShadow = true;
   boat.add(bowStripe);
 
-  const keel = new THREE.Mesh(new THREE.ConeGeometry(1.1, 10.8, 4), hullMaterial);
+  const bowLight = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.34, 0.62), bowMarkerMaterial);
+  bowLight.position.set(7.65, 1.05, 0);
+  bowLight.castShadow = true;
+  boat.add(bowLight);
+
+  const keel = new THREE.Mesh(new THREE.ConeGeometry(1.15, 10.9, 4), hullMaterial);
   keel.rotation.z = Math.PI / 2;
   keel.rotation.y = Math.PI / 4;
-  keel.scale.set(1, 0.38, 0.72);
+  keel.scale.set(1, 0.36, 0.68);
   keel.position.set(-0.6, -0.74, 0);
   keel.castShadow = true;
   boat.add(keel);
 
-  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.9, 4.15), trimMaterial);
-  stern.position.x = -6.45;
+  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.15, 4.35), trimMaterial);
+  stern.position.set(-6.5, 0.05, 0);
   stern.castShadow = true;
   boat.add(stern);
 
-  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.65, 1.35), motorMaterial);
-  motor.position.set(-7.15, 0.28, 0);
+  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.42, 3.75), trimMaterial);
+  rearDeck.position.set(-4.75, 1.26, 0);
+  rearDeck.castShadow = true;
+  boat.add(rearDeck);
+
+  for (const side of [-1, 1]) {
+    const gunwale = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.34, 0.34), trimMaterial);
+    gunwale.position.set(-0.4, 1.24, side * 2.06);
+    gunwale.castShadow = true;
+    boat.add(gunwale);
+  }
+
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 2.2), trimMaterial);
+  cockpit.position.set(1.2, 1.72, 0);
+  cockpit.castShadow = true;
+  boat.add(cockpit);
+
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.1, 2.35), windshieldMaterial);
+  windshield.position.set(2.55, 2.28, 0);
+  windshield.rotation.z = -0.18;
+  boat.add(windshield);
+
+  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.8, 1.45), motorMaterial);
+  motor.position.set(-7.35, 0.32, 0);
   motor.castShadow = true;
   boat.add(motor);
 
-  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.95), bowMarkerMaterial);
-  motorCap.position.set(-7.8, 0.86, 0);
+  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.58, 1.04), bowMarkerMaterial);
+  motorCap.position.set(-8.02, 0.94, 0);
   motorCap.castShadow = true;
   boat.add(motorCap);
 
-  const benchA = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.28, 4), trimMaterial);
-  benchA.position.set(-2.35, 1.22, 0);
+  const propGuard = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.48, 1.95), motorMaterial);
+  propGuard.position.set(-8.45, -0.18, 0);
+  propGuard.castShadow = true;
+  boat.add(propGuard);
+
+  const benchA = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.28, 3.55), trimMaterial);
+  benchA.position.set(-2.25, 1.38, 0);
   benchA.castShadow = true;
   boat.add(benchA);
 
   const benchB = benchA.clone();
-  benchB.position.x = 2.45;
+  benchB.position.x = 3.05;
   boat.add(benchB);
 
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 1.5, 4, 8), personMaterial);
-  body.position.set(-0.6, 2.65, 0);
+  body.position.set(-0.42, 2.75, 0);
   body.rotation.z = -0.12;
   body.castShadow = true;
   boat.add(body);
@@ -898,18 +966,6 @@ const createBoat = () => {
   head.position.set(-0.84, 3.8, 0);
   head.castShadow = true;
   boat.add(head);
-
-  const oarMaterial = new THREE.MeshStandardMaterial({ color: 0xb67a40, roughness: 0.55 });
-  const oarGeometry = new THREE.CylinderGeometry(0.07, 0.07, 10, 8);
-
-  for (const side of [-1, 1]) {
-    const oar = new THREE.Mesh(oarGeometry, oarMaterial);
-    oar.rotation.z = Math.PI / 2;
-    oar.rotation.y = side * 0.28;
-    oar.position.set(0.8, 2.1, side * 2.9);
-    oar.castShadow = true;
-    boat.add(oar);
-  }
 
   return boat;
 };
@@ -926,9 +982,10 @@ const updateDriveState = (
       (0 - driveState.currentSteer) * Math.min(1, delta * DRIVE_STEER_EASE_OUT);
     driveState.throttleHoldTime = 0;
     driveState.wakePower += (0 - driveState.wakePower) * Math.min(1, delta * 2.8);
-    driveState.mobilePointerActive = false;
     driveState.mobileThrottle = false;
-    driveState.mobileBrake = false;
+    driveState.mobileLeft = false;
+    driveState.mobileRight = false;
+    driveState.mobileAnchor = false;
     driveState.mobileSteer = 0;
     return;
   }
@@ -938,10 +995,11 @@ const updateDriveState = (
   const previousSpeed = driveState.speed;
 
   const keyboardSteer = Number(input.left) - Number(input.right);
-  const mobileSteer = driveState.mobilePointerActive ? -driveState.mobileSteer : 0;
+  const mobileSteer = driveState.mobileSteer;
   const targetSteer = clamp(keyboardSteer + mobileSteer, -1, 1) * DRIVE_STEER_SENSITIVITY;
   const throttleActive = input.forward || driveState.mobileThrottle;
-  const brakeActive = input.backward || driveState.mobileBrake;
+  const brakeActive = input.backward;
+  const anchorActive = input.anchor || driveState.mobileAnchor;
 
   if (throttleActive) {
     driveState.throttleHoldTime = Math.min(2.2, driveState.throttleHoldTime + delta);
@@ -964,7 +1022,7 @@ const updateDriveState = (
     driveState.speed += acceleration * delta;
   }
 
-  if (input.anchor) {
+  if (anchorActive) {
     driveState.speed = approach(driveState.speed, 0, DRIVE_ANCHOR_BRAKE_FORCE * delta);
     driveState.wakePower *= Math.pow(0.22, delta);
   } else if (brakeActive) {
@@ -1011,6 +1069,7 @@ const updateDriveState = (
     driveState.currentSteer *
     (DRIVE_TURN_RATE_LOW_SPEED * (1 - speedRatio) + DRIVE_TURN_RATE_HIGH_SPEED * speedRatio) *
     speedSteerFactor *
+    Math.max(throttleActive ? 0.34 : 0, clamp(Math.abs(driveState.speed) / 10, 0, 1)) *
     DRIVE_WATER_RESISTANCE_TURN_DAMPING;
   const yawDelta = clamp(
     turnRate * delta * (driveState.speed >= 0 ? 1 : -0.62),
@@ -1438,6 +1497,8 @@ type WakeSegment = {
   side: number;
   speedRatio: number;
   baseScale: number;
+  heightScale: number;
+  lengthScale: number;
   driftX: number;
   driftZ: number;
   spin: number;
@@ -1450,7 +1511,7 @@ const createWakeEffect = (): WakeEffect => {
 
   for (let index = 0; index < 96; index += 1) {
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(2.4, 0.12, 2.4),
+      new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshBasicMaterial({
         color: 0xf2fbff,
         transparent: true,
@@ -1467,6 +1528,8 @@ const createWakeEffect = (): WakeEffect => {
       side: index % 2 === 0 ? -1 : 1,
       speedRatio: 0,
       baseScale: 1,
+      heightScale: 1,
+      lengthScale: 1,
       driftX: 0,
       driftZ: 0,
       spin: 0,
@@ -1487,28 +1550,31 @@ const emitWakeSegment = (
   const lateral = new THREE.Vector3(-forward.z, 0, forward.x);
   const segment = wake.segments[wake.cursor];
   wake.cursor = (wake.cursor + 1) % wake.segments.length;
-  const spread = side === 0 ? 0 : 2.2 + speedRatio * 4.4 + wakePower * 1.4;
-  const rearDistance = 7.5 + speedRatio * 4.8 + Math.random() * 2.2;
+  const spread = side === 0 ? (Math.random() - 0.5) * 1.2 : 1.35 + speedRatio * 5.2 + wakePower * 2;
+  const rearDistance = 8.35 + speedRatio * 5.6 + Math.random() * 3.2;
   segment.mesh.position
-    .set(driveState.x, 0.24, driveState.z)
+    .set(driveState.x, 0.42 + Math.random() * 0.26, driveState.z)
     .addScaledVector(forward, -rearDistance)
-    .addScaledVector(lateral, side * spread + (Math.random() - 0.5) * 1.8);
+    .addScaledVector(lateral, side * spread + (Math.random() - 0.5) * 1.5);
   segment.mesh.rotation.set(
-    0,
-    -driveState.yaw + side * (0.25 + speedRatio * 0.25) - driveState.currentSteer * 0.1,
+    (Math.random() - 0.5) * 0.35,
+    -driveState.yaw + side * (0.32 + speedRatio * 0.32) - driveState.currentSteer * 0.16,
     Math.random() * Math.PI,
   );
   segment.mesh.scale.set(1, 1, 1);
   segment.age = 0;
-  segment.lifetime = 0.85 + speedRatio * 0.75 + wakePower * 0.4;
+  segment.lifetime = 0.72 + speedRatio * 0.64 + wakePower * 0.32;
   segment.active = true;
   segment.side = side;
   segment.speedRatio = speedRatio;
-  segment.baseScale = 0.55 + speedRatio * 1.15 + wakePower * 0.9 + Math.random() * 0.24;
-  segment.driftX = forward.x * -1.5 + lateral.x * side * (0.4 + speedRatio * 1.3);
-  segment.driftZ = forward.z * -1.5 + lateral.z * side * (0.4 + speedRatio * 1.3);
-  segment.spin = (Math.random() - 0.5) * 1.6;
-  segment.mesh.material.opacity = 0.28 + speedRatio * 0.28 + wakePower * 0.26;
+  segment.baseScale = 0.5 + speedRatio * 1.25 + wakePower * 0.9 + Math.random() * 0.28;
+  segment.heightScale = 0.26 + speedRatio * 0.42 + wakePower * 0.36 + Math.random() * 0.18;
+  segment.lengthScale = 0.9 + speedRatio * 1.15 + Math.random() * 0.6;
+  segment.driftX = forward.x * -(1.6 + speedRatio * 1.2) + lateral.x * side * (0.7 + speedRatio * 1.8);
+  segment.driftZ = forward.z * -(1.6 + speedRatio * 1.2) + lateral.z * side * (0.7 + speedRatio * 1.8);
+  segment.spin = (Math.random() - 0.5) * (2.2 + wakePower);
+  segment.mesh.material.color.set(wakePower > 1 ? 0xffffff : 0xd8f5ff);
+  segment.mesh.material.opacity = 0.38 + speedRatio * 0.28 + wakePower * 0.24;
 };
 
 const animateWakeEffect = (
@@ -1541,13 +1607,18 @@ const animateWakeEffect = (
     segment.age += delta;
     const progress = clamp(segment.age / segment.lifetime, 0, 1);
     const fade = (1 - progress) * (0.55 + segment.speedRatio * 0.45);
-    const widen = 1 + progress * (0.7 + segment.speedRatio * 1.5);
-    const flatten = 1 - progress * 0.28;
+    const widen = 1 + progress * (0.45 + segment.speedRatio * 1.15);
+    const settle = 1 - progress * 0.5;
     segment.mesh.position.x += segment.driftX * delta;
     segment.mesh.position.z += segment.driftZ * delta;
-    segment.mesh.position.y = 0.23 + progress * 0.05;
+    segment.mesh.position.y = Math.max(0.16, segment.mesh.position.y - delta * (0.18 + progress * 0.45));
+    segment.mesh.rotation.x += segment.spin * 0.42 * delta;
     segment.mesh.rotation.z += segment.spin * delta;
-    segment.mesh.scale.set(segment.baseScale * widen, Math.max(0.18, flatten), segment.baseScale * widen);
+    segment.mesh.scale.set(
+      segment.baseScale * segment.lengthScale * widen,
+      Math.max(0.08, segment.heightScale * settle),
+      segment.baseScale * (0.62 + segment.speedRatio * 0.42) * widen,
+    );
     segment.mesh.material.opacity = fade * 0.86;
 
     if (progress >= 1) {
@@ -1721,8 +1792,8 @@ const applyWeatherToScene = ({
   hemisphereLight.color.set(fire > 0.12 ? 0x7a2117 : 0x9fd4ff);
 
   water.mesh.material.color
-    .set(0x276f86)
-    .lerp(new THREE.Color(0x10272e), dark)
+    .set(0x187da5)
+    .lerp(new THREE.Color(0x0e3442), dark)
     .lerp(new THREE.Color(0x401514), fire * 0.45);
   water.mesh.material.roughness = 0.24 + weather.dials.chop * 0.55;
   water.mesh.material.clearcoat = Math.max(0.05, 0.45 - weather.dials.chop * 0.28);
@@ -1775,15 +1846,16 @@ const applyWeatherToScene = ({
       .addScaledVector(tempForward, tableauPreset.lookAhead);
   }
 
-  desiredCameraPosition.x += Math.sin(elapsed * 8.7) * shake * 0.48;
-  desiredCameraPosition.y += Math.sin(elapsed * 11.1) * shake * 0.28;
-  desiredCameraPosition.z += Math.cos(elapsed * 7.5) * shake * 0.42;
+  const cameraShake = driveState.mode === "Drive" ? 0 : shake;
+  desiredCameraPosition.x += Math.sin(elapsed * 8.7) * cameraShake * 0.48;
+  desiredCameraPosition.y += Math.sin(elapsed * 11.1) * cameraShake * 0.28;
+  desiredCameraPosition.z += Math.cos(elapsed * 7.5) * cameraShake * 0.42;
   desiredCameraPosition.y = Math.max(9, desiredCameraPosition.y);
   camera.position.lerp(
     desiredCameraPosition,
     driveState.mode === "Drive" ? DRIVE_CAMERA_DAMPING : FRAME_CAMERA_DAMPING,
   );
-  cameraTarget.lerp(desiredCameraTarget, driveState.mode === "Drive" ? 0.18 : 0.08);
+  cameraTarget.lerp(desiredCameraTarget, driveState.mode === "Drive" ? 0.32 : 0.08);
   camera.lookAt(cameraTarget);
 };
 
@@ -1792,7 +1864,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 9</span>
+    <span>Hashlake Phase 10</span>
   `;
   return status;
 };
@@ -1811,7 +1883,7 @@ const showDriveHud = (hud: HTMLDivElement, mode: "Frame" | "Drive") => {
     mode === "Frame" ? String(window.performance.now() + 2200) : "always";
   hud.textContent =
     mode === "Drive"
-      ? "DRIVE MODE - Up throttle / Down brake / Left-right arc / Shift boost / Touch upper lake to drive"
+      ? "DRIVE MODE - Up throttle / Down brake / Left-right arc / Shift boost / Mobile pad to steer"
       : "FRAME MODE - Living art view";
   hud.classList.add("drive-hud--visible");
 };
@@ -1827,7 +1899,7 @@ const animateDriveHud = (
   }
 
   if (driveState.mode === "Drive") {
-    hud.textContent = `DRIVE MODE - Up throttle / Down brake / Left-right arc / Shift boost / Speed ${Math.abs(
+    hud.textContent = `DRIVE MODE - Hard-lock chase / Bow leads / Speed ${Math.abs(
       driveState.speed,
     ).toFixed(0)}`;
     hud.classList.add("drive-hud--visible");

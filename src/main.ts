@@ -83,6 +83,8 @@ const boot = () => {
       toggleDrive: scene.toggleDriveMode,
       toggleDebug: debugPanel.toggle,
       toggleLegend: legendPanel.toggle,
+      setDriveCommand: scene.setMobileDriveCommand,
+      isDriveMode: () => scene.getTelemetry().mode === "Drive",
     });
     liveBitcoinStore.start();
     scene.start();

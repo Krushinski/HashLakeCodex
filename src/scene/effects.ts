@@ -44,11 +44,11 @@ export const createSceneEffects = (
 
   const addRing = (color: number, strength: number) => {
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(1, 0.055 + strength * 0.035, 8, 72),
+      new THREE.TorusGeometry(1, 0.04 + strength * 0.026, 8, 72),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.42,
         depthWrite: false,
       }),
     );
@@ -58,8 +58,8 @@ export const createSceneEffects = (
     rings.push({
       mesh: ring,
       age: 0,
-      lifetime: 1.8 + strength * 0.7,
-      maxScale: 22 + strength * 42,
+      lifetime: 0.82 + strength * 0.28,
+      maxScale: 28 + strength * 34,
     });
   };
 
@@ -163,9 +163,10 @@ export const createSceneEffects = (
       const ring = rings[index];
       ring.age += delta;
       const progress = Math.min(1, ring.age / ring.lifetime);
-      const scale = 1 + progress * ring.maxScale;
+      const eased = 1 - (1 - progress) ** 3;
+      const scale = 1 + eased * ring.maxScale;
       ring.mesh.scale.setScalar(scale);
-      ring.mesh.material.opacity = (1 - progress) * 0.7;
+      ring.mesh.material.opacity = (1 - progress) ** 1.7 * 0.42;
 
       if (progress >= 1) {
         group.remove(ring.mesh);

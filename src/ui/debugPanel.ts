@@ -44,6 +44,12 @@ export type SceneTelemetry = {
     z: number;
   };
   heading: number;
+  visualHeading: number;
+  movementVector: {
+    x: number;
+    z: number;
+  };
+  steerInput: number;
   cameraPreset: string;
   nearestLocation: string;
   savedTableau: boolean;
@@ -67,6 +73,9 @@ const metricTiles: MetricTile[] = [
   { label: "Mode", value: "Frame", tone: "muted" },
   { label: "Boat speed", value: "0.0" },
   { label: "Boat pos", value: "0, 0" },
+  { label: "Heading", value: "0 / 0" },
+  { label: "Move vec", value: "0, 0" },
+  { label: "Steer", value: "0.00" },
   { label: "Nearest", value: "Dock" },
   { label: "Camera", value: "Cinematic" },
 ];
@@ -727,6 +736,15 @@ export const createDebugPanel = (
     const cameraMetric = wrapper.querySelector<HTMLElement>(
       '[data-debug-metric="Camera"] .debug-metric__value',
     );
+    const headingMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Heading"] .debug-metric__value',
+    );
+    const moveMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Move vec"] .debug-metric__value',
+    );
+    const steerMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Steer"] .debug-metric__value',
+    );
 
     if (modeMetric) {
       modeMetric.textContent = telemetry.mode;
@@ -746,6 +764,20 @@ export const createDebugPanel = (
       cameraMetric.textContent = telemetry.savedTableau
         ? telemetry.cameraPreset
         : `${telemetry.cameraPreset}*`;
+    }
+
+    if (headingMetric) {
+      const physicsHeading = ((telemetry.heading * 180) / Math.PI + 360) % 360;
+      const visualHeading = ((telemetry.visualHeading * 180) / Math.PI + 360) % 360;
+      headingMetric.textContent = `${physicsHeading.toFixed(0)} / ${visualHeading.toFixed(0)}`;
+    }
+
+    if (moveMetric) {
+      moveMetric.textContent = `${telemetry.movementVector.x.toFixed(1)}, ${telemetry.movementVector.z.toFixed(1)}`;
+    }
+
+    if (steerMetric) {
+      steerMetric.textContent = telemetry.steerInput.toFixed(2);
     }
 
     setMetric("Nearest", telemetry.nearestLocation);
