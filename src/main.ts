@@ -1,6 +1,7 @@
 import "./styles.css";
 import { createHashlakeScene, webGLCanRun } from "./scene/createScene";
 import { createEventBus } from "./state/eventBus";
+import { createLiveBitcoinStore } from "./state/liveBitcoinStore";
 import { createWeatherStore } from "./state/weatherEngine";
 import { createDebugPanel } from "./ui/debugPanel";
 import { createEventToasts } from "./ui/eventToast";
@@ -44,6 +45,7 @@ const boot = () => {
     setFallback("Launching the realtime lake renderer...");
     const eventBus = createEventBus();
     const weatherStore = createWeatherStore(eventBus);
+    const liveBitcoinStore = createLiveBitcoinStore(eventBus);
 
     const scene = createHashlakeScene({
       container: appElement,
@@ -52,11 +54,25 @@ const boot = () => {
       weatherStore,
       eventBus,
     });
+    liveBitcoinStore.subscribe((snapshot) => {
+      const dataMode =
+        snapshot.dataMode === "STALE"
+          ? "STALE"
+          : snapshot.dataMode === "CACHED"
+            ? "CACHED"
+            : "LIVE";
+      weatherStore.setLiveStormIndex(
+        snapshot.stormIndex,
+        dataMode,
+        snapshot.dataMode === "STALE",
+      );
+    });
 
     const debugPanel = createDebugPanel(
       appElement,
       weatherStore,
       eventBus,
+      liveBitcoinStore,
       scene.getTelemetry,
     );
     const legendPanel = createLegendPanel(appElement);
@@ -66,6 +82,7 @@ const boot = () => {
       toggleDebug: debugPanel.toggle,
       toggleLegend: legendPanel.toggle,
     });
+    liveBitcoinStore.start();
     scene.start();
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown renderer error";

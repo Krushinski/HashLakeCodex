@@ -23,6 +23,13 @@ const CAMERA_HOME = new THREE.Vector3(0, 34, 78);
 const BOAT_HOME = new THREE.Vector3(0, 2.2, 0);
 const DRIVE_BOUNDARY_RADIUS = 132;
 const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
+const DRIVE_ACCELERATION = 78;
+const DRIVE_MAX_SPEED = 68;
+const DRIVE_BOOST_MULTIPLIER = 1.85;
+const DRIVE_TURN_RATE = 3.35;
+const DRIVE_DRAG = 0.92;
+const DRIVE_CAMERA_DAMPING = 0.17;
+const FRAME_CAMERA_DAMPING = 0.08;
 
 type SceneTelemetry = {
   mode: "Frame" | "Drive";
@@ -70,6 +77,7 @@ type DriveState = {
   lookYaw: number;
   lookPitch: number;
   boatHop: number;
+  lastMode: "Frame" | "Drive";
 };
 
 type DriveInput = {
@@ -84,10 +92,10 @@ type DriveInput = {
 const CAMERA_PRESETS: CameraPreset[] = [
   {
     name: "Cinematic Chase",
-    distance: 46,
-    height: 21,
-    lookAhead: 16,
-    lookHeight: 5.4,
+    distance: 38,
+    height: 19,
+    lookAhead: 20,
+    lookHeight: 5.8,
   },
   {
     name: "High Drift",
@@ -275,6 +283,7 @@ export const createHashlakeScene = ({
     lookYaw: 0,
     lookPitch: 0,
     boatHop: 0,
+    lastMode: "Frame",
   };
   boat.position.x = driveState.x;
   boat.position.z = driveState.z;
@@ -294,6 +303,8 @@ export const createHashlakeScene = ({
 
   const weatherEffects = createWeatherEffects();
   scene.add(weatherEffects.group);
+  const wakeEffect = createWakeEffect();
+  scene.add(wakeEffect.group);
   const sceneEffects = createSceneEffects(
     eventBus,
     () => new THREE.Vector3(driveState.x, boat.position.y, driveState.z),
@@ -305,6 +316,8 @@ export const createHashlakeScene = ({
 
   const status = createStatusPill();
   container.append(status);
+  const driveHud = createDriveHud();
+  container.append(driveHud);
 
   const startedAt = window.performance.now();
   let animationId = 0;
@@ -331,8 +344,9 @@ export const createHashlakeScene = ({
     lastFrameTime = now;
     const weather = weatherStore.getSnapshot();
     updateDriveState(driveState, input, delta, weather);
-    animateWater(water, elapsed, weather);
+    animateWater(water, elapsed, weather, driveState);
     animateBoat(boat, elapsed, weather, driveState);
+    animateWakeEffect(wakeEffect, driveState, elapsed);
     animateWeatherEffects(weatherEffects, elapsed, weather);
     sceneEffects.update(delta);
     applyWeatherToScene({
@@ -352,6 +366,7 @@ export const createHashlakeScene = ({
       tempSide,
     });
     animateStatus(status, elapsed);
+    animateDriveHud(driveHud, driveState, now);
     renderer.render(scene, camera);
 
     if (!hasRenderedFrame) {
@@ -379,6 +394,7 @@ export const createHashlakeScene = ({
     driveState.speed = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
+    showDriveHud(driveHud, driveState.mode);
   };
 
   const resetView = () => {
@@ -420,6 +436,7 @@ export const createHashlakeScene = ({
     driveState.speed = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
+    showDriveHud(driveHud, "Frame");
   };
 
   const handleKey = (event: KeyboardEvent, isDown: boolean) => {
@@ -463,6 +480,7 @@ export const createHashlakeScene = ({
       event.preventDefault();
       driveState.mode = "Frame";
       driveState.speed = 0;
+      showDriveHud(driveHud, "Frame");
       Object.keys(input).forEach((name) => {
         input[name as keyof DriveInput] = false;
       });
@@ -556,6 +574,7 @@ export const createHashlakeScene = ({
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);
       renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
       status.remove();
+      driveHud.remove();
       sceneEffects.dispose();
       renderer.dispose();
     },
@@ -603,22 +622,33 @@ const createWater = (): WaterSurface => {
   };
 };
 
-const animateWater = (water: WaterSurface, elapsed: number, weather: WeatherSnapshot) => {
+const animateWater = (
+  water: WaterSurface,
+  elapsed: number,
+  weather: WeatherSnapshot,
+  driveState: DriveState,
+) => {
   const position = water.mesh.geometry.attributes.position;
   const values = position.array as Float32Array;
   const waveHeight = 0.34 + weather.dials.chop * 2.6;
   const waveSpeed = 0.72 + weather.dials.wind * 1.7;
   const chop = weather.dials.chop;
+  const speedWake = clamp(Math.abs(driveState.speed) / DRIVE_MAX_SPEED, 0, 1);
 
   for (let index = 0; index < values.length; index += 3) {
     const x = water.basePositions[index];
     const z = water.basePositions[index + 2];
+    const distanceToBoat = Math.hypot(x - driveState.x, z - driveState.z);
+    const localWake =
+      Math.max(0, 1 - distanceToBoat / 30) *
+      speedWake *
+      Math.sin(distanceToBoat * 0.56 - elapsed * 10);
     const longWave = Math.sin(x * 0.035 + elapsed * waveSpeed) * waveHeight;
     const crossWave = Math.cos(z * 0.042 + elapsed * (waveSpeed * 0.75)) * waveHeight * 0.62;
     const shimmer =
       Math.sin((x + z) * (0.08 + chop * 0.07) + elapsed * (1.35 + chop * 2)) *
       (0.08 + chop * 0.42);
-    values[index + 1] = longWave + crossWave + shimmer;
+    values[index + 1] = longWave + crossWave + shimmer + localWake * 0.62;
   }
 
   position.needsUpdate = true;
@@ -707,19 +737,22 @@ const updateDriveState = (
   weather: WeatherSnapshot,
 ) => {
   if (driveState.mode !== "Drive") {
-    driveState.speed *= Math.pow(0.08, delta);
+    driveState.speed *= Math.pow(0.05, delta);
     return;
   }
 
-  const stormDrag = weather.dials.boatInstability * 0.26;
-  const boost = input.boost ? 1.72 : 1;
-  const maxForwardSpeed = 34 * boost;
-  const maxReverseSpeed = -13;
-  const acceleration = 24 * boost;
-  const braking = 29;
+  const stormDrag = weather.dials.boatInstability * 0.12;
+  const boost = input.boost ? DRIVE_BOOST_MULTIPLIER : 1;
+  const maxForwardSpeed = DRIVE_MAX_SPEED * boost;
+  const maxReverseSpeed = -22;
+  const acceleration = DRIVE_ACCELERATION * boost;
+  const braking = DRIVE_ACCELERATION * 0.72;
 
   if (input.forward) {
     driveState.speed += acceleration * delta;
+    if (driveState.speed < 12) {
+      driveState.speed += acceleration * delta * 0.5;
+    }
   }
 
   if (input.backward) {
@@ -727,18 +760,19 @@ const updateDriveState = (
   }
 
   if (input.anchor) {
-    driveState.speed *= Math.pow(0.016, delta);
+    driveState.speed *= Math.pow(0.006, delta);
   } else {
-    driveState.speed *= Math.pow(0.72 - stormDrag * 0.18, delta);
+    driveState.speed *= Math.pow(DRIVE_DRAG - stormDrag, delta);
   }
 
   driveState.speed = clamp(driveState.speed, maxReverseSpeed, maxForwardSpeed);
 
-  const speedRatio = clamp(Math.abs(driveState.speed) / 36, 0, 1);
-  const lowSpeedAssist = 1.15 - speedRatio * 0.48;
+  const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_MAX_SPEED, 0, 1);
+  const lowSpeedAssist = 1.2 - speedRatio * 0.36;
   const turnInput = Number(input.left) - Number(input.right);
-  const turnRate = turnInput * lowSpeedAssist * (1.7 - speedRatio * 0.55);
-  driveState.yaw += turnRate * delta * (driveState.speed >= 0 ? 1 : -0.72);
+  const turnAuthority = Math.max(0.35, Math.abs(driveState.speed) / 16);
+  const turnRate = turnInput * DRIVE_TURN_RATE * lowSpeedAssist * turnAuthority;
+  driveState.yaw += turnRate * delta * (driveState.speed >= 0 ? 1 : -0.65);
 
   const forwardX = Math.cos(driveState.yaw);
   const forwardZ = Math.sin(driveState.yaw);
@@ -890,6 +924,10 @@ const createDestinationMarkers = () => {
 
   const dock = new THREE.Group();
   dock.name = "Dock area";
+  const dockBeacon = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.4, 22, 8), dockMaterial);
+  dockBeacon.position.set(-104, 10, -112);
+  dockBeacon.castShadow = true;
+  dock.add(dockBeacon);
   for (let index = 0; index < 5; index += 1) {
     const plank = new THREE.Mesh(new THREE.BoxGeometry(22, 0.45, 2.1), dockMaterial);
     plank.position.set(-98 + index * 2.6, 0.55, -104 + index * 0.5);
@@ -903,6 +941,7 @@ const createDestinationMarkers = () => {
     post.castShadow = true;
     dock.add(post);
   }
+  dock.add(createWorldLabel("Dock", new THREE.Vector3(-105, 23, -112)));
   group.add(dock);
 
   const sandbar = new THREE.Mesh(new THREE.CylinderGeometry(24, 30, 0.55, 48), sandMaterial);
@@ -912,6 +951,7 @@ const createDestinationMarkers = () => {
   sandbar.rotation.y = 0.34;
   sandbar.receiveShadow = true;
   group.add(sandbar);
+  group.add(createWorldLabel("Sandbar", new THREE.Vector3(72, 8, 48)));
 
   const coveMarker = new THREE.Group();
   coveMarker.name = "Mountain cove";
@@ -923,6 +963,7 @@ const createDestinationMarkers = () => {
   const coveBeacon = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 10), markerMaterial);
   coveBeacon.position.set(18, 23, -124);
   coveMarker.add(coveBeacon);
+  coveMarker.add(createWorldLabel("Cove", new THREE.Vector3(18, 31, -124)));
   group.add(coveMarker);
 
   const island = new THREE.Group();
@@ -936,6 +977,7 @@ const createDestinationMarkers = () => {
     rock.castShadow = true;
     island.add(rock);
   }
+  island.add(createWorldLabel("Rocky Island", new THREE.Vector3(104, 14, -34)));
   group.add(island);
 
   const reeds = new THREE.Group();
@@ -947,9 +989,43 @@ const createDestinationMarkers = () => {
     reed.castShadow = true;
     reeds.add(reed);
   }
+  reeds.add(createWorldLabel("Reeds", new THREE.Vector3(-102, 10, 64)));
   group.add(reeds);
 
   return group;
+};
+
+const createWorldLabel = (text: string, position: THREE.Vector3) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.fillStyle = "rgba(8, 28, 32, 0.72)";
+    context.fillRect(8, 10, 240, 44);
+    context.strokeStyle = "rgba(145, 242, 191, 0.7)";
+    context.lineWidth = 3;
+    context.strokeRect(8, 10, 240, 44);
+    context.fillStyle = "#fff6df";
+    context.font = "700 23px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(text, 128, 33);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const label = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: false,
+    }),
+  );
+  label.position.copy(position);
+  label.scale.set(24, 6, 1);
+  return label;
 };
 
 const createSunDisc = () => {
@@ -991,6 +1067,59 @@ type WeatherEffects = {
   rain: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   embers: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   lightning: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+};
+
+type WakeEffect = {
+  group: THREE.Group;
+  streaks: Array<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>>;
+};
+
+const createWakeEffect = (): WakeEffect => {
+  const group = new THREE.Group();
+  group.name = "Drive wake";
+  const streaks: WakeEffect["streaks"] = [];
+
+  for (let index = 0; index < 14; index += 1) {
+    const streak = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4 + index * 0.25, 12 + index * 1.2),
+      new THREE.MeshBasicMaterial({
+        color: 0xd7f4ff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    streak.rotation.x = -Math.PI / 2;
+    group.add(streak);
+    streaks.push(streak);
+  }
+
+  return { group, streaks };
+};
+
+const animateWakeEffect = (
+  wake: WakeEffect,
+  driveState: DriveState,
+  elapsed: number,
+) => {
+  const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_MAX_SPEED, 0, 1);
+  const forward = new THREE.Vector3(Math.cos(driveState.yaw), 0, Math.sin(driveState.yaw));
+  const side = new THREE.Vector3(-forward.z, 0, forward.x);
+
+  wake.streaks.forEach((streak, index) => {
+    const pairSide = index % 2 === 0 ? -1 : 1;
+    const pairIndex = Math.floor(index / 2);
+    const distance = 7 + pairIndex * 6.2;
+    const width = 1.8 + pairIndex * 0.75 + Math.sin(elapsed * 4 + index) * 0.18;
+    streak.position
+      .set(driveState.x, 0.16 + pairIndex * 0.008, driveState.z)
+      .addScaledVector(forward, -distance)
+      .addScaledVector(side, pairSide * width);
+    streak.rotation.z = -driveState.yaw + pairSide * (0.16 + pairIndex * 0.018);
+    streak.scale.setScalar(0.65 + speedRatio * 0.75);
+    streak.material.opacity = speedRatio * Math.max(0, 0.24 - pairIndex * 0.026);
+  });
 };
 
 const createWeatherEffects = (): WeatherEffects => {
@@ -1180,13 +1309,14 @@ const applyWeatherToScene = ({
   tempSide.set(-tempForward.z, 0, tempForward.x);
 
   if (driveState.mode === "Drive") {
+    const speedLag = clamp(driveState.speed / DRIVE_MAX_SPEED, -0.4, 1.7);
     desiredCameraPosition
       .copy(tempForward)
-      .multiplyScalar(-preset.distance)
+      .multiplyScalar(-(preset.distance + speedLag * 11))
       .add(new THREE.Vector3(driveState.x, BOAT_HOME.y + preset.height, driveState.z));
     desiredCameraTarget
       .copy(tempForward)
-      .multiplyScalar(preset.lookAhead)
+      .multiplyScalar(preset.lookAhead + speedLag * 12)
       .add(new THREE.Vector3(driveState.x, BOAT_HOME.y + preset.lookHeight, driveState.z));
   } else {
     const tableauPreset = driveState.savedTableau.camera;
@@ -1206,8 +1336,11 @@ const applyWeatherToScene = ({
   desiredCameraPosition.y += Math.sin(elapsed * 11.1) * shake * 0.28;
   desiredCameraPosition.z += Math.cos(elapsed * 7.5) * shake * 0.42;
   desiredCameraPosition.y = Math.max(9, desiredCameraPosition.y);
-  camera.position.lerp(desiredCameraPosition, driveState.mode === "Drive" ? 0.08 : 0.065);
-  cameraTarget.lerp(desiredCameraTarget, driveState.mode === "Drive" ? 0.1 : 0.08);
+  camera.position.lerp(
+    desiredCameraPosition,
+    driveState.mode === "Drive" ? DRIVE_CAMERA_DAMPING : FRAME_CAMERA_DAMPING,
+  );
+  cameraTarget.lerp(desiredCameraTarget, driveState.mode === "Drive" ? 0.18 : 0.08);
   camera.lookAt(cameraTarget);
 };
 
@@ -1216,9 +1349,47 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 4</span>
+    <span>Hashlake Phase 5</span>
   `;
   return status;
+};
+
+const createDriveHud = () => {
+  const hud = document.createElement("div");
+  hud.className = "drive-hud";
+  hud.setAttribute("aria-live", "polite");
+  hud.textContent = "FRAME MODE - Living art view";
+  return hud;
+};
+
+const showDriveHud = (hud: HTMLDivElement, mode: "Frame" | "Drive") => {
+  hud.dataset.mode = mode;
+  hud.dataset.visibleUntil =
+    mode === "Frame" ? String(window.performance.now() + 2200) : "always";
+  hud.textContent =
+    mode === "Drive"
+      ? "DRIVE MODE - Arrow keys steer / Shift boost / Enter save / Esc exit"
+      : "FRAME MODE - Living art view";
+  hud.classList.add("drive-hud--visible");
+};
+
+const animateDriveHud = (
+  hud: HTMLDivElement,
+  driveState: DriveState,
+  timestamp: number,
+) => {
+  if (driveState.mode !== driveState.lastMode) {
+    showDriveHud(hud, driveState.mode);
+    driveState.lastMode = driveState.mode;
+  }
+
+  if (driveState.mode === "Drive") {
+    hud.classList.add("drive-hud--visible");
+    return;
+  }
+
+  const visibleUntil = Number(hud.dataset.visibleUntil ?? 0);
+  hud.classList.toggle("drive-hud--visible", timestamp < visibleUntil);
 };
 
 const animateStatus = (status: HTMLDivElement, elapsed: number) => {

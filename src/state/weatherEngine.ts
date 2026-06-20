@@ -24,6 +24,7 @@ export type WeatherSnapshot = {
   stormIndex: number;
   stage: StormStageName;
   mode: string;
+  dataMode: "LIVE" | "MANUAL" | "CACHED" | "STALE";
   staleData: boolean;
   easternTimeDarkness: number;
   stormDarkness: number;
@@ -48,6 +49,11 @@ type WeatherListener = (snapshot: WeatherSnapshot, event?: WeatherEvent) => void
 export type WeatherStore = {
   getSnapshot: () => WeatherSnapshot;
   setStormIndex: (value: number, mode: string) => void;
+  setLiveStormIndex: (
+    value: number,
+    dataMode: "LIVE" | "CACHED" | "STALE",
+    staleData: boolean,
+  ) => void;
   triggerCrash: () => void;
   triggerRally: () => void;
   triggerGust: () => void;
@@ -145,6 +151,7 @@ export const calculateWeatherSnapshot = (
     staleData?: boolean;
     gustFactor?: number;
     mode?: string;
+    dataMode?: "LIVE" | "MANUAL" | "CACHED" | "STALE";
     now?: Date;
   } = {},
 ): WeatherSnapshot => {
@@ -173,6 +180,7 @@ export const calculateWeatherSnapshot = (
     stormIndex,
     stage: getStormStage(stormIndex),
     mode: options.mode ?? "Live",
+    dataMode: options.dataMode ?? "LIVE",
     staleData: Boolean(options.staleData),
     easternTimeDarkness,
     stormDarkness,
@@ -183,8 +191,14 @@ export const calculateWeatherSnapshot = (
 export const createWeatherStore = (eventBus?: HashlakeEventBus): WeatherStore => {
   let stormIndex = DEFAULT_STORM_INDEX;
   let mode = "Live";
+  let dataMode: "LIVE" | "MANUAL" | "CACHED" | "STALE" = "LIVE";
   let staleData = false;
   let gustUntil = 0;
+  let manualOverride = false;
+  let lastLiveIndex = DEFAULT_STORM_INDEX;
+  let lastLiveMode = "Live";
+  let lastLiveDataMode: "LIVE" | "CACHED" | "STALE" = "LIVE";
+  let lastLiveStaleData = false;
   const listeners = new Set<WeatherListener>();
 
   const getGustFactor = () => {
@@ -200,6 +214,7 @@ export const createWeatherStore = (eventBus?: HashlakeEventBus): WeatherStore =>
     calculateWeatherSnapshot(stormIndex, {
       gustFactor: getGustFactor(),
       mode,
+      dataMode,
       staleData,
     });
 
@@ -212,6 +227,9 @@ export const createWeatherStore = (eventBus?: HashlakeEventBus): WeatherStore =>
     const previousStage = getStormStage(stormIndex);
     stormIndex = clampStormIndex(value);
     mode = nextMode;
+    dataMode = "MANUAL";
+    manualOverride = true;
+    staleData = false;
     const nextStage = getStormStage(stormIndex);
     const event =
       previousStage !== nextStage && stormIndex >= 40
@@ -223,6 +241,28 @@ export const createWeatherStore = (eventBus?: HashlakeEventBus): WeatherStore =>
   return {
     getSnapshot,
     setStormIndex,
+    setLiveStormIndex: (value, nextDataMode, nextStaleData) => {
+      lastLiveIndex = clampStormIndex(value);
+      lastLiveDataMode = nextDataMode;
+      lastLiveMode = nextDataMode === "LIVE" ? "Live" : nextDataMode;
+      lastLiveStaleData = nextStaleData;
+
+      if (manualOverride) {
+        return;
+      }
+
+      const previousStage = getStormStage(stormIndex);
+      stormIndex = lastLiveIndex;
+      mode = lastLiveMode;
+      dataMode = lastLiveDataMode;
+      staleData = lastLiveStaleData;
+      const nextStage = getStormStage(stormIndex);
+      emit(
+        previousStage !== nextStage && stormIndex >= 40
+          ? { name: "storm-front", message: "Storm front forming" }
+          : undefined,
+      );
+    },
     triggerCrash: () => {
       staleData = false;
       setStormIndex(86, "Manual Crash");
@@ -239,6 +279,8 @@ export const createWeatherStore = (eventBus?: HashlakeEventBus): WeatherStore =>
     triggerGust: () => {
       gustUntil = window.performance.now() + GUST_DURATION_MS;
       mode = "Manual Gust";
+      dataMode = "MANUAL";
+      manualOverride = true;
       stormIndex = Math.max(stormIndex, 63);
       eventBus?.emit({ type: "gust" });
       emit({ name: "gust", message: "Gust event" });
@@ -246,15 +288,20 @@ export const createWeatherStore = (eventBus?: HashlakeEventBus): WeatherStore =>
     triggerStaleFog: () => {
       staleData = true;
       mode = "Manual Stale";
+      dataMode = "MANUAL";
+      manualOverride = true;
       stormIndex = Math.min(stormIndex, 32);
       eventBus?.emit({ type: "stale" });
       emit({ name: "stale", message: "Stale feed - fog rolling in" });
     },
     resumeLive: () => {
+      manualOverride = false;
       staleData = false;
       gustUntil = 0;
-      stormIndex = DEFAULT_STORM_INDEX;
-      mode = "Live";
+      stormIndex = lastLiveIndex;
+      staleData = lastLiveStaleData;
+      mode = lastLiveMode;
+      dataMode = lastLiveDataMode;
       emit({ name: "network-calm", message: "Network calm" });
     },
     subscribe: (listener: WeatherListener) => {

@@ -1,13 +1,17 @@
 import type { HashlakeEventBus } from "../state/eventBus";
+import type {
+  FeedName,
+  FeedSource,
+  FeedStatus,
+  LiveBitcoinSnapshot,
+  LiveBitcoinStore,
+} from "../state/liveBitcoinStore";
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 
-type FeedStatus = "ok" | "stale" | "error" | "offline";
-
 type FeedRow = {
-  name: string;
+  name: FeedName;
   status: FeedStatus;
-  lastSeenOffsetSeconds: number;
-  source: "live" | "cached" | "sim";
+  source: FeedSource;
 };
 
 type DebugPanel = {
@@ -53,6 +57,7 @@ const metricTiles: MetricTile[] = [
   { label: "Difficulty", value: "+4.40%" },
   { label: "Hashrate dip", value: "-2.65%" },
   { label: "WebSocket", value: "live", tone: "good" },
+  { label: "Data mode", value: "LIVE", tone: "good" },
   { label: "Staleness", value: "0%", tone: "good" },
   { label: "Fire / FW", value: "0.00 / 0.00" },
   { label: "Mode", value: "Frame", tone: "muted" },
@@ -83,14 +88,15 @@ const dialLabels: Array<{ key: keyof WeatherDials; label: string }> = [
 ];
 
 const feedRows: FeedRow[] = [
-  { name: "price", status: "ok", lastSeenOffsetSeconds: 0, source: "live" },
-  { name: "mempool", status: "ok", lastSeenOffsetSeconds: 1, source: "live" },
-  { name: "fees", status: "stale", lastSeenOffsetSeconds: 64, source: "cached" },
-  { name: "whales", status: "ok", lastSeenOffsetSeconds: 2, source: "sim" },
-  { name: "market", status: "stale", lastSeenOffsetSeconds: 86, source: "cached" },
-  { name: "difficulty", status: "ok", lastSeenOffsetSeconds: 86, source: "cached" },
-  { name: "hashrate", status: "error", lastSeenOffsetSeconds: 120, source: "cached" },
-  { name: "websocket", status: "offline", lastSeenOffsetSeconds: 12, source: "sim" },
+  { name: "price", status: "offline", source: "none" },
+  { name: "mempool", status: "offline", source: "none" },
+  { name: "fees", status: "offline", source: "none" },
+  { name: "block", status: "offline", source: "none" },
+  { name: "whales", status: "ok", source: "sim" },
+  { name: "market", status: "offline", source: "none" },
+  { name: "difficulty", status: "offline", source: "none" },
+  { name: "hashrate", status: "offline", source: "none" },
+  { name: "websocket", status: "offline", source: "none" },
 ];
 
 const formatAgo = (seconds: number) => {
@@ -107,6 +113,34 @@ const formatAgo = (seconds: number) => {
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   return `${hours}h ${remainingMinutes}m ago`;
+};
+
+const formatLastSeen = (timestamp: number | null) => {
+  if (!timestamp) {
+    return "--";
+  }
+
+  return formatAgo(Math.max(0, Math.floor((Date.now() - timestamp) / 1000)));
+};
+
+const formatCurrency = (value: number | null) => {
+  if (value === null) {
+    return "--";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+    style: "currency",
+    currency: "USD",
+  }).format(value);
+};
+
+const formatPercent = (value: number | null) => {
+  if (value === null) {
+    return "--";
+  }
+
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 };
 
 const createMetricTiles = () =>
@@ -250,21 +284,23 @@ const isEditableTarget = (target: EventTarget | null) => {
   return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 };
 
-const updateFeedRows = (wrapper: HTMLElement, staleData: boolean) => {
+const updateFeedRows = (wrapper: HTMLElement, snapshot: LiveBitcoinSnapshot) => {
   for (const feed of feedRows) {
     const row = wrapper.querySelector<HTMLElement>(`[data-feed="${feed.name}"]`);
     const dot = row?.querySelector<HTMLElement>(".debug-feed__dot");
     const status = row?.querySelector<HTMLElement>(".debug-feed__status");
-    if (!row || !dot || !status) {
+    const source = row?.querySelector<HTMLElement>(".debug-feed__source");
+    const timer = row?.querySelector<HTMLTimeElement>(".debug-feed__timer");
+    const liveFeed = snapshot.feeds[feed.name];
+    if (!row || !dot || !status || !source || !timer || !liveFeed) {
       continue;
     }
 
-    const nextStatus: FeedStatus =
-      staleData && ["price", "mempool", "fees", "market"].includes(feed.name)
-        ? "stale"
-        : feed.status;
+    const nextStatus = liveFeed.status;
     dot.className = `debug-feed__dot debug-feed__dot--${nextStatus}`;
     status.textContent = nextStatus;
+    source.textContent = liveFeed.source;
+    timer.textContent = formatLastSeen(liveFeed.lastSuccessAt);
   }
 };
 
@@ -272,6 +308,7 @@ export const createDebugPanel = (
   container: HTMLElement,
   weatherStore: WeatherStore,
   eventBus: HashlakeEventBus,
+  liveBitcoinStore: LiveBitcoinStore,
   getTelemetry: () => SceneTelemetry,
 ): DebugPanel => {
   const wrapper = document.createElement("div");
@@ -291,11 +328,11 @@ export const createDebugPanel = (
   const closeButton = wrapper.querySelector<HTMLButtonElement>(".debug-close");
   const actionButtons = wrapper.querySelectorAll<HTMLButtonElement>("[data-debug-action]");
 
-  const feedStartedAt = window.performance.now();
   let fpsFrame = 0;
   let fpsFrames = 0;
   let fpsLastSample = window.performance.now();
   let timerId = 0;
+  let currentWeatherDataMode: WeatherSnapshot["dataMode"] = "LIVE";
 
   const setVisible = (visible: boolean) => {
     wrapper.classList.toggle("debug-panel-shell--visible", visible);
@@ -303,6 +340,7 @@ export const createDebugPanel = (
   };
 
   const renderWeather = (snapshot: WeatherSnapshot) => {
+    currentWeatherDataMode = snapshot.dataMode;
     if (stormValueElement) {
       stormValueElement.textContent = snapshot.stormIndex.toFixed(1);
     }
@@ -318,6 +356,16 @@ export const createDebugPanel = (
     if (liveModeElement) {
       liveModeElement.textContent = snapshot.mode;
     }
+
+    setMetric(
+      "Data mode",
+      snapshot.dataMode,
+      snapshot.dataMode === "LIVE"
+        ? "good"
+        : snapshot.dataMode === "STALE"
+          ? "bad"
+          : "warn",
+    );
 
     const stalenessMetric = wrapper.querySelector<HTMLElement>(
       '[data-debug-metric="Staleness"] .debug-metric__value',
@@ -349,22 +397,109 @@ export const createDebugPanel = (
       }
     });
 
-    updateFeedRows(wrapper, snapshot.staleData);
     wrapper.dataset.weatherStage = snapshot.stage;
     wrapper.classList.toggle("debug-panel-shell--stale", snapshot.staleData);
   };
 
   const updateFeedTimers = () => {
-    const elapsedSeconds = Math.floor((window.performance.now() - feedStartedAt) / 1000);
+    updateFeedRows(wrapper, liveBitcoinStore.getSnapshot());
+  };
 
-    for (const feed of feedRows) {
-      const timer = wrapper.querySelector<HTMLTimeElement>(
-        `[data-feed-timer="${feed.name}"]`,
-      );
-      if (timer) {
-        timer.textContent = formatAgo(feed.lastSeenOffsetSeconds + elapsedSeconds);
-      }
+  const setMetric = (
+    label: string,
+    value: string,
+    tone?: "good" | "bad" | "warn" | "muted",
+  ) => {
+    const element = wrapper.querySelector<HTMLElement>(
+      `[data-debug-metric="${label}"] .debug-metric__value`,
+    );
+    if (!element) {
+      return;
     }
+
+    element.textContent = value;
+    element.classList.toggle("debug-tone-good", tone === "good");
+    element.classList.toggle("debug-tone-bad", tone === "bad");
+    element.classList.toggle("debug-tone-warn", tone === "warn");
+    element.classList.toggle("debug-tone-muted", tone === "muted");
+  };
+
+  const renderLiveData = (snapshot: LiveBitcoinSnapshot) => {
+    const { metrics } = snapshot;
+    setMetric("Price", formatCurrency(metrics.priceUsd));
+    setMetric(
+      "24h",
+      formatPercent(metrics.priceChange24h),
+      metrics.priceChange24h === null ? "muted" : metrics.priceChange24h >= 0 ? "good" : "bad",
+    );
+    setMetric(
+      "7d",
+      formatPercent(metrics.priceChange7d),
+      metrics.priceChange7d === null ? "muted" : metrics.priceChange7d >= 0 ? "good" : "bad",
+    );
+    setMetric("Fastest fee", metrics.fastestFee === null ? "--" : `${metrics.fastestFee} sat/vB`);
+    setMetric(
+      "Mempool",
+      metrics.mempoolCount === null
+        ? "--"
+        : `${new Intl.NumberFormat("en-US").format(metrics.mempoolCount)} tx`,
+    );
+    setMetric("Block", metrics.blockHeight === null ? "--" : `#${metrics.blockHeight}`);
+    setMetric(
+      "Block age",
+      metrics.blockTimestamp === null
+        ? "--"
+        : formatAgo(Math.max(0, Math.floor(Date.now() / 1000 - metrics.blockTimestamp))),
+    );
+    setMetric("Difficulty", formatPercent(metrics.difficultyChange));
+    setMetric("Hashrate dip", formatPercent(metrics.hashrateChange), "muted");
+    setMetric(
+      "WebSocket",
+      snapshot.feeds.websocket.status,
+      snapshot.feeds.websocket.status === "ok"
+        ? "good"
+        : snapshot.feeds.websocket.status === "reconnecting"
+          ? "warn"
+          : "bad",
+    );
+    const displayedDataMode =
+      currentWeatherDataMode === "MANUAL" ? "MANUAL" : snapshot.dataMode;
+    setMetric(
+      "Data mode",
+      displayedDataMode,
+      displayedDataMode === "LIVE"
+        ? "good"
+        : displayedDataMode === "STALE"
+          ? "bad"
+          : "warn",
+    );
+    setMetric(
+      "Staleness",
+      `${Math.round(snapshot.staleness * 100)}%`,
+      snapshot.staleness > 0.65 ? "bad" : snapshot.staleness > 0.25 ? "warn" : "good",
+    );
+
+    const bars: Array<[string, number]> = [
+      ["price trend", snapshot.contributions.priceTrend],
+      ["network", snapshot.contributions.network],
+      ["fees", snapshot.contributions.fees],
+      ["congestion", snapshot.contributions.congestion],
+      ["freshness", snapshot.contributions.freshness],
+    ];
+
+    bars.forEach(([label, value]) => {
+      const row = wrapper.querySelector<HTMLElement>(`[data-debug-bar="${label}"]`);
+      const bar = row?.querySelector<HTMLElement>(".debug-bar__track span");
+      const strong = row?.querySelector<HTMLElement>(".debug-bar__meta strong");
+      if (bar) {
+        bar.style.width = `${Math.round((value / 10) * 100)}%`;
+      }
+      if (strong) {
+        strong.textContent = value.toFixed(1);
+      }
+    });
+
+    updateFeedRows(wrapper, snapshot);
   };
 
   const updateTelemetry = () => {
@@ -463,11 +598,24 @@ export const createDebugPanel = (
         weatherStore.triggerStaleFog();
       } else {
         weatherStore.resumeLive();
+        const liveSnapshot = liveBitcoinStore.getSnapshot();
+        const dataMode =
+          liveSnapshot.dataMode === "STALE"
+            ? "STALE"
+            : liveSnapshot.dataMode === "CACHED"
+              ? "CACHED"
+              : "LIVE";
+        weatherStore.setLiveStormIndex(
+          liveSnapshot.stormIndex,
+          dataMode,
+          liveSnapshot.dataMode === "STALE",
+        );
       }
     });
   });
 
   const unsubscribe = weatherStore.subscribe(renderWeather);
+  const unsubscribeLive = liveBitcoinStore.subscribe(renderLiveData);
   window.addEventListener("keydown", handleKeydown);
   updateFeedTimers();
   updateTelemetry();
@@ -481,6 +629,7 @@ export const createDebugPanel = (
       window.clearInterval(timerId);
       window.cancelAnimationFrame(fpsFrame);
       unsubscribe();
+      unsubscribeLive();
       wrapper.remove();
     },
     isVisible: () => wrapper.classList.contains("debug-panel-shell--visible"),

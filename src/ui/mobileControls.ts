@@ -12,6 +12,7 @@ export const createMobileControls = (
 ): MobileControls => {
   const controls = document.createElement("div");
   controls.className = "mobile-mode-controls";
+  // TODO: Add real touch throttle/steering controls when mobile Drive Mode becomes a focus.
   controls.innerHTML = `
     <button type="button" data-mobile-control="drive">Drive</button>
     <button type="button" data-mobile-control="debug">Debug</button>

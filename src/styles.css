@@ -73,6 +73,40 @@ body {
   box-shadow: 0 0 14px rgba(145, 242, 191, 0.9);
 }
 
+.drive-hud {
+  position: fixed;
+  left: 50%;
+  top: clamp(50px, 8vh, 78px);
+  z-index: 16;
+  max-width: calc(100vw - 28px);
+  padding: 8px 12px;
+  border: 1px solid rgba(145, 242, 191, 0.34);
+  border-radius: 8px;
+  background: rgba(8, 28, 32, 0.72);
+  color: #fff6df;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -6px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  backdrop-filter: blur(12px);
+}
+
+.drive-hud--visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.drive-hud[data-mode="Drive"] {
+  border-color: rgba(126, 217, 218, 0.58);
+  box-shadow: 0 0 28px rgba(126, 217, 218, 0.18);
+}
+
 .debug-panel-shell {
   position: fixed;
   inset: 0 auto auto 0;
@@ -361,6 +395,11 @@ body {
 .debug-feed__dot--stale {
   background: #e6c66e;
   box-shadow: 0 0 9px rgba(230, 198, 110, 0.62);
+}
+
+.debug-feed__dot--reconnecting {
+  background: #75dddd;
+  box-shadow: 0 0 9px rgba(117, 221, 221, 0.62);
 }
 
 .debug-feed__dot--error,

@@ -14,6 +14,7 @@ const stormStages = [
 ];
 
 const triggers = [
+  "live Bitcoin data",
   "price trend",
   "network health",
   "fees",
@@ -45,6 +46,12 @@ const controls = [
   ["Space", "Anchor/stabilize"],
   ["Enter", "Save tableau"],
   ["Esc", "Exit/cancel"],
+];
+
+const notes = [
+  "Live no-key public feeds drive stormIndex when available.",
+  "Fog means stale or uncertain data, not necessarily bad Bitcoin conditions.",
+  "Mobile Drive Mode is experimental and limited in this phase.",
 ];
 
 const renderLegend = () => `
@@ -88,6 +95,13 @@ const renderLegend = () => `
           ${visualEffects.map((effect) => `<li>${effect}</li>`).join("")}
         </ul>
       </div>
+    </div>
+
+    <div class="legend-section">
+      <h2>data notes</h2>
+      <ul>
+        ${notes.map((note) => `<li>${note}</li>`).join("")}
+      </ul>
     </div>
 
     <div class="legend-section">
