@@ -45,11 +45,18 @@ export type SceneTelemetry = {
   };
   heading: number;
   visualHeading: number;
+  cameraHeading: number;
   movementVector: {
     x: number;
     z: number;
   };
   steerInput: number;
+  throttleInput: number;
+  brakeInput: number;
+  inputSource: "desktop" | "mobile" | "none";
+  worldRotationLocked: boolean;
+  headingWarning: boolean;
+  cameraWarning: boolean;
   cameraPreset: string;
   nearestLocation: string;
   savedTableau: boolean;
@@ -74,8 +81,13 @@ const metricTiles: MetricTile[] = [
   { label: "Boat speed", value: "0.0" },
   { label: "Boat pos", value: "0, 0" },
   { label: "Heading", value: "0 / 0" },
+  { label: "Camera hdg", value: "0" },
   { label: "Move vec", value: "0, 0" },
   { label: "Steer", value: "0.00" },
+  { label: "Throttle", value: "0.00" },
+  { label: "Brake", value: "0.00" },
+  { label: "Input", value: "none" },
+  { label: "World lock", value: "locked", tone: "good" },
   { label: "Nearest", value: "Dock" },
   { label: "Camera", value: "Cinematic" },
 ];
@@ -140,6 +152,9 @@ const formatAgo = (seconds: number) => {
   const remainingMinutes = minutes % 60;
   return `${hours}h ${remainingMinutes}m ago`;
 };
+
+const formatHeading = (radians: number) =>
+  (((radians * 180) / Math.PI + 360) % 360).toFixed(0);
 
 const formatLastSeen = (timestamp: number | null) => {
   if (!timestamp) {
@@ -739,11 +754,26 @@ export const createDebugPanel = (
     const headingMetric = wrapper.querySelector<HTMLElement>(
       '[data-debug-metric="Heading"] .debug-metric__value',
     );
+    const cameraHeadingMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Camera hdg"] .debug-metric__value',
+    );
     const moveMetric = wrapper.querySelector<HTMLElement>(
       '[data-debug-metric="Move vec"] .debug-metric__value',
     );
     const steerMetric = wrapper.querySelector<HTMLElement>(
       '[data-debug-metric="Steer"] .debug-metric__value',
+    );
+    const throttleMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Throttle"] .debug-metric__value',
+    );
+    const brakeMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Brake"] .debug-metric__value',
+    );
+    const inputMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Input"] .debug-metric__value',
+    );
+    const worldLockMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="World lock"] .debug-metric__value',
     );
 
     if (modeMetric) {
@@ -767,9 +797,15 @@ export const createDebugPanel = (
     }
 
     if (headingMetric) {
-      const physicsHeading = ((telemetry.heading * 180) / Math.PI + 360) % 360;
-      const visualHeading = ((telemetry.visualHeading * 180) / Math.PI + 360) % 360;
-      headingMetric.textContent = `${physicsHeading.toFixed(0)} / ${visualHeading.toFixed(0)}`;
+      headingMetric.textContent = `${formatHeading(telemetry.heading)} / ${formatHeading(
+        telemetry.visualHeading,
+      )}`;
+      headingMetric.classList.toggle("debug-tone-bad", telemetry.headingWarning);
+    }
+
+    if (cameraHeadingMetric) {
+      cameraHeadingMetric.textContent = formatHeading(telemetry.cameraHeading);
+      cameraHeadingMetric.classList.toggle("debug-tone-bad", telemetry.cameraWarning);
     }
 
     if (moveMetric) {
@@ -778,6 +814,24 @@ export const createDebugPanel = (
 
     if (steerMetric) {
       steerMetric.textContent = telemetry.steerInput.toFixed(2);
+    }
+
+    if (throttleMetric) {
+      throttleMetric.textContent = telemetry.throttleInput.toFixed(2);
+    }
+
+    if (brakeMetric) {
+      brakeMetric.textContent = telemetry.brakeInput.toFixed(2);
+    }
+
+    if (inputMetric) {
+      inputMetric.textContent = telemetry.inputSource;
+    }
+
+    if (worldLockMetric) {
+      worldLockMetric.textContent = telemetry.worldRotationLocked ? "locked" : "rotating";
+      worldLockMetric.classList.toggle("debug-tone-good", telemetry.worldRotationLocked);
+      worldLockMetric.classList.toggle("debug-tone-bad", !telemetry.worldRotationLocked);
     }
 
     setMetric("Nearest", telemetry.nearestLocation);
