@@ -41,6 +41,7 @@ export type MarketWebSocketState = {
   status: FeedStatus;
   lastTickAt: number | null;
   lastHeartbeatAt: number | null;
+  lastPriceDisplayAt: number | null;
   message: string;
 };
 
@@ -348,6 +349,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     status: "offline",
     lastTickAt: null,
     lastHeartbeatAt: null,
+    lastPriceDisplayAt: null,
     message: "Waiting for market tape",
   };
   const largeTradeState: LargeTradeState = {
@@ -360,6 +362,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
   };
   let lastLargeTradeEmitAt = 0;
   let lastMarketPriceAppliedAt = 0;
+  let lastMarketHeartbeatEventAt = 0;
 
   const emit = () => {
     const snapshot = getSnapshot();
@@ -573,6 +576,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     }
 
     lastMarketPriceAppliedAt = timestamp;
+    marketWebSocketState.lastPriceDisplayAt = timestamp;
     metrics.priceUsd = priceUsd;
     if (priceChange24h !== null) {
       metrics.priceChange24h = priceChange24h;
@@ -596,6 +600,29 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
       },
       timestamp,
     );
+    eventBus.emit({
+      type: "marketTick",
+      price: priceUsd,
+      previousPrice: previousPrice ?? undefined,
+      intensity: clamp(priceMove / 120, 0.12, 1.25),
+    });
+  };
+
+  const markMarketHeartbeat = (timestamp: number) => {
+    marketWebSocketState.status = "ok";
+    marketWebSocketState.lastHeartbeatAt = timestamp;
+    marketWebSocketState.message = "Heartbeat";
+    feeds.market.status = "ok";
+    feeds.market.source = "live";
+    feeds.market.lastSuccessAt = timestamp;
+    feeds.market.message = "Coinbase heartbeat";
+    if (!lastMarketHeartbeatEventAt || timestamp - lastMarketHeartbeatEventAt >= 5000) {
+      lastMarketHeartbeatEventAt = timestamp;
+      eventBus.emit({
+        type: "marketHeartbeat",
+        intensity: 0.18,
+      });
+    }
   };
 
   const applyLargeTrade = (
@@ -661,13 +688,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     const channel = typeof data.channel === "string" ? data.channel : "";
     const events = Array.isArray(data.events) ? data.events : [];
     if (channel === "heartbeats" || channel === "subscriptions") {
-      marketWebSocketState.status = "ok";
-      marketWebSocketState.lastHeartbeatAt = now();
-      marketWebSocketState.message = channel === "heartbeats" ? "Heartbeat" : "Subscribed";
-      feeds.market.status = "ok";
-      feeds.market.source = "live";
-      feeds.market.lastSuccessAt = marketWebSocketState.lastHeartbeatAt;
-      feeds.market.message = "Coinbase heartbeat";
+      markMarketHeartbeat(now());
       return;
     }
 

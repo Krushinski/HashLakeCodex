@@ -52,16 +52,16 @@ const DRIVE_BOW_LIFT_SCALE = 0.15;
 const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
-const WAKE_BLOCK_SIZE_MIN = 0.44;
-const WAKE_BLOCK_SIZE_MAX = 1.16;
-const WAKE_VERTICAL_VELOCITY = 0.04;
-const WAKE_BACKWARD_VELOCITY = 5.6;
-const WAKE_OUTWARD_SPREAD = 3.7;
-const WAKE_LIFETIME_SECONDS = 0.72;
-const WAKE_EMISSION_RATE = 18;
+const WAKE_BLOCK_SIZE_MIN = 0.5;
+const WAKE_BLOCK_SIZE_MAX = 1.25;
+const WAKE_VERTICAL_VELOCITY = 0.025;
+const WAKE_BACKWARD_VELOCITY = 6.4;
+const WAKE_OUTWARD_SPREAD = 4.6;
+const WAKE_LIFETIME_SECONDS = 0.58;
+const WAKE_EMISSION_RATE = 22;
 const WAKE_BOOST_MULTIPLIER = 1.32;
-const WAKE_SURFACE_Y_OFFSET = 0.32;
-const WAKE_FADE_SPEED = 1.28;
+const WAKE_SURFACE_Y_OFFSET = 0.27;
+const WAKE_FADE_SPEED = 1.42;
 const WAKE_MAX_ACTIVE_BLOCKS = 192;
 
 type SceneTelemetry = {
@@ -327,6 +327,8 @@ export const createHashlakeScene = ({
   renderer.setClearColor(0x9fc8d4, 1);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.domElement.className = "hashlake-canvas";
@@ -1815,12 +1817,12 @@ const emitWakeSegment = (
       : 1;
   const spread =
     side === 0
-      ? (Math.random() - 0.5) * WAKE_OUTWARD_SPREAD * 0.28
-      : 1.2 + speedRatio * WAKE_OUTWARD_SPREAD + wakePower * 1.25;
+      ? (Math.random() - 0.5) * WAKE_OUTWARD_SPREAD * 0.34
+      : 1.35 + speedRatio * WAKE_OUTWARD_SPREAD + wakePower * 1.45;
   const rearDistance =
     side === 0
-      ? 7.3 + Math.random() * 1.35
-      : 8.3 + speedRatio * WAKE_BACKWARD_VELOCITY * 1.45 + Math.random() * 2.7;
+      ? 6.95 + Math.random() * 1.05
+      : 8.15 + speedRatio * WAKE_BACKWARD_VELOCITY * 1.5 + Math.random() * 2.45;
   segment.mesh.position
     .set(
       driveState.x,
@@ -1850,14 +1852,14 @@ const emitWakeSegment = (
       WAKE_BLOCK_SIZE_MAX * boostIntensity,
     );
   segment.heightScale = 0.1 + Math.random() * 0.12 + wakePower * 0.05;
-  segment.lengthScale = 1.18 + speedRatio * 0.84 + Math.random() * 0.5;
+  segment.lengthScale = 1.28 + speedRatio * 0.92 + Math.random() * 0.56;
   segment.driftX =
     forward.x * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
-    lateral.x * side * (0.8 + speedRatio * 1.75);
+    lateral.x * side * (1.05 + speedRatio * 2.15);
   segment.driftZ =
     forward.z * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
-    lateral.z * side * (0.8 + speedRatio * 1.75);
-  segment.spin = (Math.random() - 0.5) * (0.8 + wakePower * 0.34);
+    lateral.z * side * (1.05 + speedRatio * 2.15);
+  segment.spin = (Math.random() - 0.5) * (0.58 + wakePower * 0.26);
   segment.mesh.material.color.set(wakePower > 1 ? 0xffffff : 0xd8f5ff);
   segment.mesh.material.opacity = 0.58 + speedRatio * 0.12 + wakePower * 0.1;
 };
@@ -1883,6 +1885,7 @@ const animateWakeEffect = (
     emitWakeSegment(wake, driveState, -1);
     emitWakeSegment(wake, driveState, 1);
     emitWakeSegment(wake, driveState, 0);
+    emitWakeSegment(wake, driveState, 0);
     if (wakePower > 0.22) {
       emitWakeSegment(wake, driveState, 0);
     }
@@ -1907,8 +1910,8 @@ const animateWakeEffect = (
     segment.mesh.position.y =
       WAKE_SURFACE_Y_OFFSET +
       Math.sin(segment.age * 10 + segment.side) * WAKE_VERTICAL_VELOCITY;
-    segment.mesh.rotation.x += segment.spin * 0.08 * delta;
-    segment.mesh.rotation.z += segment.spin * 0.62 * delta;
+    segment.mesh.rotation.x += segment.spin * 0.04 * delta;
+    segment.mesh.rotation.z += segment.spin * 0.48 * delta;
     segment.mesh.scale.set(
       segment.baseScale * segment.lengthScale * widen,
       Math.max(0.045, segment.heightScale * settle),
@@ -2157,7 +2160,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 14B</span>
+    <span>Hashlake Phase 15</span>
   `;
   return status;
 };

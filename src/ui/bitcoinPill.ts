@@ -58,16 +58,33 @@ export const createBitcoinPill = (
   const blockElement = pill.querySelector<HTMLElement>("[data-bitcoin-pill-block]");
   const statusElement = pill.querySelector<HTMLElement>("[data-bitcoin-pill-status]");
   const dotElement = pill.querySelector<HTMLElement>("[data-bitcoin-pill-dot]");
-  let previousFreshKey = "";
+  let previousPriceKey = "";
+  let previousFeeKey = "";
+  let previousBlockKey = "";
+  let previousHeartbeatKey = "";
+  let lastHeartbeatPulseAt = 0;
+
+  const pulse = (element: HTMLElement | null, className: string) => {
+    if (!element) {
+      return;
+    }
+
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
+  };
 
   const render = (snapshot: LiveBitcoinSnapshot) => {
     const { metrics } = snapshot;
     const tone = statusTone(snapshot);
-    const freshKey = [
-      snapshot.feeds.price.lastSuccessAt ?? 0,
-      snapshot.feeds.fees.lastSuccessAt ?? 0,
-      snapshot.feeds.block.lastSuccessAt ?? 0,
-    ].join(":");
+    const priceKey = String(snapshot.feeds.price.lastSuccessAt ?? 0);
+    const feeKey = String(snapshot.feeds.fees.lastSuccessAt ?? 0);
+    const blockKey = String(snapshot.feeds.block.lastSuccessAt ?? 0);
+    const heartbeatKey = String(snapshot.marketWebSocket.lastHeartbeatAt ?? 0);
+    const heartbeatFresh =
+      snapshot.marketWebSocket.status === "ok" &&
+      snapshot.marketWebSocket.lastHeartbeatAt !== null &&
+      Date.now() - snapshot.marketWebSocket.lastHeartbeatAt < 9000;
 
     if (priceElement) {
       priceElement.textContent = `BTC ${formatCurrency(metrics.priceUsd)}`;
@@ -94,13 +111,41 @@ export const createBitcoinPill = (
 
     pill.classList.toggle("bitcoin-pill--stale", tone === "stale");
     pill.classList.toggle("bitcoin-pill--bad", tone === "error");
+    pill.classList.toggle("bitcoin-pill--live", tone === "ok" && heartbeatFresh);
+    pill.title =
+      snapshot.marketWebSocket.lastHeartbeatAt === null
+        ? "Market heartbeat waiting"
+        : `Market heartbeat ${
+            Math.max(0, Math.floor((Date.now() - snapshot.marketWebSocket.lastHeartbeatAt) / 1000))
+          }s ago`;
 
-    if (previousFreshKey && freshKey !== previousFreshKey && tone === "ok") {
-      pill.classList.remove("bitcoin-pill--fresh");
-      void pill.offsetWidth;
-      pill.classList.add("bitcoin-pill--fresh");
+    if (previousPriceKey && priceKey !== previousPriceKey && tone === "ok") {
+      pulse(pill, "bitcoin-pill--fresh");
+      pulse(priceElement, "bitcoin-pill__value--price-fresh");
     }
-    previousFreshKey = freshKey;
+
+    if (previousFeeKey && feeKey !== previousFeeKey && tone === "ok") {
+      pulse(feeElement, "bitcoin-pill__value--fresh");
+    }
+
+    if (previousBlockKey && blockKey !== previousBlockKey && tone === "ok") {
+      pulse(blockElement, "bitcoin-pill__value--block-fresh");
+    }
+
+    if (
+      previousHeartbeatKey &&
+      heartbeatKey !== previousHeartbeatKey &&
+      tone === "ok" &&
+      Date.now() - lastHeartbeatPulseAt > 4500
+    ) {
+      lastHeartbeatPulseAt = Date.now();
+      pulse(pill, "bitcoin-pill--heartbeat");
+    }
+
+    previousPriceKey = priceKey;
+    previousFeeKey = feeKey;
+    previousBlockKey = blockKey;
+    previousHeartbeatKey = heartbeatKey;
   };
 
   const unsubscribe = liveBitcoinStore.subscribe(render);

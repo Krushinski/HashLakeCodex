@@ -152,6 +152,10 @@ body {
   box-shadow: 0 0 10px rgba(108, 232, 169, 0.76);
 }
 
+.bitcoin-pill--live .bitcoin-pill__dot--ok {
+  animation: bitcoinPillLive 4.8s ease-in-out infinite;
+}
+
 .bitcoin-pill__dot--stale {
   background: #e6c66e;
   box-shadow: 0 0 10px rgba(230, 198, 110, 0.66);
@@ -168,6 +172,22 @@ body {
 
 .bitcoin-pill--fresh {
   animation: bitcoinPillFresh 900ms ease-out;
+}
+
+.bitcoin-pill--heartbeat {
+  animation: bitcoinPillHeartbeat 1100ms ease-out;
+}
+
+.bitcoin-pill__value--fresh {
+  animation: bitcoinPillValueFresh 850ms ease-out;
+}
+
+.bitcoin-pill__value--price-fresh {
+  animation: bitcoinPillPriceFresh 1100ms ease-out;
+}
+
+.bitcoin-pill__value--block-fresh {
+  animation: bitcoinPillBlockFresh 1050ms ease-out;
 }
 
 .bitcoin-pill--stale strong {
@@ -635,6 +655,71 @@ body {
 
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes bitcoinPillLive {
+  0%,
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 8px rgba(108, 232, 169, 0.62);
+    opacity: 0.72;
+  }
+
+  50% {
+    transform: scale(1.16);
+    box-shadow: 0 0 16px rgba(108, 232, 169, 0.92);
+    opacity: 1;
+  }
+}
+
+@keyframes bitcoinPillHeartbeat {
+  0% {
+    border-color: rgba(126, 217, 218, 0.4);
+    box-shadow: 0 0 18px rgba(126, 217, 218, 0.14);
+  }
+
+  100% {
+    border-color: rgba(255, 240, 201, 0.22);
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.24);
+  }
+}
+
+@keyframes bitcoinPillValueFresh {
+  0% {
+    color: #d8fff0;
+    text-shadow: 0 0 10px rgba(145, 242, 191, 0.44);
+  }
+
+  100% {
+    color: #fff6df;
+    text-shadow: none;
+  }
+}
+
+@keyframes bitcoinPillPriceFresh {
+  0% {
+    color: #ffffff;
+    text-shadow:
+      0 0 8px rgba(145, 242, 191, 0.54),
+      0 0 22px rgba(126, 217, 218, 0.22);
+  }
+
+  100% {
+    color: #fff6df;
+    text-shadow: none;
+  }
+}
+
+@keyframes bitcoinPillBlockFresh {
+  0% {
+    color: #fff2bd;
+    text-shadow: 0 0 12px rgba(255, 211, 125, 0.42);
+  }
+
+  100% {
+    color: #fff6df;
+    text-shadow: none;
   }
 }
 

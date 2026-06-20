@@ -82,6 +82,7 @@ const metricTiles: MetricTile[] = [
   { label: "Market WS", value: "offline", tone: "muted" },
   { label: "Tick age", value: "--" },
   { label: "Heartbeat", value: "--" },
+  { label: "Price shown", value: "--" },
   { label: "Whale min", value: "3 BTC" },
   { label: "Last trade", value: "--" },
   { label: "Trade side", value: "--" },
@@ -657,7 +658,10 @@ export const createDebugPanel = (
 
   const pulseFreshFeeds = (snapshot: LiveBitcoinSnapshot) => {
     feedRows.forEach((feed) => {
-      const nextSuccessAt = snapshot.feeds[feed.name]?.lastSuccessAt ?? null;
+      const nextSuccessAt =
+        feed.name === "market"
+          ? snapshot.marketWebSocket.lastPriceDisplayAt
+          : (snapshot.feeds[feed.name]?.lastSuccessAt ?? null);
       const hadPrevious = previousFeedSuccessAt.has(feed.name);
       const previousSuccessAt = previousFeedSuccessAt.get(feed.name) ?? null;
       previousFeedSuccessAt.set(feed.name, nextSuccessAt);
@@ -727,6 +731,7 @@ export const createDebugPanel = (
     );
     setMetric("Tick age", formatLastSeen(snapshot.marketWebSocket.lastTickAt));
     setMetric("Heartbeat", formatLastSeen(snapshot.marketWebSocket.lastHeartbeatAt));
+    setMetric("Price shown", formatLastSeen(snapshot.marketWebSocket.lastPriceDisplayAt));
     setMetric("Whale min", `${WHALE_MIN_BTC} BTC`);
     setMetric("Last trade", formatBtcAmount(snapshot.largeTrade.btcAmount));
     setMetric(

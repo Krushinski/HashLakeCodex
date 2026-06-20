@@ -24,6 +24,10 @@ type Firework = {
   velocity: Float32Array;
 };
 
+const MAX_ACTIVE_RINGS = 14;
+const MAX_ACTIVE_SPLASHES = 5;
+const MAX_ACTIVE_FIREWORKS = 5;
+
 export type SceneEffects = {
   group: THREE.Group;
   update: (delta: number) => void;
@@ -47,6 +51,26 @@ const getTradeColor = (side: LargeTradeSide | undefined) => {
 
 const getTradeStrength = (btcAmount: number) =>
   Math.min(4.2, Math.max(0.32, Math.log10(Math.max(3, btcAmount)) * 1.42));
+
+const disposeRing = (group: THREE.Group, ring: ExpandingRing) => {
+  group.remove(ring.mesh);
+  ring.mesh.geometry.dispose();
+  ring.mesh.material.dispose();
+};
+
+const disposeSplash = (group: THREE.Group, splash: Splash) => {
+  splash.blocks.forEach((block) => {
+    group.remove(block);
+    block.geometry.dispose();
+    block.material.dispose();
+  });
+};
+
+const disposeFirework = (group: THREE.Group, firework: Firework) => {
+  group.remove(firework.points);
+  firework.points.geometry.dispose();
+  firework.points.material.dispose();
+};
 
 export const createSceneEffects = (
   eventBus: HashlakeEventBus,
@@ -85,6 +109,19 @@ export const createSceneEffects = (
       maxScale: 24 + strength * 38,
       baseOpacity: opacity,
     });
+    while (rings.length > MAX_ACTIVE_RINGS) {
+      const oldest = rings.shift();
+      if (oldest) {
+        disposeRing(group, oldest);
+      }
+    }
+  };
+
+  const addMarketSignal = (strength: number, color = 0x8be8ff) => {
+    const origin = getWaterPosition(getBoatPosition());
+    origin.x += (Math.random() - 0.5) * 8;
+    origin.z += 8 + Math.random() * 8;
+    addRing(color, strength, origin, 0.58 + strength * 0.16, 0.075 + strength * 0.045);
   };
 
   const addLargeTradeSplash = (
@@ -145,6 +182,12 @@ export const createSceneEffects = (
       velocity,
       strength,
     });
+    while (splashes.length > MAX_ACTIVE_SPLASHES) {
+      const oldest = splashes.shift();
+      if (oldest) {
+        disposeSplash(group, oldest);
+      }
+    }
     addRing(color, strength, origin, 0.92 + strength * 0.16, 0.2);
     if (btcAmount >= 50) {
       addRing(color, strength * 0.72, origin, 1.18 + strength * 0.12, 0.13);
@@ -192,10 +235,24 @@ export const createSceneEffects = (
       );
       group.add(points);
       fireworks.push({ points, age: 0, lifetime: 1.35 + intensity * 0.4, velocity });
+      while (fireworks.length > MAX_ACTIVE_FIREWORKS) {
+        const oldest = fireworks.shift();
+        if (oldest) {
+          disposeFirework(group, oldest);
+        }
+      }
     }
   };
 
   const handleEvent = (event: HashlakeEvent) => {
+    if (event.type === "marketHeartbeat") {
+      addMarketSignal(event.intensity ?? 0.16, 0x75dddd);
+    }
+
+    if (event.type === "marketTick") {
+      addMarketSignal(0.24 + (event.intensity ?? 0.2) * 0.36, 0x91f2bf);
+    }
+
     if ((event.type === "whale" || event.type === "largeTrade") && (event.btcAmount ?? 0) >= 3) {
       addLargeTradeSplash(event.btcAmount ?? 3, event.side ?? "unknown");
     }
@@ -223,9 +280,7 @@ export const createSceneEffects = (
       ring.mesh.material.opacity = (1 - progress) ** 1.7 * ring.baseOpacity;
 
       if (progress >= 1) {
-        group.remove(ring.mesh);
-        ring.mesh.geometry.dispose();
-        ring.mesh.material.dispose();
+        disposeRing(group, ring);
         rings.splice(index, 1);
       }
     }
@@ -248,11 +303,7 @@ export const createSceneEffects = (
       });
 
       if (progress >= 1) {
-        splash.blocks.forEach((block) => {
-          group.remove(block);
-          block.geometry.dispose();
-          block.material.dispose();
-        });
+        disposeSplash(group, splash);
         splashes.splice(splashIndex, 1);
       }
     }
@@ -276,9 +327,7 @@ export const createSceneEffects = (
       firework.points.material.opacity = (1 - progress) * 0.95;
 
       if (progress >= 1) {
-        group.remove(firework.points);
-        firework.points.geometry.dispose();
-        firework.points.material.dispose();
+        disposeFirework(group, firework);
         fireworks.splice(fireworkIndex, 1);
       }
     }
@@ -293,20 +342,9 @@ export const createSceneEffects = (
     },
     dispose: () => {
       unsubscribe();
-      rings.forEach((ring) => {
-        ring.mesh.geometry.dispose();
-        ring.mesh.material.dispose();
-      });
-      splashes.forEach((splash) => {
-        splash.blocks.forEach((block) => {
-          block.geometry.dispose();
-          block.material.dispose();
-        });
-      });
-      fireworks.forEach((firework) => {
-        firework.points.geometry.dispose();
-        firework.points.material.dispose();
-      });
+      rings.forEach((ring) => disposeRing(group, ring));
+      splashes.forEach((splash) => disposeSplash(group, splash));
+      fireworks.forEach((firework) => disposeFirework(group, firework));
     },
   };
 };
