@@ -64,7 +64,7 @@ export const createSceneEffects = (
     strength: number,
     origin = getWaterPosition(getBoatPosition()),
     lifetime = 0.78 + strength * 0.24,
-    opacity = 0.34,
+    opacity = 0.28,
   ) => {
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(1, 0.035 + strength * 0.018, 8, 72),
@@ -82,7 +82,7 @@ export const createSceneEffects = (
       mesh: ring,
       age: 0,
       lifetime,
-      maxScale: 22 + strength * 36,
+      maxScale: 24 + strength * 38,
       baseOpacity: opacity,
     });
   };
@@ -121,18 +121,18 @@ export const createSceneEffects = (
       );
       block.position.set(
         origin.x + Math.cos(angle) * radius,
-        0.42 + Math.random() * 0.32,
+        0.32 + Math.random() * 0.22,
         origin.z + Math.sin(angle) * radius,
       );
       const size = 0.42 + Math.random() * 0.54 + strength * 0.08;
-      block.scale.set(size * (1.15 + Math.random() * 0.5), size * 0.42, size);
-      block.rotation.set(Math.random() * 0.25, angle, Math.random() * Math.PI);
+      block.scale.set(size * (1.18 + Math.random() * 0.48), size * 0.32, size);
+      block.rotation.set(Math.random() * 0.18, angle, Math.random() * Math.PI);
       group.add(block);
       blocks.push(block);
       velocity.push(
         new THREE.Vector3(
           Math.cos(angle) * (3.2 + strength * 1.6) * Math.random(),
-          0.45 + Math.random() * 0.75 + strength * 0.08,
+          0.25 + Math.random() * 0.42 + strength * 0.05,
           Math.sin(angle) * (3.2 + strength * 1.6) * Math.random(),
         ),
       );
@@ -145,9 +145,9 @@ export const createSceneEffects = (
       velocity,
       strength,
     });
-    addRing(color, strength, origin, 0.9 + strength * 0.16, 0.24);
+    addRing(color, strength, origin, 0.92 + strength * 0.16, 0.2);
     if (btcAmount >= 50) {
-      addRing(color, strength * 0.72, origin, 1.15 + strength * 0.12, 0.16);
+      addRing(color, strength * 0.72, origin, 1.18 + strength * 0.12, 0.13);
     }
     if (btcAmount >= 300) {
       addBoatHop(1.45);
@@ -201,7 +201,7 @@ export const createSceneEffects = (
     }
 
     if (event.type === "newBlock") {
-      addRing(0xffe6a3, 0.85, getWaterPosition(getBoatPosition()), 0.58, 0.24);
+      addRing(0xffe6a3, 0.85, getWaterPosition(getBoatPosition()), 0.5, 0.18);
       addBoatHop(1.25);
     }
 
@@ -238,13 +238,13 @@ export const createSceneEffects = (
       const progress = Math.min(1, splash.age / splash.lifetime);
       splash.blocks.forEach((block, index) => {
         const velocity = splash.velocity[index];
-        velocity.y -= 2.1 * delta;
+        velocity.y -= 2.8 * delta;
         block.position.x += velocity.x * delta;
         block.position.z += velocity.z * delta;
-        block.position.y = Math.max(0.25, block.position.y + velocity.y * delta);
+        block.position.y = Math.max(0.22, block.position.y + velocity.y * delta);
         block.rotation.y += delta * (0.6 + splash.strength * 0.2);
         block.scale.multiplyScalar(1 - delta * 0.32);
-        block.material.opacity = (1 - progress) * 0.72;
+        block.material.opacity = (1 - progress) * 0.62;
       });
 
       if (progress >= 1) {

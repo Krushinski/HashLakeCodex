@@ -5,6 +5,7 @@ import { createSceneEffects } from "./effects";
 import {
   LAKE_MAP,
   clampBoatToWater,
+  distanceToShore,
   getExpandedOutline,
   getNearestLocation,
   isWater,
@@ -826,9 +827,15 @@ type WaterSurface = {
 const createOrganicWaterGeometry = () => {
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
+  const colors: number[] = [];
+  const depthFactors: number[] = [];
   const indices: number[] = [];
   const step = 9;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
+  const deepColor = new THREE.Color(0x116f9a);
+  const midColor = new THREE.Color(0x1b93b8);
+  const shallowColor = new THREE.Color(0x58b9c3);
+  const sandbarColor = new THREE.Color(0x88caba);
 
   for (let x = minX; x < maxX; x += step) {
     for (let z = minZ; z < maxZ; z += step) {
@@ -843,12 +850,24 @@ const createOrganicWaterGeometry = () => {
 
       const vertexIndex = positions.length / 3;
       positions.push(x, 0, z, x + step, 0, z, x + step, 0, z + step, x, 0, z + step);
+      const shoreDepth = clamp(distanceToShore(center) / 74, 0, 1);
+      const sandbarDx = (center.x - LAKE_MAP.sandbar.center.x) / (LAKE_MAP.sandbar.radiusX + 60);
+      const sandbarDz = (center.z - LAKE_MAP.sandbar.center.z) / (LAKE_MAP.sandbar.radiusZ + 42);
+      const nearSandbar = clamp(1 - Math.hypot(sandbarDx, sandbarDz), 0, 1);
+      const tint = shallowColor.clone().lerp(midColor, shoreDepth).lerp(deepColor, shoreDepth * 0.42);
+      tint.lerp(sandbarColor, nearSandbar * 0.55);
+      for (let vertex = 0; vertex < 4; vertex += 1) {
+        colors.push(tint.r, tint.g, tint.b);
+        depthFactors.push(clamp(shoreDepth, 0.35, 1));
+      }
       indices.push(vertexIndex, vertexIndex + 1, vertexIndex + 2);
       indices.push(vertexIndex, vertexIndex + 2, vertexIndex + 3);
     }
   }
 
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute("depthFactor", new THREE.Float32BufferAttribute(depthFactors, 1));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -859,12 +878,13 @@ const createWater = (): WaterSurface => {
 
   const material = new THREE.MeshPhysicalMaterial({
     color: 0x187da5,
-    roughness: 0.28,
+    roughness: 0.2,
     metalness: 0.02,
+    vertexColors: true,
     transmission: 0,
-    clearcoat: 0.45,
-    clearcoatRoughness: 0.18,
-    reflectivity: 0.7,
+    clearcoat: 0.56,
+    clearcoatRoughness: 0.14,
+    reflectivity: 0.82,
   });
 
   const mesh = new THREE.Mesh(geometry, material);
@@ -886,8 +906,9 @@ const animateWater = (
 ) => {
   const position = water.mesh.geometry.attributes.position;
   const values = position.array as Float32Array;
-  const waveHeight = 0.34 + weather.dials.chop * 2.6;
-  const waveSpeed = 0.72 + weather.dials.wind * 1.7;
+  const depthFactors = water.mesh.geometry.attributes.depthFactor.array as Float32Array;
+  const waveHeight = 0.12 + weather.dials.chop * 2.45;
+  const waveSpeed = 0.45 + weather.dials.wind * 1.85;
   const chop = weather.dials.chop;
   const speedWake = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
 
@@ -899,11 +920,13 @@ const animateWater = (
       Math.max(0, 1 - distanceToBoat / 30) *
       speedWake *
       Math.sin(distanceToBoat * 0.56 - elapsed * 10);
-    const longWave = Math.sin(x * 0.035 + elapsed * waveSpeed) * waveHeight;
-    const crossWave = Math.cos(z * 0.042 + elapsed * (waveSpeed * 0.75)) * waveHeight * 0.62;
+    const shoreDepth = depthFactors[index / 3] ?? 1;
+    const longWave = Math.sin(x * 0.026 + elapsed * waveSpeed) * waveHeight * shoreDepth;
+    const crossWave =
+      Math.cos(z * 0.034 + elapsed * (waveSpeed * 0.72)) * waveHeight * 0.48 * shoreDepth;
     const shimmer =
-      Math.sin((x + z) * (0.08 + chop * 0.07) + elapsed * (1.35 + chop * 2)) *
-      (0.08 + chop * 0.42);
+      Math.sin((x + z) * (0.052 + chop * 0.07) + elapsed * (0.82 + chop * 2.3)) *
+      (0.035 + chop * 0.38);
     values[index + 1] = longWave + crossWave + shimmer + localWake * 0.62;
   }
 
@@ -918,17 +941,17 @@ const createBoat = () => {
   boat.scale.setScalar(0.84);
 
   const hullMaterial = new THREE.MeshStandardMaterial({
-    color: 0x7b4928,
-    roughness: 0.62,
+    color: 0x6f3f25,
+    roughness: 0.54,
     metalness: 0.04,
   });
   const trimMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd2a16c,
-    roughness: 0.48,
+    color: 0xd8b57c,
+    roughness: 0.42,
   });
   const bowMarkerMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf4f5eb,
-    roughness: 0.42,
+    color: 0xf7f2dd,
+    roughness: 0.34,
   });
   const motorMaterial = new THREE.MeshStandardMaterial({
     color: 0x20292d,
@@ -1054,6 +1077,22 @@ const createBoat = () => {
   const benchB = benchA.clone();
   benchB.position.x = 3.05;
   boat.add(benchB);
+
+  const deckLineMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf0d9a6,
+    roughness: 0.38,
+  });
+  for (const side of [-1, 1]) {
+    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.16, 0.16), deckLineMaterial);
+    rubRail.position.set(-0.35, 0.82, side * 2.38);
+    rubRail.castShadow = true;
+    boat.add(rubRail);
+  }
+
+  const sternPlate = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.78, 2.6), deckLineMaterial);
+  sternPlate.position.set(-6.98, 0.92, 0);
+  sternPlate.castShadow = true;
+  boat.add(sternPlate);
 
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 1.5, 4, 8), personMaterial);
   body.position.set(-0.42, 2.75, 0);
@@ -1302,18 +1341,26 @@ const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xb79d67,
-    roughness: 0.9,
+    color: 0xc7b474,
+    roughness: 0.88,
+  });
+  const wetSandMaterial = new THREE.MeshStandardMaterial({
+    color: 0x9f9464,
+    roughness: 0.96,
+  });
+  const bankMaterial = new THREE.MeshStandardMaterial({
+    color: 0x557245,
+    roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x7fb8aa,
+    color: 0x8ed0c2,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.2,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x315f3f,
+    color: 0x2f563b,
     roughness: 0.92,
   });
   const grassMaterial = new THREE.MeshStandardMaterial({
@@ -1323,6 +1370,10 @@ const createShoreline = () => {
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: 0x6c7571,
     roughness: 0.94,
+  });
+  const coveRockMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4f5b58,
+    roughness: 0.98,
   });
 
   const land = new THREE.Mesh(
@@ -1334,19 +1385,35 @@ const createShoreline = () => {
   land.receiveShadow = true;
   group.add(land);
 
+  const wetSand = new THREE.Mesh(
+    createStripGeometry(LAKE_MAP.outline, getExpandedOutline(13)),
+    wetSandMaterial,
+  );
+  wetSand.position.y = 0.035;
+  wetSand.receiveShadow = true;
+  group.add(wetSand);
+
   const shoreline = new THREE.Mesh(
-    createStripGeometry(LAKE_MAP.outline, getExpandedOutline(LAKE_MAP.shorelineWidth)),
+    createStripGeometry(getExpandedOutline(13), getExpandedOutline(LAKE_MAP.shorelineWidth)),
     sandMaterial,
   );
-  shoreline.position.y = 0.03;
+  shoreline.position.y = 0.025;
   shoreline.receiveShadow = true;
   group.add(shoreline);
 
+  const raisedBank = new THREE.Mesh(
+    createStripGeometry(getExpandedOutline(34), getExpandedOutline(62)),
+    bankMaterial,
+  );
+  raisedBank.position.y = 0;
+  raisedBank.receiveShadow = true;
+  group.add(raisedBank);
+
   const shallow = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(-16), LAKE_MAP.outline),
+    createStripGeometry(getExpandedOutline(-26), LAKE_MAP.outline),
     shallowMaterial,
   );
-  shallow.position.y = 0.09;
+  shallow.position.y = 0.11;
   group.add(shallow);
 
   const treeGeometry = new THREE.ConeGeometry(3.2, 14, 8);
@@ -1390,6 +1457,28 @@ const createShoreline = () => {
     group.add(rock);
   }
 
+  for (let index = 0; index < 28; index += 1) {
+    const base = LAKE_MAP.outline[(index * 3 + 12) % LAKE_MAP.outline.length];
+    if (base.x < 350) {
+      continue;
+    }
+
+    const length = Math.max(1, Math.hypot(base.x, base.z));
+    const ridge = new THREE.Mesh(
+      new THREE.ConeGeometry(8 + (index % 4) * 2.4, 14 + (index % 5) * 3.5, 5),
+      coveRockMaterial,
+    );
+    ridge.position.set(
+      base.x + (base.x / length) * (22 + (index % 3) * 8),
+      6.8,
+      base.z + (base.z / length) * (22 + (index % 3) * 8),
+    );
+    ridge.rotation.y = index * 0.48;
+    ridge.scale.z = 0.78;
+    ridge.castShadow = true;
+    group.add(ridge);
+  }
+
   return group;
 };
 
@@ -1430,8 +1519,17 @@ const createDestinationMarkers = () => {
   group.name = "Phase 12 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
   const sandMaterial = new THREE.MeshStandardMaterial({ color: 0xd7c282, roughness: 0.92 });
+  const sandShallowMaterial = new THREE.MeshBasicMaterial({
+    color: 0xb4d6bd,
+    transparent: true,
+    opacity: 0.24,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
   const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x6f7471, roughness: 0.9 });
+  const darkRockMaterial = new THREE.MeshStandardMaterial({ color: 0x4c5655, roughness: 0.96 });
   const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x88a45c, roughness: 0.86 });
+  const pineMaterial = new THREE.MeshStandardMaterial({ color: 0x254d36, roughness: 0.88 });
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x91f2bf });
   const lanternMaterial = new THREE.MeshBasicMaterial({ color: 0xffd37d });
   const dockCenter = getDestinationCenter("dock");
@@ -1455,11 +1553,18 @@ const createDestinationMarkers = () => {
   dockCabin.castShadow = true;
   dock.add(dockCabin);
   for (let index = 0; index < 5; index += 1) {
-    const plank = new THREE.Mesh(new THREE.BoxGeometry(22, 0.45, 2.1), dockMaterial);
-    plank.position.set(dockCenter.x + index * 4.6, 0.55, dockCenter.z - 1 - index * 1.9);
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(24, 0.38, 1.35), dockMaterial);
+    plank.position.set(dockCenter.x + index * 4.2, 0.58, dockCenter.z - 1 - index * 1.65);
     plank.rotation.y = 0.42;
     plank.castShadow = true;
     dock.add(plank);
+  }
+  for (let index = 0; index < 7; index += 1) {
+    const crossPlank = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.32, 8.8), dockMaterial);
+    crossPlank.position.set(dockCenter.x + 1.5 + index * 3.3, 0.82, dockCenter.z - 2.6 - index * 1.35);
+    crossPlank.rotation.y = 0.42;
+    crossPlank.castShadow = true;
+    dock.add(crossPlank);
   }
   for (const side of [-1, 1]) {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 8, 8), dockMaterial);
@@ -1468,6 +1573,21 @@ const createDestinationMarkers = () => {
     dock.add(post);
   }
   group.add(dock);
+
+  const sandbarHaloShape = new THREE.Shape(
+    createEllipseOutline(
+      { x: 0, z: 0 },
+      LAKE_MAP.sandbar.radiusX + 28,
+      LAKE_MAP.sandbar.radiusZ + 14,
+      0,
+    ).map((point) => new THREE.Vector2(point.x, point.z)),
+  );
+  const sandbarHalo = new THREE.Mesh(new THREE.ShapeGeometry(sandbarHaloShape, 8), sandShallowMaterial);
+  sandbarHalo.name = "Sandbar shallows";
+  sandbarHalo.position.set(sandbarCenter.x, 0.13, sandbarCenter.z);
+  sandbarHalo.rotation.x = -Math.PI / 2;
+  sandbarHalo.rotation.z = LAKE_MAP.sandbar.rotation;
+  group.add(sandbarHalo);
 
   const sandbarShape = new THREE.Shape(
     createEllipseOutline(
@@ -1487,16 +1607,30 @@ const createDestinationMarkers = () => {
 
   const coveMarker = new THREE.Group();
   coveMarker.name = "Mountain cove";
-  const coveStone = new THREE.Mesh(new THREE.ConeGeometry(12, 28, 5), rockMaterial);
+  const coveStone = new THREE.Mesh(new THREE.ConeGeometry(12, 28, 5), darkRockMaterial);
   coveStone.position.set(coveCenter.x - 10, 14, coveCenter.z + 8);
   coveStone.rotation.y = 0.7;
   coveStone.castShadow = true;
   coveMarker.add(coveStone);
-  const coveArch = new THREE.Mesh(new THREE.TorusGeometry(13, 1.6, 8, 28, Math.PI), rockMaterial);
+  const coveArch = new THREE.Mesh(new THREE.TorusGeometry(13, 1.6, 8, 28, Math.PI), darkRockMaterial);
   coveArch.position.set(coveCenter.x + 13, 8, coveCenter.z - 2);
   coveArch.rotation.set(0, 0.35, Math.PI);
   coveArch.castShadow = true;
   coveMarker.add(coveArch);
+  for (let index = 0; index < 6; index += 1) {
+    const coveFacet = new THREE.Mesh(
+      new THREE.ConeGeometry(8 + index, 20 + index * 2.2, 5),
+      darkRockMaterial,
+    );
+    coveFacet.position.set(
+      coveCenter.x - 34 + index * 12,
+      9 + index * 0.7,
+      coveCenter.z + 28 - Math.abs(index - 2.5) * 7,
+    );
+    coveFacet.rotation.y = 0.5 + index * 0.28;
+    coveFacet.castShadow = true;
+    coveMarker.add(coveFacet);
+  }
   const coveBeacon = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 10), markerMaterial);
   coveBeacon.position.set(coveCenter.x - 10, 30, coveCenter.z + 8);
   coveMarker.add(coveBeacon);
@@ -1530,6 +1664,17 @@ const createDestinationMarkers = () => {
     rock.rotation.set(index * 0.22, angle, index * 0.17);
     rock.castShadow = true;
     island.add(rock);
+  }
+  for (let index = 0; index < 5; index += 1) {
+    const tree = new THREE.Mesh(new THREE.ConeGeometry(2.2, 8, 7), pineMaterial);
+    tree.position.set(
+      islandCenter.x - 11 + index * 5.4,
+      5.2,
+      islandCenter.z + Math.sin(index * 1.4) * 7,
+    );
+    tree.rotation.y = index * 0.7;
+    tree.castShadow = true;
+    island.add(tree);
   }
   group.add(island);
 
@@ -1924,29 +2069,29 @@ const applyWeatherToScene = ({
   const dark = weather.dials.skyDark;
   const fire = weather.dials.fireWeather;
   const fog = weather.dials.fog;
-  const brightSky = new THREE.Color(0x98cad9);
+  const brightSky = new THREE.Color(0xa9d3df);
   const stormSky = new THREE.Color(0x172a31);
   const apocalypticSky = new THREE.Color(0x1a0808);
   const skyColor = brightSky.lerp(stormSky, dark).lerp(apocalypticSky, fire * 0.75);
-  const fogColor = new THREE.Color(0x9eb7b0).lerp(new THREE.Color(0x22383b), dark);
+  const fogColor = new THREE.Color(0xb2c8bf).lerp(new THREE.Color(0x22383b), dark);
 
   scene.background = skyColor;
   if (scene.fog instanceof THREE.FogExp2) {
     scene.fog.color.copy(fogColor.lerp(new THREE.Color(0xb9c5bd), weather.staleData ? 0.45 : 0));
-    scene.fog.density = 0.0035 + fog * 0.018 + dark * 0.004;
+    scene.fog.density = 0.0028 + fog * 0.018 + dark * 0.0045;
   }
 
-  sunlight.intensity = Math.max(0.18, 3.6 * (1 - dark * 0.88));
-  sunlight.color.set(fire > 0.08 ? 0xff6c3d : 0xffd79a);
-  hemisphereLight.intensity = Math.max(0.22, 1.35 * (1 - dark * 0.72));
-  hemisphereLight.color.set(fire > 0.12 ? 0x7a2117 : 0x9fd4ff);
+  sunlight.intensity = Math.max(0.18, 3.9 * (1 - dark * 0.88));
+  sunlight.color.set(fire > 0.08 ? 0xff6c3d : dark > 0.45 ? 0x9fb7c9 : 0xffdda8);
+  hemisphereLight.intensity = Math.max(0.24, 1.48 * (1 - dark * 0.72));
+  hemisphereLight.color.set(fire > 0.12 ? 0x7a2117 : dark > 0.45 ? 0x7ea1b7 : 0xb5ddff);
 
   water.mesh.material.color
-    .set(0x187da5)
+    .set(0x1a8fbd)
     .lerp(new THREE.Color(0x0e3442), dark)
     .lerp(new THREE.Color(0x401514), fire * 0.45);
-  water.mesh.material.roughness = 0.24 + weather.dials.chop * 0.55;
-  water.mesh.material.clearcoat = Math.max(0.05, 0.45 - weather.dials.chop * 0.28);
+  water.mesh.material.roughness = 0.18 + weather.dials.chop * 0.58;
+  water.mesh.material.clearcoat = Math.max(0.08, 0.58 - weather.dials.chop * 0.34);
 
   clouds.children.forEach((cloud, index) => {
     cloud.position.y = 70 - dark * 18 + Math.sin(elapsed * 0.2 + index) * 0.8;
@@ -2012,7 +2157,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 14A</span>
+    <span>Hashlake Phase 14B</span>
   `;
   return status;
 };

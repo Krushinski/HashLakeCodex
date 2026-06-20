@@ -123,6 +123,8 @@ const FEES_INTERVAL_MS = 35000;
 const MEMPOOL_INTERVAL_MS = 40000;
 const BLOCK_INTERVAL_MS = 22000;
 const NETWORK_INTERVAL_MS = 1000 * 60 * 3;
+const MARKET_PRICE_DISPLAY_INTERVAL_MS = 10000;
+const MARKET_PRICE_FORCE_UPDATE_USD = 50;
 const HEARTBEAT_MS = 1000;
 const HIDDEN_HEARTBEAT_MS = 5000;
 const HIDDEN_POLL_MULTIPLIER = 4;
@@ -357,6 +359,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     source: "none",
   };
   let lastLargeTradeEmitAt = 0;
+  let lastMarketPriceAppliedAt = 0;
 
   const emit = () => {
     const snapshot = getSnapshot();
@@ -428,30 +431,16 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
   const refreshPrice = async () => {
     markAttempt("price");
     markAttempt("market");
-    try {
-      const data = await fetchJson<unknown>(
-        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin&price_change_percentage=24h%2C7d",
-      );
-      const first = Array.isArray(data) && isRecord(data[0]) ? data[0] : null;
-      if (!first) {
-        throw new Error("Price payload missing bitcoin market row");
-      }
-
-      const priceData: PriceData = {
-        priceUsd: numberFrom(first.current_price) ?? 0,
-        priceChange24h: numberFrom(first.price_change_percentage_24h_in_currency),
-        priceChange7d: numberFrom(first.price_change_percentage_7d_in_currency),
-      };
-      markSuccess("price", priceData, (next) => {
-        metrics.priceUsd = next.priceUsd;
-        metrics.priceChange24h = next.priceChange24h;
-        metrics.priceChange7d = next.priceChange7d;
-      });
-      feeds.market = { ...feeds.price, name: "market" };
-      failures.market = 0;
-    } catch (error) {
-      markFailure("price", error);
-      markFailure("market", error);
+    const cached = readCache<PriceData>("price");
+    if (cached) {
+      metrics.priceUsd = cached.data.priceUsd;
+      metrics.priceChange24h = cached.data.priceChange24h;
+      metrics.priceChange7d = cached.data.priceChange7d;
+      applyCachedStatus(feeds.price, cached.lastSuccessAt);
+      applyCachedStatus(feeds.market, cached.lastSuccessAt);
+    } else if (marketWebSocketState.status !== "ok") {
+      markFailure("price", new Error("Coinbase websocket price pending"));
+      markFailure("market", new Error("Coinbase websocket market pending"));
     }
     emit();
   };
@@ -564,6 +553,26 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
 
   const applyMarketTick = (priceUsd: number, priceChange24h: number | null) => {
     const timestamp = now();
+    const previousPrice = metrics.priceUsd;
+    const priceMove = previousPrice === null ? Number.POSITIVE_INFINITY : Math.abs(priceUsd - previousPrice);
+    marketWebSocketState.status = "ok";
+    marketWebSocketState.lastTickAt = timestamp;
+    marketWebSocketState.message = "Ticker live";
+
+    if (
+      lastMarketPriceAppliedAt &&
+      timestamp - lastMarketPriceAppliedAt < MARKET_PRICE_DISPLAY_INTERVAL_MS &&
+      priceMove < MARKET_PRICE_FORCE_UPDATE_USD
+    ) {
+      feeds.market.status = "ok";
+      feeds.market.source = "live";
+      feeds.market.lastSuccessAt = timestamp;
+      feeds.market.message = "Coinbase ticker throttled";
+      failures.market = 0;
+      return;
+    }
+
+    lastMarketPriceAppliedAt = timestamp;
     metrics.priceUsd = priceUsd;
     if (priceChange24h !== null) {
       metrics.priceChange24h = priceChange24h;
@@ -578,9 +587,15 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     feeds.market.message = "Coinbase market tape";
     failures.price = 0;
     failures.market = 0;
-    marketWebSocketState.status = "ok";
-    marketWebSocketState.lastTickAt = timestamp;
-    marketWebSocketState.message = "Ticker live";
+    writeCache(
+      "price",
+      {
+        priceUsd: metrics.priceUsd,
+        priceChange24h: metrics.priceChange24h,
+        priceChange7d: metrics.priceChange7d,
+      },
+      timestamp,
+    );
   };
 
   const applyLargeTrade = (
@@ -661,7 +676,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         return;
       }
 
-      if (channel === "ticker" && Array.isArray(event.tickers)) {
+      if ((channel === "ticker" || channel === "ticker_batch") && Array.isArray(event.tickers)) {
         event.tickers.forEach((ticker) => {
           if (!isRecord(ticker) || ticker.product_id !== "BTC-USD") {
             return;
@@ -849,7 +864,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         marketWebSocketState.message = "Subscribing";
         failures.market = 0;
         const subscriptions = [
-          { type: "subscribe", product_ids: ["BTC-USD"], channel: "ticker" },
+          { type: "subscribe", product_ids: ["BTC-USD"], channel: "ticker_batch" },
           { type: "subscribe", product_ids: ["BTC-USD"], channel: "market_trades" },
           { type: "subscribe", channel: "heartbeats" },
         ];
@@ -878,12 +893,12 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         marketWebSocket = null;
         failures.market = Math.min(MAX_BACKOFF_MULTIPLIER, failures.market + 1);
         marketWebSocketState.status = "offline";
-        marketWebSocketState.message = "CoinGecko fallback active";
+        marketWebSocketState.message = "Cached fallback active";
         if (!feeds.market.lastSuccessAt) {
           feeds.market.status = "offline";
           feeds.market.source = "none";
         }
-        feeds.market.message = "CoinGecko fallback active";
+        feeds.market.message = "Cached fallback active";
         emit();
         if (started) {
           const timer = window.setTimeout(openMarketWebSocket, MARKET_WEBSOCKET_RETRY_MS);
@@ -895,7 +910,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         failures.market = Math.min(MAX_BACKOFF_MULTIPLIER, failures.market + 1);
         marketWebSocketState.status = "offline";
         marketWebSocketState.message = "Coinbase market websocket failed";
-        feeds.market.message = "CoinGecko fallback active";
+        feeds.market.message = "Cached fallback active";
         emit();
       });
     } catch (error) {
