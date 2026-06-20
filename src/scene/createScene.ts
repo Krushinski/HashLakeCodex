@@ -1,9 +1,11 @@
 import * as THREE from "three";
+import type { WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 
 type HashlakeSceneOptions = {
   container: HTMLElement;
   onFirstFrame: () => void;
   onRecoverableError: (message: string) => void;
+  weatherStore: WeatherStore;
 };
 
 type HashlakeScene = {
@@ -31,9 +33,10 @@ export const createHashlakeScene = ({
   container,
   onFirstFrame,
   onRecoverableError,
+  weatherStore,
 }: HashlakeSceneOptions): HashlakeScene => {
   const scene = new THREE.Scene();
-  scene.background = createSkyTexture();
+  scene.background = new THREE.Color(0x9fc8d4);
   scene.fog = new THREE.FogExp2(0x9eb7b0, 0.0042);
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
@@ -59,17 +62,22 @@ export const createHashlakeScene = ({
   sunlight.castShadow = true;
   sunlight.shadow.mapSize.set(1024, 1024);
   scene.add(sunlight);
-  scene.add(new THREE.HemisphereLight(0x9fd4ff, 0x304e36, 1.35));
+  const hemisphereLight = new THREE.HemisphereLight(0x9fd4ff, 0x304e36, 1.35);
+  scene.add(hemisphereLight);
 
   const water = createWater();
   scene.add(water.mesh);
   scene.add(createShoreline());
   scene.add(createMountains());
   scene.add(createSunDisc());
-  scene.add(createClouds());
+  const clouds = createClouds();
+  scene.add(clouds);
 
   const boat = createBoat();
   scene.add(boat);
+
+  const weatherEffects = createWeatherEffects();
+  scene.add(weatherEffects.group);
 
   const status = createStatusPill();
   container.append(status);
@@ -94,8 +102,20 @@ export const createHashlakeScene = ({
     }
 
     const elapsed = (window.performance.now() - startedAt) / 1000;
-    animateWater(water, elapsed);
-    animateBoat(boat, elapsed);
+    const weather = weatherStore.getSnapshot();
+    animateWater(water, elapsed, weather);
+    animateBoat(boat, elapsed, weather);
+    animateWeatherEffects(weatherEffects, elapsed, weather);
+    applyWeatherToScene({
+      scene,
+      camera,
+      sunlight,
+      hemisphereLight,
+      water,
+      clouds,
+      weather,
+      elapsed,
+    });
     animateStatus(status, elapsed);
     renderer.render(scene, camera);
 
@@ -175,16 +195,21 @@ const createWater = (): WaterSurface => {
   };
 };
 
-const animateWater = (water: WaterSurface, elapsed: number) => {
+const animateWater = (water: WaterSurface, elapsed: number, weather: WeatherSnapshot) => {
   const position = water.mesh.geometry.attributes.position;
   const values = position.array as Float32Array;
+  const waveHeight = 0.34 + weather.dials.chop * 2.6;
+  const waveSpeed = 0.72 + weather.dials.wind * 1.7;
+  const chop = weather.dials.chop;
 
   for (let index = 0; index < values.length; index += 3) {
     const x = water.basePositions[index];
     const z = water.basePositions[index + 2];
-    const longWave = Math.sin(x * 0.035 + elapsed * 0.85) * 0.42;
-    const crossWave = Math.cos(z * 0.042 + elapsed * 0.62) * 0.3;
-    const shimmer = Math.sin((x + z) * 0.08 + elapsed * 1.35) * 0.08;
+    const longWave = Math.sin(x * 0.035 + elapsed * waveSpeed) * waveHeight;
+    const crossWave = Math.cos(z * 0.042 + elapsed * (waveSpeed * 0.75)) * waveHeight * 0.62;
+    const shimmer =
+      Math.sin((x + z) * (0.08 + chop * 0.07) + elapsed * (1.35 + chop * 2)) *
+      (0.08 + chop * 0.42);
     values[index + 1] = longWave + crossWave + shimmer;
   }
 
@@ -267,10 +292,12 @@ const createBoat = () => {
   return boat;
 };
 
-const animateBoat = (boat: THREE.Group, elapsed: number) => {
-  boat.position.y = BOAT_HOME.y + Math.sin(elapsed * 1.2) * 0.32;
-  boat.rotation.z = Math.sin(elapsed * 0.9) * 0.055;
-  boat.rotation.x = Math.cos(elapsed * 0.72) * 0.045;
+const animateBoat = (boat: THREE.Group, elapsed: number, weather: WeatherSnapshot) => {
+  const instability = weather.dials.boatInstability;
+  const speed = 1.1 + weather.dials.wind * 1.6;
+  boat.position.y = BOAT_HOME.y + Math.sin(elapsed * speed) * (0.24 + instability * 1.2);
+  boat.rotation.z = Math.sin(elapsed * (0.9 + instability)) * (0.05 + instability * 0.25);
+  boat.rotation.x = Math.cos(elapsed * (0.72 + instability)) * (0.04 + instability * 0.18);
   boat.rotation.y = Math.sin(elapsed * 0.22) * 0.05;
 };
 
@@ -398,12 +425,189 @@ const createClouds = () => {
   return group;
 };
 
+type WeatherEffects = {
+  group: THREE.Group;
+  rain: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  embers: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  lightning: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+};
+
+const createWeatherEffects = (): WeatherEffects => {
+  const group = new THREE.Group();
+  const rain = createParticleSheet(1200, 300, 130, 0x9dd8ef, 0.8, 0.62);
+  const embers = createParticleSheet(360, 210, 110, 0xff7340, 1.15, 0.72);
+  const lightning = createLightning();
+
+  rain.name = "Phase 3 rain";
+  embers.name = "Phase 3 embers";
+  lightning.name = "Phase 3 lightning";
+  group.add(rain, embers, lightning);
+
+  return { group, rain, embers, lightning };
+};
+
+const createParticleSheet = (
+  count: number,
+  spread: number,
+  height: number,
+  color: number,
+  size: number,
+  opacity: number,
+) => {
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+
+  for (let index = 0; index < count; index += 1) {
+    positions[index * 3] = (Math.random() - 0.5) * spread;
+    positions[index * 3 + 1] = Math.random() * height + 10;
+    positions[index * 3 + 2] = (Math.random() - 0.5) * spread;
+  }
+
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const material = new THREE.PointsMaterial({
+    color,
+    opacity: 0,
+    size,
+    transparent: true,
+    depthWrite: false,
+  });
+  material.userData.targetOpacity = opacity;
+
+  return new THREE.Points(geometry, material);
+};
+
+const createLightning = () => {
+  const points = [
+    new THREE.Vector3(-30, 94, -110),
+    new THREE.Vector3(-22, 72, -106),
+    new THREE.Vector3(-34, 55, -112),
+    new THREE.Vector3(-18, 36, -108),
+    new THREE.Vector3(-24, 20, -104),
+  ];
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({
+    color: 0xd9f7ff,
+    transparent: true,
+    opacity: 0,
+  });
+  return new THREE.Line(geometry, material);
+};
+
+const animateWeatherEffects = (
+  effects: WeatherEffects,
+  elapsed: number,
+  weather: WeatherSnapshot,
+) => {
+  const rainPositions = effects.rain.geometry.attributes.position.array as Float32Array;
+  const emberPositions = effects.embers.geometry.attributes.position.array as Float32Array;
+
+  for (let index = 0; index < rainPositions.length; index += 3) {
+    rainPositions[index + 1] -= 0.9 + weather.dials.wind * 2.2;
+    rainPositions[index] += weather.dials.wind * 0.08;
+    if (rainPositions[index + 1] < 1) {
+      rainPositions[index + 1] = 132;
+    }
+  }
+
+  for (let index = 0; index < emberPositions.length; index += 3) {
+    emberPositions[index + 1] -= 0.16 + weather.dials.wind * 0.22;
+    emberPositions[index] += Math.sin(elapsed + index) * 0.035 + weather.dials.wind * 0.05;
+    if (emberPositions[index + 1] < 2) {
+      emberPositions[index + 1] = 112;
+    }
+  }
+
+  effects.rain.geometry.attributes.position.needsUpdate = true;
+  effects.embers.geometry.attributes.position.needsUpdate = true;
+  effects.rain.material.opacity =
+    weather.dials.rain * Number(effects.rain.material.userData.targetOpacity);
+  effects.embers.material.opacity =
+    weather.dials.fireWeather * Number(effects.embers.material.userData.targetOpacity);
+  effects.lightning.material.opacity =
+    weather.dials.lightning > 0.08 && Math.sin(elapsed * 8.5) > 0.86
+      ? 0.35 + weather.dials.lightning * 0.65
+      : 0;
+};
+
+type WeatherSceneTargets = {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  sunlight: THREE.DirectionalLight;
+  hemisphereLight: THREE.HemisphereLight;
+  water: WaterSurface;
+  clouds: THREE.Group;
+  weather: WeatherSnapshot;
+  elapsed: number;
+};
+
+const applyWeatherToScene = ({
+  scene,
+  camera,
+  sunlight,
+  hemisphereLight,
+  water,
+  clouds,
+  weather,
+  elapsed,
+}: WeatherSceneTargets) => {
+  const dark = weather.dials.skyDark;
+  const fire = weather.dials.fireWeather;
+  const fog = weather.dials.fog;
+  const brightSky = new THREE.Color(0x98cad9);
+  const stormSky = new THREE.Color(0x172a31);
+  const apocalypticSky = new THREE.Color(0x1a0808);
+  const skyColor = brightSky.lerp(stormSky, dark).lerp(apocalypticSky, fire * 0.75);
+  const fogColor = new THREE.Color(0x9eb7b0).lerp(new THREE.Color(0x22383b), dark);
+
+  scene.background = skyColor;
+  if (scene.fog instanceof THREE.FogExp2) {
+    scene.fog.color.copy(fogColor.lerp(new THREE.Color(0xb9c5bd), weather.staleData ? 0.45 : 0));
+    scene.fog.density = 0.0035 + fog * 0.018 + dark * 0.004;
+  }
+
+  sunlight.intensity = Math.max(0.18, 3.6 * (1 - dark * 0.88));
+  sunlight.color.set(fire > 0.08 ? 0xff6c3d : 0xffd79a);
+  hemisphereLight.intensity = Math.max(0.22, 1.35 * (1 - dark * 0.72));
+  hemisphereLight.color.set(fire > 0.12 ? 0x7a2117 : 0x9fd4ff);
+
+  water.mesh.material.color
+    .set(0x276f86)
+    .lerp(new THREE.Color(0x10272e), dark)
+    .lerp(new THREE.Color(0x401514), fire * 0.45);
+  water.mesh.material.roughness = 0.24 + weather.dials.chop * 0.55;
+  water.mesh.material.clearcoat = Math.max(0.05, 0.45 - weather.dials.chop * 0.28);
+
+  clouds.children.forEach((cloud, index) => {
+    cloud.position.y = 70 - dark * 18 + Math.sin(elapsed * 0.2 + index) * 0.8;
+    cloud.scale.setScalar(1 + dark * 1.35);
+    cloud.children.forEach((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        child.material.color.set(dark > 0.45 ? 0x404c4c : 0xf4f1df);
+        child.material.opacity = 0.7 + dark * 0.25;
+      }
+    });
+  });
+
+  const shake = weather.dials.cameraShake;
+  camera.position.set(
+    CAMERA_HOME.x + Math.sin(elapsed * 8.7) * shake * 0.48,
+    CAMERA_HOME.y + Math.sin(elapsed * 11.1) * shake * 0.28,
+    CAMERA_HOME.z + Math.cos(elapsed * 7.5) * shake * 0.42,
+  );
+  camera.lookAt(
+    Math.sin(elapsed * 5.4) * shake * 0.7,
+    6 + Math.cos(elapsed * 6.8) * shake * 0.32,
+    0,
+  );
+};
+
 const createStatusPill = () => {
   const status = document.createElement("div");
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 2</span>
+    <span>Hashlake Phase 3</span>
   `;
   return status;
 };
@@ -416,27 +620,4 @@ const animateStatus = (status: HTMLDivElement, elapsed: number) => {
 
   const pulse = 0.7 + Math.sin(elapsed * 2) * 0.3;
   dot.style.opacity = pulse.toFixed(2);
-};
-
-const createSkyTexture = () => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 16;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    return new THREE.Color(0x9fc8d4);
-  }
-
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#6da8ce");
-  gradient.addColorStop(0.48, "#c9d8bd");
-  gradient.addColorStop(1, "#f0c27a");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.mapping = THREE.EquirectangularReflectionMapping;
-  return texture;
 };

@@ -1,3 +1,5 @@
+import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
+
 type FeedStatus = "ok" | "stale" | "error" | "offline";
 
 type FeedRow = {
@@ -28,11 +30,6 @@ type BarValue = {
   max: number;
 };
 
-type DialValue = {
-  label: string;
-  value: number;
-};
-
 const metricTiles: MetricTile[] = [
   { label: "Price", value: "$62,989" },
   { label: "24h", value: "+0.48%", tone: "good" },
@@ -41,29 +38,32 @@ const metricTiles: MetricTile[] = [
   { label: "Mempool", value: "113,080 tx" },
   { label: "Block", value: "#954,434" },
   { label: "Block age", value: "12.2 min" },
-  { label: "Difficulty Δ", value: "+4.40%" },
+  { label: "Difficulty", value: "+4.40%" },
   { label: "Hashrate dip", value: "-2.65%" },
   { label: "WebSocket", value: "live", tone: "good" },
-  { label: "Staleness", value: "0%" },
+  { label: "Staleness", value: "0%", tone: "good" },
   { label: "Fire / FW", value: "0.00 / 0.00" },
 ];
 
 const contributionBars: BarValue[] = [
-  { label: "price trend", weight: "×0.35", value: 1.6, max: 10 },
-  { label: "network", weight: "×0.25", value: 0.3, max: 10 },
-  { label: "fees", weight: "×0.2", value: 0.7, max: 10 },
-  { label: "congestion", weight: "×0.1", value: 7.1, max: 10 },
-  { label: "freshness", weight: "×0.1", value: 0, max: 10 },
+  { label: "price trend", weight: "x0.35", value: 1.6, max: 10 },
+  { label: "network", weight: "x0.25", value: 0.3, max: 10 },
+  { label: "fees", weight: "x0.2", value: 0.7, max: 10 },
+  { label: "congestion", weight: "x0.1", value: 7.1, max: 10 },
+  { label: "freshness", weight: "x0.1", value: 0, max: 10 },
 ];
 
-const weatherDials: DialValue[] = [
-  { label: "chop", value: 9 },
-  { label: "wind", value: 0 },
-  { label: "rain", value: 0 },
-  { label: "lightning", value: 0 },
-  { label: "sky dark", value: 0 },
-  { label: "fog", value: 0 },
-  { label: "activity", value: 0 },
+const dialLabels: Array<{ key: keyof WeatherDials; label: string }> = [
+  { key: "chop", label: "chop" },
+  { key: "wind", label: "wind" },
+  { key: "rain", label: "rain" },
+  { key: "lightning", label: "lightning" },
+  { key: "skyDark", label: "sky dark" },
+  { key: "fog", label: "fog" },
+  { key: "fireWeather", label: "fire" },
+  { key: "boatInstability", label: "boat" },
+  { key: "cameraShake", label: "camera" },
+  { key: "ambientActivity", label: "activity" },
 ];
 
 const feedRows: FeedRow[] = [
@@ -93,31 +93,11 @@ const formatAgo = (seconds: number) => {
   return `${hours}h ${remainingMinutes}m ago`;
 };
 
-const getStormLabel = (value: number) => {
-  if (value < 20) {
-    return "Serene";
-  }
-
-  if (value < 40) {
-    return "Slightly Uneasy";
-  }
-
-  if (value < 60) {
-    return "Volatile";
-  }
-
-  if (value < 80) {
-    return "Storm";
-  }
-
-  return "Apocalyptic";
-};
-
 const createMetricTiles = () =>
   metricTiles
     .map(
       (tile) => `
-        <div class="debug-metric">
+        <div class="debug-metric" data-debug-metric="${tile.label}">
           <span class="debug-metric__label">${tile.label}</span>
           <strong class="debug-metric__value ${
             tile.tone ? `debug-tone-${tile.tone}` : ""
@@ -145,15 +125,15 @@ const createBars = () =>
     .join("");
 
 const createDials = () =>
-  weatherDials
+  dialLabels
     .map(
       (dial) => `
-        <div class="debug-dial">
+        <div class="debug-dial" data-debug-dial="${dial.key}">
           <span>${dial.label}</span>
           <div class="debug-dial__track">
-            <span style="width: ${dial.value}%"></span>
+            <span style="width: 0%"></span>
           </div>
-          <strong>${dial.value}%</strong>
+          <strong>0%</strong>
         </div>
       `,
     )
@@ -178,11 +158,11 @@ const renderTemplate = () => `
   <section class="debug-panel" aria-label="Hashlake debug dashboard">
     <header class="debug-panel__header">
       <div>
-        <strong>Hashlake — Debug</strong>
+        <strong>Hashlake - Debug</strong>
       </div>
       <div class="debug-panel__actions">
         <span class="debug-fps"><span data-debug-fps>--</span> fps</span>
-        <button class="debug-close" type="button" aria-label="Close debug panel">×</button>
+        <button class="debug-close" type="button" aria-label="Close debug panel">x</button>
       </div>
     </header>
 
@@ -239,6 +219,7 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="whale">Whale</button>
         <button type="button" data-debug-action="block">Block</button>
         <button type="button" data-debug-action="gust">Gust</button>
+        <button type="button" data-debug-action="stale">Stale Fog</button>
         <button type="button" data-debug-action="resume">Resume Live</button>
       </div>
     </div>
@@ -253,7 +234,28 @@ const isEditableTarget = (target: EventTarget | null) => {
   return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 };
 
-export const createDebugPanel = (container: HTMLElement): DebugPanel => {
+const updateFeedRows = (wrapper: HTMLElement, staleData: boolean) => {
+  for (const feed of feedRows) {
+    const row = wrapper.querySelector<HTMLElement>(`[data-feed="${feed.name}"]`);
+    const dot = row?.querySelector<HTMLElement>(".debug-feed__dot");
+    const status = row?.querySelector<HTMLElement>(".debug-feed__status");
+    if (!row || !dot || !status) {
+      continue;
+    }
+
+    const nextStatus: FeedStatus =
+      staleData && ["price", "mempool", "fees", "market"].includes(feed.name)
+        ? "stale"
+        : feed.status;
+    dot.className = `debug-feed__dot debug-feed__dot--${nextStatus}`;
+    status.textContent = nextStatus;
+  }
+};
+
+export const createDebugPanel = (
+  container: HTMLElement,
+  weatherStore: WeatherStore,
+): DebugPanel => {
   const wrapper = document.createElement("div");
   wrapper.className = "debug-panel-shell";
   wrapper.setAttribute("aria-hidden", "true");
@@ -282,25 +284,56 @@ export const createDebugPanel = (container: HTMLElement): DebugPanel => {
     wrapper.setAttribute("aria-hidden", String(!visible));
   };
 
-  const setStorm = (value: number, mode: string) => {
-    const clampedValue = Math.max(0, Math.min(100, value));
-    const label = getStormLabel(clampedValue);
-
+  const renderWeather = (snapshot: WeatherSnapshot) => {
     if (stormValueElement) {
-      stormValueElement.textContent = clampedValue.toFixed(1);
+      stormValueElement.textContent = snapshot.stormIndex.toFixed(1);
     }
 
     if (stormLabelElement) {
-      stormLabelElement.textContent = label;
+      stormLabelElement.textContent = snapshot.stage;
     }
 
     if (stormSlider) {
-      stormSlider.value = clampedValue.toFixed(1);
+      stormSlider.value = snapshot.stormIndex.toFixed(1);
     }
 
     if (liveModeElement) {
-      liveModeElement.textContent = mode;
+      liveModeElement.textContent = snapshot.mode;
     }
+
+    const stalenessMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Staleness"] .debug-metric__value',
+    );
+    const fireMetric = wrapper.querySelector<HTMLElement>(
+      '[data-debug-metric="Fire / FW"] .debug-metric__value',
+    );
+
+    if (stalenessMetric) {
+      stalenessMetric.textContent = snapshot.staleData ? "86%" : "0%";
+      stalenessMetric.classList.toggle("debug-tone-warn", snapshot.staleData);
+      stalenessMetric.classList.toggle("debug-tone-good", !snapshot.staleData);
+    }
+
+    if (fireMetric) {
+      fireMetric.textContent = `${snapshot.dials.fireWeather.toFixed(2)} / ${snapshot.dials.fog.toFixed(2)}`;
+    }
+
+    dialLabels.forEach((dial) => {
+      const row = wrapper.querySelector<HTMLElement>(`[data-debug-dial="${dial.key}"]`);
+      const bar = row?.querySelector<HTMLElement>(".debug-dial__track span");
+      const value = row?.querySelector<HTMLElement>("strong");
+      const percent = Math.round(snapshot.dials[dial.key] * 100);
+      if (bar) {
+        bar.style.width = `${percent}%`;
+      }
+      if (value) {
+        value.textContent = `${percent}%`;
+      }
+    });
+
+    updateFeedRows(wrapper, snapshot.staleData);
+    wrapper.dataset.weatherStage = snapshot.stage;
+    wrapper.classList.toggle("debug-panel-shell--stale", snapshot.staleData);
   };
 
   const updateFeedTimers = () => {
@@ -342,7 +375,7 @@ export const createDebugPanel = (container: HTMLElement): DebugPanel => {
   };
 
   stormSlider?.addEventListener("input", () => {
-    setStorm(Number(stormSlider.value), "Manual");
+    weatherStore.setStormIndex(Number(stormSlider.value), "Manual");
   });
 
   closeButton?.addEventListener("click", () => setVisible(false));
@@ -351,21 +384,24 @@ export const createDebugPanel = (container: HTMLElement): DebugPanel => {
     button.addEventListener("click", () => {
       const action = button.dataset.debugAction;
       if (action === "crash") {
-        setStorm(86, "Manual Crash");
+        weatherStore.triggerCrash();
       } else if (action === "rally") {
-        setStorm(7, "Manual Rally");
+        weatherStore.triggerRally();
       } else if (action === "whale") {
-        setStorm(54, "Manual Whale");
+        weatherStore.setStormIndex(54, "Manual Whale");
       } else if (action === "block") {
-        setStorm(18, "Manual Block");
+        weatherStore.setStormIndex(18, "Manual Block");
       } else if (action === "gust") {
-        setStorm(63, "Manual Gust");
+        weatherStore.triggerGust();
+      } else if (action === "stale") {
+        weatherStore.triggerStaleFog();
       } else {
-        setStorm(8.9, "Live");
+        weatherStore.resumeLive();
       }
     });
   });
 
+  const unsubscribe = weatherStore.subscribe(renderWeather);
   window.addEventListener("keydown", handleKeydown);
   updateFeedTimers();
   timerId = window.setInterval(updateFeedTimers, 1000);
@@ -377,6 +413,7 @@ export const createDebugPanel = (container: HTMLElement): DebugPanel => {
       window.removeEventListener("keydown", handleKeydown);
       window.clearInterval(timerId);
       window.cancelAnimationFrame(fpsFrame);
+      unsubscribe();
       wrapper.remove();
     },
     isVisible: () => wrapper.classList.contains("debug-panel-shell--visible"),
