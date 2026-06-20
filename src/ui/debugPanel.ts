@@ -7,6 +7,7 @@ import type {
   LiveBitcoinStore,
 } from "../state/liveBitcoinStore";
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
+import { LAKE_MAP } from "../scene/lakeMap";
 
 type FeedRow = {
   name: FeedName;
@@ -42,7 +43,9 @@ export type SceneTelemetry = {
     x: number;
     z: number;
   };
+  heading: number;
   cameraPreset: string;
+  nearestLocation: string;
   savedTableau: boolean;
 };
 
@@ -57,12 +60,14 @@ const metricTiles: MetricTile[] = [
   { label: "Difficulty", value: "+4.40%" },
   { label: "Hashrate dip", value: "-2.65%" },
   { label: "WebSocket", value: "live", tone: "good" },
+  { label: "Polling", value: "active", tone: "good" },
   { label: "Data mode", value: "LIVE", tone: "good" },
   { label: "Staleness", value: "0%", tone: "good" },
   { label: "Fire / FW", value: "0.00 / 0.00" },
   { label: "Mode", value: "Frame", tone: "muted" },
   { label: "Boat speed", value: "0.0" },
   { label: "Boat pos", value: "0, 0" },
+  { label: "Nearest", value: "Dock" },
   { label: "Camera", value: "Cinematic" },
 ];
 
@@ -98,6 +103,18 @@ const feedRows: FeedRow[] = [
   { name: "hashrate", status: "offline", source: "none" },
   { name: "websocket", status: "offline", source: "none" },
 ];
+
+const metricLabelsByFeed: Record<FeedName, string[]> = {
+  price: ["Price"],
+  market: ["24h", "7d"],
+  fees: ["Fastest fee"],
+  mempool: ["Mempool"],
+  block: ["Block", "Block age"],
+  difficulty: ["Difficulty"],
+  hashrate: ["Hashrate dip"],
+  whales: [],
+  websocket: ["WebSocket"],
+};
 
 const formatAgo = (seconds: number) => {
   if (seconds < 60) {
@@ -273,6 +290,20 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="resume">Resume Live</button>
       </div>
     </div>
+
+    <div class="debug-section debug-minimap-section">
+      <div class="debug-section__heading">
+        <span>Lake Map</span>
+        <strong data-debug-nearest>--</strong>
+      </div>
+      <canvas
+        class="debug-minimap"
+        width="320"
+        height="190"
+        data-debug-minimap
+        aria-label="Debug lake minimap"
+      ></canvas>
+    </div>
   </section>
 `;
 
@@ -304,6 +335,112 @@ const updateFeedRows = (wrapper: HTMLElement, snapshot: LiveBitcoinSnapshot) => 
   }
 };
 
+const drawMinimap = (
+  canvas: HTMLCanvasElement,
+  telemetry: SceneTelemetry,
+  isStale: boolean,
+) => {
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const scale = (Math.min(width, height) - 28) / (LAKE_MAP.mapRadius * 2);
+  const mapX = (x: number) => width / 2 + x * scale;
+  const mapY = (z: number) => height / 2 + z * scale;
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "rgba(4, 14, 18, 0.74)";
+  context.fillRect(0, 0, width, height);
+
+  context.save();
+  context.translate(width / 2, height / 2);
+  context.scale(scale, scale);
+  context.lineWidth = 2 / scale;
+
+  context.fillStyle = "rgba(55, 92, 62, 0.42)";
+  context.strokeStyle = "rgba(153, 220, 183, 0.24)";
+  context.beginPath();
+  context.arc(0, 0, LAKE_MAP.shorelineOuterRadius, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "rgba(36, 112, 133, 0.72)";
+  context.strokeStyle = "rgba(126, 217, 218, 0.44)";
+  context.beginPath();
+  context.arc(0, 0, LAKE_MAP.waterRadius, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "rgba(220, 194, 126, 0.78)";
+  context.strokeStyle = "rgba(255, 246, 206, 0.36)";
+  context.beginPath();
+  context.ellipse(
+    LAKE_MAP.sandbar.center.x,
+    LAKE_MAP.sandbar.center.z,
+    LAKE_MAP.sandbar.radiusX,
+    LAKE_MAP.sandbar.radiusZ,
+    0.34,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "rgba(111, 116, 113, 0.86)";
+  context.strokeStyle = "rgba(238, 245, 238, 0.28)";
+  context.beginPath();
+  context.arc(LAKE_MAP.island.center.x, LAKE_MAP.island.center.z, LAKE_MAP.island.radius, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+
+  context.restore();
+
+  context.font = "10px Cascadia Mono, SFMono-Regular, Consolas, monospace";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  LAKE_MAP.destinations.forEach((destination) => {
+    const x = mapX(destination.center.x);
+    const y = mapY(destination.center.z);
+    context.fillStyle =
+      destination.kind === "shore"
+        ? "rgba(145, 242, 191, 0.9)"
+        : "rgba(255, 224, 145, 0.92)";
+    context.beginPath();
+    context.arc(x, y, 3.2, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "rgba(235, 246, 239, 0.82)";
+    context.fillText(destination.label, x, y - 9);
+  });
+
+  const boatX = mapX(telemetry.position.x);
+  const boatY = mapY(telemetry.position.z);
+  const forwardX = Math.cos(telemetry.heading);
+  const forwardY = Math.sin(telemetry.heading);
+  const sideX = -forwardY;
+  const sideY = forwardX;
+  context.fillStyle = telemetry.mode === "Drive" ? "#91f2bf" : "#75dddd";
+  context.strokeStyle = "rgba(2, 8, 10, 0.72)";
+  context.lineWidth = 1.4;
+  context.beginPath();
+  context.moveTo(boatX + forwardX * 8, boatY + forwardY * 8);
+  context.lineTo(boatX - forwardX * 6 + sideX * 4.5, boatY - forwardY * 6 + sideY * 4.5);
+  context.lineTo(boatX - forwardX * 6 - sideX * 4.5, boatY - forwardY * 6 - sideY * 4.5);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  if (isStale) {
+    context.fillStyle = "rgba(208, 218, 205, 0.2)";
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = "rgba(245, 241, 222, 0.72)";
+    context.textAlign = "left";
+    context.fillText("fog/stale", 10, height - 13);
+  }
+};
+
 export const createDebugPanel = (
   container: HTMLElement,
   weatherStore: WeatherStore,
@@ -327,12 +464,16 @@ export const createDebugPanel = (
   const liveModeElement = wrapper.querySelector<HTMLElement>("[data-debug-live-mode]");
   const closeButton = wrapper.querySelector<HTMLButtonElement>(".debug-close");
   const actionButtons = wrapper.querySelectorAll<HTMLButtonElement>("[data-debug-action]");
+  const minimapCanvas = wrapper.querySelector<HTMLCanvasElement>("[data-debug-minimap]");
+  const nearestLocationElement = wrapper.querySelector<HTMLElement>("[data-debug-nearest]");
 
   let fpsFrame = 0;
   let fpsFrames = 0;
   let fpsLastSample = window.performance.now();
   let timerId = 0;
   let currentWeatherDataMode: WeatherSnapshot["dataMode"] = "LIVE";
+  let currentWeatherStale = false;
+  const previousFeedSuccessAt = new Map<FeedName, number | null>();
 
   const setVisible = (visible: boolean) => {
     wrapper.classList.toggle("debug-panel-shell--visible", visible);
@@ -341,6 +482,7 @@ export const createDebugPanel = (
 
   const renderWeather = (snapshot: WeatherSnapshot) => {
     currentWeatherDataMode = snapshot.dataMode;
+    currentWeatherStale = snapshot.staleData;
     if (stormValueElement) {
       stormValueElement.textContent = snapshot.stormIndex.toFixed(1);
     }
@@ -424,8 +566,42 @@ export const createDebugPanel = (
     element.classList.toggle("debug-tone-muted", tone === "muted");
   };
 
+  const pulseMetricCard = (label: string) => {
+    const element = wrapper.querySelector<HTMLElement>(`[data-debug-metric="${label}"]`);
+    if (!element) {
+      return;
+    }
+
+    element.classList.remove("debug-metric--fresh");
+    void element.offsetWidth;
+    element.classList.add("debug-metric--fresh");
+  };
+
+  const pulseFreshFeeds = (snapshot: LiveBitcoinSnapshot) => {
+    feedRows.forEach((feed) => {
+      const nextSuccessAt = snapshot.feeds[feed.name]?.lastSuccessAt ?? null;
+      const hadPrevious = previousFeedSuccessAt.has(feed.name);
+      const previousSuccessAt = previousFeedSuccessAt.get(feed.name) ?? null;
+      previousFeedSuccessAt.set(feed.name, nextSuccessAt);
+
+      if (!hadPrevious || !nextSuccessAt || nextSuccessAt === previousSuccessAt) {
+        return;
+      }
+
+      const row = wrapper.querySelector<HTMLElement>(`[data-feed="${feed.name}"]`);
+      if (row) {
+        row.classList.remove("debug-feed--fresh");
+        void row.offsetWidth;
+        row.classList.add("debug-feed--fresh");
+      }
+
+      metricLabelsByFeed[feed.name].forEach(pulseMetricCard);
+    });
+  };
+
   const renderLiveData = (snapshot: LiveBitcoinSnapshot) => {
     const { metrics } = snapshot;
+    pulseFreshFeeds(snapshot);
     setMetric("Price", formatCurrency(metrics.priceUsd));
     setMetric(
       "24h",
@@ -459,6 +635,15 @@ export const createDebugPanel = (
       snapshot.feeds.websocket.status === "ok"
         ? "good"
         : snapshot.feeds.websocket.status === "reconnecting"
+          ? "warn"
+          : "bad",
+    );
+    setMetric(
+      "Polling",
+      snapshot.pollingMode,
+      snapshot.pollingMode === "active"
+        ? "good"
+        : snapshot.pollingMode === "slowed"
           ? "warn"
           : "bad",
     );
@@ -535,6 +720,16 @@ export const createDebugPanel = (
       cameraMetric.textContent = telemetry.savedTableau
         ? telemetry.cameraPreset
         : `${telemetry.cameraPreset}*`;
+    }
+
+    setMetric("Nearest", telemetry.nearestLocation);
+
+    if (nearestLocationElement) {
+      nearestLocationElement.textContent = telemetry.nearestLocation;
+    }
+
+    if (minimapCanvas) {
+      drawMinimap(minimapCanvas, telemetry, currentWeatherStale);
     }
   };
 

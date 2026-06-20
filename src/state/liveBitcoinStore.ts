@@ -3,6 +3,7 @@ import type { HashlakeEventBus } from "./eventBus";
 export type FeedStatus = "ok" | "stale" | "error" | "offline" | "reconnecting";
 export type FeedSource = "live" | "cached" | "sim" | "none";
 export type DataMode = "LIVE" | "MANUAL" | "CACHED" | "STALE";
+export type PollingMode = "active" | "slowed" | "backoff";
 
 export type FeedName =
   | "price"
@@ -48,6 +49,7 @@ export type LiveBitcoinSnapshot = {
   metrics: BitcoinMetrics;
   feeds: Record<FeedName, FeedHealth>;
   dataMode: DataMode;
+  pollingMode: PollingMode;
   stormIndex: number;
   staleness: number;
   contributions: StormContributions;
@@ -93,11 +95,15 @@ type NetworkData = {
 const CACHE_PREFIX = "hashlake.feed.";
 const FETCH_TIMEOUT_MS = 7000;
 const STALE_AFTER_MS = 1000 * 60 * 4;
-const PRICE_INTERVAL_MS = 30000;
-const FEES_INTERVAL_MS = 45000;
-const MEMPOOL_INTERVAL_MS = 52000;
-const BLOCK_INTERVAL_MS = 25000;
-const NETWORK_INTERVAL_MS = 1000 * 60 * 4;
+const PRICE_INTERVAL_MS = 20000;
+const FEES_INTERVAL_MS = 35000;
+const MEMPOOL_INTERVAL_MS = 40000;
+const BLOCK_INTERVAL_MS = 22000;
+const NETWORK_INTERVAL_MS = 1000 * 60 * 3;
+const HEARTBEAT_MS = 1000;
+const HIDDEN_HEARTBEAT_MS = 5000;
+const HIDDEN_POLL_MULTIPLIER = 4;
+const MAX_BACKOFF_MULTIPLIER = 4;
 const WEBSOCKET_RETRY_MS = 30000;
 
 const FEED_NAMES: FeedName[] = [
@@ -267,6 +273,10 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     FeedName,
     FeedHealth
   >;
+  const failures = Object.fromEntries(FEED_NAMES.map((name) => [name, 0])) as Record<
+    FeedName,
+    number
+  >;
   const metrics: BitcoinMetrics = { ...DEFAULT_METRICS };
   const timers: number[] = [];
   let websocket: WebSocket | null = null;
@@ -289,10 +299,12 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     feeds[name].source = "live";
     feeds[name].lastSuccessAt = timestamp;
     feeds[name].message = "Live update";
+    failures[name] = 0;
     writeCache(name, data, timestamp);
   };
 
   const markFailure = (name: FeedName, error: unknown) => {
+    failures[name] = Math.min(MAX_BACKOFF_MULTIPLIER, failures[name] + 1);
     const hasCache = Boolean(feeds[name].lastSuccessAt);
     feeds[name].status = hasCache ? "stale" : "error";
     feeds[name].source = hasCache ? "cached" : "none";
@@ -361,6 +373,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         metrics.priceChange7d = next.priceChange7d;
       });
       feeds.market = { ...feeds.price, name: "market" };
+      failures.market = 0;
     } catch (error) {
       markFailure("price", error);
       markFailure("market", error);
@@ -465,6 +478,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         metrics.hashrateChange = next.hashrateChange;
       });
       feeds.hashrate = { ...feeds.difficulty, name: "hashrate" };
+      failures.hashrate = 0;
     } catch (error) {
       markFailure("difficulty", error);
       markFailure("hashrate", error);
@@ -472,16 +486,61 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     emit();
   };
 
-  const schedule = (task: () => Promise<void>, initialDelay: number, cadence: number) => {
+  const getPollingMultiplier = (names: FeedName[]) => {
+    const highestFailureCount = Math.max(...names.map((name) => failures[name]));
+    const backoffMultiplier =
+      highestFailureCount > 0
+        ? Math.min(MAX_BACKOFF_MULTIPLIER, 1 + highestFailureCount)
+        : 1;
+    return Math.max(document.hidden ? HIDDEN_POLL_MULTIPLIER : 1, backoffMultiplier);
+  };
+
+  const schedule = (
+    task: () => Promise<void>,
+    initialDelay: number,
+    cadence: number,
+    names: FeedName[],
+  ) => {
     let timer = 0;
     const run = () => {
       void task().finally(() => {
-        timer = window.setTimeout(run, cadence);
+        if (!started) {
+          return;
+        }
+
+        timer = window.setTimeout(run, cadence * getPollingMultiplier(names));
         timers.push(timer);
       });
     };
     timer = window.setTimeout(run, initialDelay);
     timers.push(timer);
+  };
+
+  const getPollingMode = (): PollingMode => {
+    if (document.hidden) {
+      return "slowed";
+    }
+
+    return FEED_NAMES.some((name) => name !== "whales" && failures[name] > 0)
+      ? "backoff"
+      : "active";
+  };
+
+  const runHeartbeat = () => {
+    if (!started) {
+      return;
+    }
+
+    emit();
+    const timer = window.setTimeout(
+      runHeartbeat,
+      document.hidden ? HIDDEN_HEARTBEAT_MS : HEARTBEAT_MS,
+    );
+    timers.push(timer);
+  };
+
+  const handleVisibilityChange = () => {
+    emit();
   };
 
   const openWebSocket = () => {
@@ -500,6 +559,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         feeds.websocket.source = "live";
         feeds.websocket.lastSuccessAt = now();
         feeds.websocket.message = "Live websocket";
+        failures.websocket = 0;
         websocket?.send(JSON.stringify({ action: "want", data: ["blocks"] }));
         emit();
       });
@@ -508,6 +568,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
         feeds.websocket.status = "ok";
         feeds.websocket.lastSuccessAt = now();
         feeds.websocket.message = "Heartbeat";
+        failures.websocket = 0;
         try {
           const data = JSON.parse(String(message.data)) as unknown;
           const block = isRecord(data) && isRecord(data.block) ? data.block : null;
@@ -524,6 +585,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
       });
 
       websocket.addEventListener("close", () => {
+        failures.websocket = Math.min(MAX_BACKOFF_MULTIPLIER, failures.websocket + 1);
         feeds.websocket.status = "offline";
         feeds.websocket.message = "Polling fallback active";
         emit();
@@ -534,11 +596,13 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
       });
 
       websocket.addEventListener("error", () => {
+        failures.websocket = Math.min(MAX_BACKOFF_MULTIPLIER, failures.websocket + 1);
         feeds.websocket.status = "offline";
         feeds.websocket.message = "Websocket failed";
         emit();
       });
     } catch (error) {
+      failures.websocket = Math.min(MAX_BACKOFF_MULTIPLIER, failures.websocket + 1);
       feeds.websocket.status = "offline";
       feeds.websocket.message = error instanceof Error ? error.message : "Websocket unavailable";
       emit();
@@ -554,6 +618,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
       metrics: { ...metrics },
       feeds: { ...feeds },
       dataMode: getDataMode(feeds),
+      pollingMode: getPollingMode(),
       stormIndex: scored.stormIndex,
       staleness: scored.staleness,
       contributions: scored.contributions,
@@ -571,15 +636,18 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
 
       started = true;
       emit();
-      schedule(refreshPrice, 50, PRICE_INTERVAL_MS);
-      schedule(refreshFees, 900, FEES_INTERVAL_MS);
-      schedule(refreshMempool, 1700, MEMPOOL_INTERVAL_MS);
-      schedule(refreshBlock, 2500, BLOCK_INTERVAL_MS);
-      schedule(refreshNetwork, 4200, NETWORK_INTERVAL_MS);
+      window.addEventListener("visibilitychange", handleVisibilityChange);
+      schedule(refreshPrice, 50, PRICE_INTERVAL_MS, ["price", "market"]);
+      schedule(refreshFees, 900, FEES_INTERVAL_MS, ["fees"]);
+      schedule(refreshMempool, 1700, MEMPOOL_INTERVAL_MS, ["mempool"]);
+      schedule(refreshBlock, 2500, BLOCK_INTERVAL_MS, ["block"]);
+      schedule(refreshNetwork, 4200, NETWORK_INTERVAL_MS, ["difficulty", "hashrate"]);
+      runHeartbeat();
       openWebSocket();
     },
     stop: () => {
       started = false;
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
       timers.forEach((timer) => window.clearTimeout(timer));
       timers.length = 0;
       websocket?.close();

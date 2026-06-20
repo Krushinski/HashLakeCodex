@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { createSceneEffects } from "./effects";
+import { LAKE_MAP, clampBoatToLake, getNearestLocation } from "./lakeMap";
 
 type HashlakeSceneOptions = {
   container: HTMLElement;
@@ -21,7 +22,6 @@ type HashlakeScene = {
 const LAKE_SIZE = 520;
 const CAMERA_HOME = new THREE.Vector3(0, 34, 78);
 const BOAT_HOME = new THREE.Vector3(0, 2.2, 0);
-const DRIVE_BOUNDARY_RADIUS = 132;
 const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
 const DRIVE_ACCELERATION = 96;
 const DRIVE_MAX_SPEED = 72;
@@ -45,7 +45,9 @@ type SceneTelemetry = {
     x: number;
     z: number;
   };
+  heading: number;
   cameraPreset: string;
+  nearestLocation: string;
   savedTableau: boolean;
 };
 
@@ -141,6 +143,12 @@ const clamp = (value: number, min: number, max: number) =>
 
 const shortestAngleDelta = (from: number, to: number) =>
   Math.atan2(Math.sin(to - from), Math.cos(to - from));
+
+const getDestinationCenter = (key: "dock" | "sandbar" | "cove" | "island" | "reeds") =>
+  LAKE_MAP.destinations.find((destination) => destination.key === key)?.center ?? {
+    x: 0,
+    z: 0,
+  };
 
 const createDefaultTableau = (): SavedTableau => ({
   boat: {
@@ -642,7 +650,12 @@ export const createHashlakeScene = ({
         x: driveState.x,
         z: driveState.z,
       },
+      heading: driveState.yaw,
       cameraPreset: CAMERA_PRESETS[driveState.cameraPresetIndex].name,
+      nearestLocation: getNearestLocation({
+        x: driveState.x,
+        z: driveState.z,
+      }).destination.label,
       savedTableau: driveState.hasSavedTableau,
     }),
     toggleDriveMode,
@@ -874,23 +887,31 @@ const updateDriveState = (
   driveState.x += forwardX * driveState.speed * delta;
   driveState.z += forwardZ * driveState.speed * delta;
 
-  const distanceFromCenter = Math.hypot(driveState.x, driveState.z);
-  if (distanceFromCenter > DRIVE_BOUNDARY_RADIUS) {
-    const overage = distanceFromCenter - DRIVE_BOUNDARY_RADIUS;
-    const outwardX = driveState.x / distanceFromCenter;
-    const outwardZ = driveState.z / distanceFromCenter;
-    const centerYaw = Math.atan2(-driveState.z, -driveState.x);
-    driveState.x -= outwardX * overage * 0.18;
-    driveState.z -= outwardZ * overage * 0.18;
-    driveState.speed *= Math.pow(0.35, delta);
-    driveState.yaw += shortestAngleDelta(driveState.yaw, centerYaw) * delta * 0.9;
-  }
+  const clamped = clampBoatToLake({
+    x: driveState.x,
+    z: driveState.z,
+  });
 
-  if (distanceFromCenter > DRIVE_BOUNDARY_RADIUS + 10) {
-    const scale = (DRIVE_BOUNDARY_RADIUS + 10) / distanceFromCenter;
-    driveState.x *= scale;
-    driveState.z *= scale;
-    driveState.speed *= 0.52;
+  if (clamped.hitBoundary) {
+    const boundaryDistance = Math.hypot(
+      clamped.point.x - driveState.x,
+      clamped.point.z - driveState.z,
+    );
+    const correction = Math.min(1, delta * 8);
+    driveState.x += (clamped.point.x - driveState.x) * correction;
+    driveState.z += (clamped.point.z - driveState.z) * correction;
+    driveState.speed *= Math.pow(0.32, delta);
+    driveState.yaw += shortestAngleDelta(driveState.yaw, clamped.centerYaw) * delta * 0.8;
+
+    if (boundaryDistance > 10) {
+      const hardClamp = clampBoatToLake({
+        x: driveState.x,
+        z: driveState.z,
+      });
+      driveState.x = hardClamp.point.x;
+      driveState.z = hardClamp.point.z;
+      driveState.speed *= 0.68;
+    }
   }
 };
 
@@ -934,7 +955,14 @@ const createShoreline = () => {
     roughness: 0.94,
   });
 
-  const sand = new THREE.Mesh(new THREE.RingGeometry(136, 236, 96), sandMaterial);
+  const sand = new THREE.Mesh(
+    new THREE.RingGeometry(
+      LAKE_MAP.shorelineInnerRadius,
+      LAKE_MAP.shorelineOuterRadius,
+      128,
+    ),
+    sandMaterial,
+  );
   sand.rotation.x = -Math.PI / 2;
   sand.position.y = -0.18;
   sand.receiveShadow = true;
@@ -946,7 +974,7 @@ const createShoreline = () => {
 
   for (let index = 0; index < 90; index += 1) {
     const angle = index * 2.399963 + Math.sin(index) * 0.1;
-    const radius = 150 + ((index * 37) % 78);
+    const radius = LAKE_MAP.shorelineInnerRadius + 16 + ((index * 37) % 76);
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
 
@@ -965,7 +993,7 @@ const createShoreline = () => {
 
   for (let index = 0; index < 34; index += 1) {
     const angle = index * 1.77;
-    const radius = 128 + ((index * 29) % 54);
+    const radius = LAKE_MAP.shorelineInnerRadius + 2 + ((index * 29) % 58);
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(2.5 + (index % 5) * 0.4), rockMaterial);
     rock.position.set(Math.cos(angle) * radius, 1.1, Math.sin(angle) * radius);
     rock.scale.y = 0.55 + (index % 4) * 0.12;
@@ -1011,38 +1039,43 @@ const createMountains = () => {
 
 const createDestinationMarkers = () => {
   const group = new THREE.Group();
-  group.name = "Phase 6 destination landmarks";
+  group.name = "Phase 7 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
   const sandMaterial = new THREE.MeshStandardMaterial({ color: 0xd7c282, roughness: 0.92 });
   const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x6f7471, roughness: 0.9 });
   const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x88a45c, roughness: 0.86 });
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x91f2bf });
   const lanternMaterial = new THREE.MeshBasicMaterial({ color: 0xffd37d });
+  const dockCenter = getDestinationCenter("dock");
+  const sandbarCenter = getDestinationCenter("sandbar");
+  const coveCenter = getDestinationCenter("cove");
+  const islandCenter = getDestinationCenter("island");
+  const reedsCenter = getDestinationCenter("reeds");
 
   const dock = new THREE.Group();
   dock.name = "Dock area";
   const dockBeacon = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.4, 22, 8), dockMaterial);
-  dockBeacon.position.set(-104, 10, -112);
+  dockBeacon.position.set(dockCenter.x + 2, 10, dockCenter.z - 2);
   dockBeacon.castShadow = true;
   dock.add(dockBeacon);
   const dockLantern = new THREE.Mesh(new THREE.SphereGeometry(2.4, 18, 12), lanternMaterial);
-  dockLantern.position.set(-104, 22.4, -112);
+  dockLantern.position.set(dockCenter.x + 2, 22.4, dockCenter.z - 2);
   dock.add(dockLantern);
   const dockCabin = new THREE.Mesh(new THREE.BoxGeometry(13, 8, 10), dockMaterial);
-  dockCabin.position.set(-122, 4.2, -120);
+  dockCabin.position.set(dockCenter.x - 16, 4.2, dockCenter.z - 10);
   dockCabin.rotation.y = -0.28;
   dockCabin.castShadow = true;
   dock.add(dockCabin);
   for (let index = 0; index < 5; index += 1) {
     const plank = new THREE.Mesh(new THREE.BoxGeometry(22, 0.45, 2.1), dockMaterial);
-    plank.position.set(-98 + index * 2.6, 0.55, -104 + index * 0.5);
+    plank.position.set(dockCenter.x + 8 + index * 2.6, 0.55, dockCenter.z + 6 + index * 0.5);
     plank.rotation.y = -0.18;
     plank.castShadow = true;
     dock.add(plank);
   }
   for (const side of [-1, 1]) {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 8, 8), dockMaterial);
-    post.position.set(-94, 3, -104 + side * 6);
+    post.position.set(dockCenter.x + 12, 3, dockCenter.z + 6 + side * 6);
     post.castShadow = true;
     dock.add(post);
   }
@@ -1050,7 +1083,7 @@ const createDestinationMarkers = () => {
 
   const sandbar = new THREE.Mesh(new THREE.CylinderGeometry(24, 30, 0.55, 48), sandMaterial);
   sandbar.name = "Sandbar";
-  sandbar.position.set(72, 0.08, 48);
+  sandbar.position.set(sandbarCenter.x, 0.08, sandbarCenter.z);
   sandbar.scale.z = 0.42;
   sandbar.rotation.y = 0.34;
   sandbar.receiveShadow = true;
@@ -1059,26 +1092,36 @@ const createDestinationMarkers = () => {
   const coveMarker = new THREE.Group();
   coveMarker.name = "Mountain cove";
   const coveStone = new THREE.Mesh(new THREE.ConeGeometry(8, 20, 5), rockMaterial);
-  coveStone.position.set(18, 10, -124);
+  coveStone.position.set(coveCenter.x - 4, 10, coveCenter.z);
   coveStone.rotation.y = 0.7;
   coveStone.castShadow = true;
   coveMarker.add(coveStone);
   const coveArch = new THREE.Mesh(new THREE.TorusGeometry(10, 1.3, 8, 28, Math.PI), rockMaterial);
-  coveArch.position.set(31, 7, -126);
+  coveArch.position.set(coveCenter.x + 9, 7, coveCenter.z - 2);
   coveArch.rotation.set(0, 0.35, Math.PI);
   coveArch.castShadow = true;
   coveMarker.add(coveArch);
   const coveBeacon = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 10), markerMaterial);
-  coveBeacon.position.set(18, 23, -124);
+  coveBeacon.position.set(coveCenter.x - 4, 23, coveCenter.z);
   coveMarker.add(coveBeacon);
   group.add(coveMarker);
 
   const island = new THREE.Group();
   island.name = "Rocky island";
+  const islandBase = new THREE.Mesh(new THREE.CylinderGeometry(22, 28, 1.15, 48), rockMaterial);
+  islandBase.position.set(islandCenter.x, 0.25, islandCenter.z);
+  islandBase.scale.z = 0.72;
+  islandBase.rotation.y = -0.25;
+  islandBase.receiveShadow = true;
+  island.add(islandBase);
   for (let index = 0; index < 8; index += 1) {
     const angle = index * 0.78;
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(3.8 + (index % 3)), rockMaterial);
-    rock.position.set(104 + Math.cos(angle) * 12, 2.3, -34 + Math.sin(angle) * 8);
+    rock.position.set(
+      islandCenter.x + Math.cos(angle) * 12,
+      2.3,
+      islandCenter.z + Math.sin(angle) * 8,
+    );
     rock.scale.y = 0.58 + (index % 4) * 0.14;
     rock.rotation.set(index * 0.22, angle, index * 0.17);
     rock.castShadow = true;
@@ -1090,7 +1133,13 @@ const createDestinationMarkers = () => {
   reeds.name = "Reed shoreline";
   for (let index = 0; index < 34; index += 1) {
     const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 6 + (index % 4), 5), reedMaterial);
-    reed.position.set(-118 + (index % 9) * 4.4, 2.5, 54 + Math.floor(index / 9) * 6);
+    const angle = 2.6 + (index % 9) * 0.035;
+    const radius = LAKE_MAP.shorelineInnerRadius - 4 + Math.floor(index / 9) * 3;
+    reed.position.set(
+      Math.cos(angle) * radius + (reedsCenter.x + 116) * 0.08,
+      2.5,
+      Math.sin(angle) * radius + (reedsCenter.z - 68) * 0.08,
+    );
     reed.rotation.z = Math.sin(index) * 0.12;
     reed.castShadow = true;
     reeds.add(reed);
@@ -1481,7 +1530,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 6</span>
+    <span>Hashlake Phase 7</span>
   `;
   return status;
 };
