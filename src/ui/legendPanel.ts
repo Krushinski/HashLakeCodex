@@ -14,12 +14,11 @@ const stormStages = [
 ];
 
 const triggers = [
-  "live Bitcoin data",
   "price trend",
   "network health",
   "fees",
   "mempool congestion",
-  "data freshness/staleness",
+  "data freshness",
 ];
 
 const visualEffects = [
@@ -35,7 +34,7 @@ const visualEffects = [
   "camera shake",
 ];
 
-const controls = [
+const driveControls = [
   ["D", "Debug"],
   ["L", "Legend"],
   ["X", "Toggle Drive Mode"],
@@ -50,12 +49,25 @@ const controls = [
   ["Esc", "Exit/cancel"],
 ];
 
-const notes = [
-  "Live no-key public feeds drive stormIndex when available.",
-  "Fog means stale or uncertain data, not necessarily bad Bitcoin conditions.",
-  "Whale splashes are market-trade proxy events, not confirmed on-chain whale alerts.",
-  "Bigger BTC trades create larger lake ripples; green is buy-side proxy, red is sell-side proxy, blue-white is neutral or unknown.",
-  "Drive Mode camera is hard locked behind the boat; touch and keys only steer the hull.",
+const bitcoinSignals = [
+  "Price trend shapes weather pressure.",
+  "Fees and mempool add network stress.",
+  "Whales create local ripples only.",
+  "New blocks create a teal signal pulse.",
+];
+
+const debugManual = [
+  "Crash and Gust affect weather.",
+  "Whale buttons test local splash scale.",
+  "Resume Live returns to feed-driven state.",
+  "300 BTC should not darken the sky.",
+];
+
+const dataFog = [
+  "Fog means stale or uncertain data.",
+  "Fog is separate from apocalypse.",
+  "No-key public feeds only.",
+  "Drive camera remains hard locked.",
 ];
 
 const renderLegend = () => `
@@ -68,7 +80,7 @@ const renderLegend = () => `
       <button class="legend-close" type="button" aria-label="Close legend">x</button>
     </header>
 
-    <div class="legend-section">
+    <div class="legend-section legend-tile">
       <h2>stormIndex stages</h2>
       <div class="legend-stage-grid">
         ${stormStages
@@ -85,33 +97,47 @@ const renderLegend = () => `
       </div>
     </div>
 
-    <div class="legend-columns">
-      <div class="legend-section">
-        <h2>what moves the storm</h2>
+    <div class="legend-tile-grid">
+      <div class="legend-section legend-tile">
+        <h2>Bitcoin Signals</h2>
+        <ul>
+          ${bitcoinSignals.map((signal) => `<li>${signal}</li>`).join("")}
+        </ul>
+      </div>
+
+      <div class="legend-section legend-tile">
+        <h2>Weather Inputs</h2>
         <ul>
           ${triggers.map((trigger) => `<li>${trigger}</li>`).join("")}
         </ul>
       </div>
 
-      <div class="legend-section">
-        <h2>visual effects</h2>
+      <div class="legend-section legend-tile">
+        <h2>Visual Effects</h2>
         <ul>
           ${visualEffects.map((effect) => `<li>${effect}</li>`).join("")}
         </ul>
       </div>
+
+      <div class="legend-section legend-tile">
+        <h2>Debug / Manual</h2>
+        <ul>
+          ${debugManual.map((note) => `<li>${note}</li>`).join("")}
+        </ul>
+      </div>
+
+      <div class="legend-section legend-tile">
+        <h2>Data / Fog Meaning</h2>
+        <ul>
+          ${dataFog.map((note) => `<li>${note}</li>`).join("")}
+        </ul>
+      </div>
     </div>
 
-    <div class="legend-section">
-      <h2>data notes</h2>
-      <ul>
-        ${notes.map((note) => `<li>${note}</li>`).join("")}
-      </ul>
-    </div>
-
-    <div class="legend-section">
+    <div class="legend-section legend-tile">
       <h2>controls</h2>
       <div class="legend-controls">
-        ${controls
+        ${driveControls
           .map(
             ([key, description]) => `
               <div class="legend-control">

@@ -237,7 +237,7 @@ body {
   inset: 0 auto auto 0;
   z-index: 20;
   display: none;
-  width: min(390px, calc(100vw - 18px));
+  width: min(470px, calc(100vw - 18px));
   max-height: calc(100dvh - 12px);
   margin: 6px;
   overflow-y: auto;
@@ -256,7 +256,7 @@ body {
 
 .debug-panel {
   display: grid;
-  gap: 7px;
+  gap: 9px;
   width: 100%;
   padding: 10px;
   border: 1px solid rgba(212, 233, 225, 0.16);
@@ -334,6 +334,24 @@ body {
   gap: 5px;
 }
 
+.debug-metric-section {
+  display: grid;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.debug-metric-section--boat .debug-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.debug-metric-section--bitcoin .debug-metrics,
+.debug-metric-section--network .debug-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .debug-metric {
   display: grid;
   min-width: 0;
@@ -388,7 +406,7 @@ body {
 
 .debug-section {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .debug-section__heading {
@@ -790,6 +808,19 @@ body {
   gap: 8px;
 }
 
+.legend-tile {
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.legend-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .legend-section h2 {
   margin: 0;
   color: #75dddd;
@@ -1175,6 +1206,12 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .debug-metric-section--boat .debug-metrics,
+  .debug-metric-section--bitcoin .debug-metrics,
+  .debug-metric-section--network .debug-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .debug-bar {
     grid-template-columns: 1fr;
     gap: 4px;
@@ -1199,6 +1236,7 @@ body {
   }
 
   .legend-stage-grid,
+  .legend-tile-grid,
   .legend-columns,
   .legend-controls,
   .legend-section ul {

@@ -32,6 +32,12 @@ type DebugPanel = {
 type MetricTile = {
   label: string;
   value: string;
+  group:
+    | "global"
+    | "bitcoin"
+    | "network"
+    | "weather"
+    | "boat";
   tone?: "good" | "bad" | "warn" | "muted";
 };
 
@@ -69,42 +75,50 @@ export type SceneTelemetry = {
 };
 
 const metricTiles: MetricTile[] = [
-  { label: "Price", value: "$62,989" },
-  { label: "24h", value: "+0.48%", tone: "good" },
-  { label: "7d", value: "-1.27%", tone: "bad" },
-  { label: "Fastest fee", value: "3 sat/vB" },
-  { label: "Mempool", value: "113,080 tx" },
-  { label: "Block", value: "#954,434" },
-  { label: "Block age", value: "12.2 min" },
-  { label: "Difficulty", value: "+4.40%" },
-  { label: "Hashrate dip", value: "-2.65%" },
-  { label: "WebSocket", value: "live", tone: "good" },
-  { label: "Market WS", value: "offline", tone: "muted" },
-  { label: "Tick age", value: "--" },
-  { label: "Heartbeat", value: "--" },
-  { label: "Price shown", value: "--" },
-  { label: "Whale min", value: "3 BTC" },
-  { label: "Last trade", value: "--" },
-  { label: "Trade side", value: "--" },
-  { label: "Trade price", value: "--" },
-  { label: "Whale source", value: "proxy", tone: "muted" },
-  { label: "Polling", value: "active", tone: "good" },
-  { label: "Data mode", value: "LIVE", tone: "good" },
-  { label: "Staleness", value: "0%", tone: "good" },
-  { label: "Fire / FW", value: "0.00 / 0.00" },
-  { label: "Mode", value: "Frame", tone: "muted" },
-  { label: "Boat speed", value: "0.0" },
-  { label: "Boat pos", value: "0, 0" },
-  { label: "Heading", value: "0 / 0" },
-  { label: "Camera hdg", value: "0" },
-  { label: "Move vec", value: "0, 0" },
-  { label: "Steer", value: "0.00" },
-  { label: "Throttle", value: "0.00" },
-  { label: "Brake", value: "0.00" },
-  { label: "Input", value: "none" },
-  { label: "World lock", value: "locked", tone: "good" },
-  { label: "Nearest", value: "Dock" },
-  { label: "Camera", value: "Cinematic" },
+  { group: "global", label: "Data mode", value: "LIVE", tone: "good" },
+  { group: "global", label: "Polling", value: "active", tone: "good" },
+  { group: "global", label: "Staleness", value: "0%", tone: "good" },
+  { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
+  { group: "bitcoin", label: "Price", value: "$62,989" },
+  { group: "bitcoin", label: "24h", value: "+0.48%", tone: "good" },
+  { group: "bitcoin", label: "7d", value: "-1.27%", tone: "bad" },
+  { group: "bitcoin", label: "Market WS", value: "offline", tone: "muted" },
+  { group: "bitcoin", label: "Tick age", value: "--" },
+  { group: "bitcoin", label: "Heartbeat", value: "--" },
+  { group: "bitcoin", label: "Price shown", value: "--" },
+  { group: "bitcoin", label: "Whale min", value: "3 BTC" },
+  { group: "bitcoin", label: "Last trade", value: "--" },
+  { group: "bitcoin", label: "Trade side", value: "--" },
+  { group: "bitcoin", label: "Trade price", value: "--" },
+  { group: "bitcoin", label: "Whale source", value: "proxy", tone: "muted" },
+  { group: "network", label: "Fastest fee", value: "3 sat/vB" },
+  { group: "network", label: "Mempool", value: "113,080 tx" },
+  { group: "network", label: "Block", value: "#954,434" },
+  { group: "network", label: "Block age", value: "12.2 min" },
+  { group: "network", label: "Difficulty", value: "+4.40%" },
+  { group: "network", label: "Hashrate dip", value: "-2.65%" },
+  { group: "network", label: "WebSocket", value: "live", tone: "good" },
+  { group: "boat", label: "Mode", value: "Frame", tone: "muted" },
+  { group: "boat", label: "Boat speed", value: "0.0" },
+  { group: "boat", label: "Boat pos", value: "0, 0" },
+  { group: "boat", label: "Heading", value: "0 / 0" },
+  { group: "boat", label: "Camera hdg", value: "0" },
+  { group: "boat", label: "Move vec", value: "0, 0" },
+  { group: "boat", label: "Steer", value: "0.00" },
+  { group: "boat", label: "Throttle", value: "0.00" },
+  { group: "boat", label: "Brake", value: "0.00" },
+  { group: "boat", label: "Input", value: "none" },
+  { group: "boat", label: "World lock", value: "locked", tone: "good" },
+  { group: "boat", label: "Nearest", value: "Dock" },
+  { group: "boat", label: "Camera", value: "Cinematic" },
+];
+
+const metricGroups: Array<{ key: MetricTile["group"]; title: string }> = [
+  { key: "global", title: "Data Mode / Global" },
+  { key: "bitcoin", title: "Bitcoin / Market" },
+  { key: "network", title: "Network / Mempool" },
+  { key: "weather", title: "Weather Engine" },
+  { key: "boat", title: "Boat / Drive" },
 ];
 
 const contributionBars: BarValue[] = [
@@ -209,8 +223,9 @@ const formatPercent = (value: number | null) => {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 };
 
-const createMetricTiles = () =>
+const createMetricCards = (group: MetricTile["group"]) =>
   metricTiles
+    .filter((tile) => tile.group === group)
     .map(
       (tile) => `
         <div class="debug-metric" data-debug-metric="${tile.label}">
@@ -218,6 +233,22 @@ const createMetricTiles = () =>
           <strong class="debug-metric__value ${
             tile.tone ? `debug-tone-${tile.tone}` : ""
           }">${tile.value}</strong>
+        </div>
+      `,
+    )
+    .join("");
+
+const createMetricSections = () =>
+  metricGroups
+    .map(
+      (group) => `
+        <div class="debug-metric-section debug-metric-section--${group.key}">
+          <div class="debug-section__heading">
+            <span>${group.title}</span>
+          </div>
+          <div class="debug-metrics">
+            ${createMetricCards(group.key)}
+          </div>
         </div>
       `,
     )
@@ -282,10 +313,6 @@ const renderTemplate = () => `
       </div>
     </header>
 
-    <div class="debug-metrics">
-      ${createMetricTiles()}
-    </div>
-
     <div class="debug-section debug-storm">
       <div class="debug-section__heading">
         <span>StormIndex</span>
@@ -305,6 +332,8 @@ const renderTemplate = () => `
         ${createBars()}
       </div>
     </div>
+
+    ${createMetricSections()}
 
     <div class="debug-section">
       <div class="debug-section__heading">
@@ -951,19 +980,14 @@ export const createDebugPanel = (
         weatherStore.triggerRally();
       } else if (action === "whale") {
         liveBitcoinStore.recordManualLargeTrade(14.7, "buy");
-        weatherStore.setStormIndex(54, "Manual Whale");
       } else if (action === "whale-3") {
         liveBitcoinStore.recordManualLargeTrade(WHALE_MIN_BTC, "buy");
-        weatherStore.setStormIndex(42, "Manual Large Trade");
       } else if (action === "whale-10") {
         liveBitcoinStore.recordManualLargeTrade(WHALE_MEDIUM_BTC, "sell");
-        weatherStore.setStormIndex(50, "Manual Large Trade");
       } else if (action === "whale-50") {
         liveBitcoinStore.recordManualLargeTrade(WHALE_LARGE_BTC, "buy");
-        weatherStore.setStormIndex(60, "Manual Large Trade");
       } else if (action === "whale-300") {
         liveBitcoinStore.recordManualLargeTrade(WHALE_HUGE_BTC, "sell");
-        weatherStore.setStormIndex(72, "Manual Whale");
       } else if (action === "block") {
         const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
         const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;

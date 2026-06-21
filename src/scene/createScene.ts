@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
+import { SCENARIO_PALETTES, getWeatherPalette } from "./artDirection";
 import { createSceneEffects } from "./effects";
 import {
   LAKE_MAP,
@@ -32,7 +33,7 @@ const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
 const DRIVE_ACCELERATION_BASE = 23;
 const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
-const DRIVE_BOOST_MAX_SPEED = 72;
+const DRIVE_BOOST_MAX_SPEED = 80;
 const DRIVE_BOOST_MULTIPLIER = 1.22;
 const DRIVE_NATURAL_BRAKE_DRAG = 34;
 const DRIVE_COAST_DRAG = 0.9;
@@ -308,8 +309,8 @@ export const createHashlakeScene = ({
   eventBus,
 }: HashlakeSceneOptions): HashlakeScene => {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x9fc8d4);
-  scene.fog = new THREE.FogExp2(0x9eb7b0, 0.0042);
+  scene.background = new THREE.Color(SCENARIO_PALETTES.Serene.skyTop);
+  scene.fog = new THREE.FogExp2(SCENARIO_PALETTES.Serene.fogColor, 0.0042);
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
   camera.position.copy(CAMERA_HOME);
@@ -324,7 +325,7 @@ export const createHashlakeScene = ({
     alpha: false,
     powerPreference: "high-performance",
   });
-  renderer.setClearColor(0x9fc8d4, 1);
+  renderer.setClearColor(SCENARIO_PALETTES.Serene.skyTop, 1);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -335,20 +336,27 @@ export const createHashlakeScene = ({
   renderer.domElement.setAttribute("aria-label", "Realtime Hashlake scene");
   container.append(renderer.domElement);
 
-  const sunlight = new THREE.DirectionalLight(0xffd79a, 3.6);
+  const sunlight = new THREE.DirectionalLight(SCENARIO_PALETTES.Serene.directionalLight, 3.6);
   sunlight.position.set(-36, 72, 45);
   sunlight.castShadow = true;
   sunlight.shadow.mapSize.set(1024, 1024);
   scene.add(sunlight);
-  const hemisphereLight = new THREE.HemisphereLight(0x9fd4ff, 0x304e36, 1.35);
+  const hemisphereLight = new THREE.HemisphereLight(
+    SCENARIO_PALETTES.Serene.ambientLight,
+    0x3f6f3d,
+    1.35,
+  );
   scene.add(hemisphereLight);
 
+  const lakeFill = createLakeFill();
+  scene.add(lakeFill);
   const water = createWater();
   scene.add(water.mesh);
   scene.add(createShoreline());
   scene.add(createMountains());
   scene.add(createDestinationMarkers());
-  scene.add(createSunDisc());
+  const sunDisc = createSunDisc();
+  scene.add(sunDisc);
   const clouds = createClouds();
   scene.add(clouds);
 
@@ -466,6 +474,8 @@ export const createHashlakeScene = ({
       sunlight,
       hemisphereLight,
       water,
+      lakeFill,
+      sunDisc,
       clouds,
       weather,
       elapsed,
@@ -826,6 +836,24 @@ type WaterSurface = {
   basePositions: Float32Array;
 };
 
+const createLakeFill = () => {
+  const shape = new THREE.Shape(
+    LAKE_MAP.outline.map((point) => new THREE.Vector2(point.x, point.z)),
+  );
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x147fb5,
+    transparent: true,
+    opacity: 0.82,
+    depthWrite: true,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 12), material);
+  mesh.name = "Blue lake depth fill";
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = -0.08;
+  return mesh;
+};
+
 const createOrganicWaterGeometry = () => {
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
@@ -834,10 +862,10 @@ const createOrganicWaterGeometry = () => {
   const indices: number[] = [];
   const step = 9;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
-  const deepColor = new THREE.Color(0x116f9a);
-  const midColor = new THREE.Color(0x1b93b8);
-  const shallowColor = new THREE.Color(0x58b9c3);
-  const sandbarColor = new THREE.Color(0x88caba);
+  const deepColor = new THREE.Color(SCENARIO_PALETTES.Serene.waterDeep);
+  const midColor = new THREE.Color(0x20a5d4);
+  const shallowColor = new THREE.Color(SCENARIO_PALETTES.Serene.waterShallow);
+  const sandbarColor = new THREE.Color(0xa4e1d0);
 
   for (let x = minX; x < maxX; x += step) {
     for (let z = minZ; z < maxZ; z += step) {
@@ -879,8 +907,10 @@ const createWater = (): WaterSurface => {
   const geometry = createOrganicWaterGeometry();
 
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x187da5,
-    roughness: 0.2,
+    color: 0x26a7d6,
+    emissive: 0x0b5c86,
+    emissiveIntensity: 0.16,
+    roughness: 0.18,
     metalness: 0.02,
     vertexColors: true,
     transmission: 0,
@@ -940,7 +970,7 @@ const createBoat = () => {
   const boat = new THREE.Group();
   boat.name = "Procedural motor skiff";
   boat.position.copy(BOAT_HOME);
-  boat.scale.setScalar(0.84);
+  boat.scale.setScalar(0.78);
 
   const hullMaterial = new THREE.MeshStandardMaterial({
     color: 0x6f3f25,
@@ -976,108 +1006,108 @@ const createBoat = () => {
     roughness: 0.7,
   });
 
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(12.4, 1.75, 3.65), hullMaterial);
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(11.5, 1.62, 3.12), hullMaterial);
   hull.castShadow = true;
   hull.scale.set(1, 0.82, 1);
   boat.add(hull);
 
   for (const side of [-1, 1]) {
-    const hullSide = new THREE.Mesh(new THREE.BoxGeometry(10.8, 1.05, 0.42), hullMaterial);
-    hullSide.position.set(-0.45, 0.1, side * 2.08);
-    hullSide.rotation.x = side * -0.18;
+    const hullSide = new THREE.Mesh(new THREE.BoxGeometry(10.35, 1.06, 0.36), hullMaterial);
+    hullSide.position.set(-0.58, 0.08, side * 1.82);
+    hullSide.rotation.x = side * -0.22;
     hullSide.castShadow = true;
     boat.add(hullSide);
   }
 
-  const lowerHull = new THREE.Mesh(new THREE.BoxGeometry(10.9, 1.1, 2.85), hullMaterial);
-  lowerHull.position.set(-0.55, -0.72, 0);
-  lowerHull.scale.set(1, 0.68, 1);
+  const lowerHull = new THREE.Mesh(new THREE.BoxGeometry(10.1, 1.02, 2.36), hullMaterial);
+  lowerHull.position.set(-0.72, -0.7, 0);
+  lowerHull.scale.set(1, 0.68, 0.92);
   lowerHull.castShadow = true;
   boat.add(lowerHull);
 
-  const bow = new THREE.Mesh(new THREE.ConeGeometry(2.35, 5.35, 4), hullMaterial);
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(1.76, 6.15, 4), hullMaterial);
   bow.rotation.z = Math.PI / 2;
   bow.rotation.y = Math.PI / 4;
-  bow.position.x = 6.95;
-  bow.scale.set(1.1, 0.9, 0.82);
+  bow.position.x = 6.75;
+  bow.scale.set(1.14, 0.8, 0.68);
   bow.castShadow = true;
   boat.add(bow);
 
-  const bowStripe = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 0.5), bowMarkerMaterial);
-  bowStripe.position.set(4.65, 1.12, 0);
+  const bowStripe = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.14, 0.42), bowMarkerMaterial);
+  bowStripe.position.set(4.35, 1.06, 0);
   bowStripe.castShadow = true;
   boat.add(bowStripe);
 
-  const bowDeck = new THREE.Mesh(new THREE.ConeGeometry(1.42, 3.4, 4), trimMaterial);
+  const bowDeck = new THREE.Mesh(new THREE.ConeGeometry(1.05, 3.65, 4), trimMaterial);
   bowDeck.rotation.z = Math.PI / 2;
   bowDeck.rotation.y = Math.PI / 4;
-  bowDeck.position.set(4.9, 1.42, 0);
-  bowDeck.scale.set(0.95, 0.28, 0.74);
+  bowDeck.position.set(4.7, 1.34, 0);
+  bowDeck.scale.set(0.98, 0.24, 0.62);
   bowDeck.castShadow = true;
   boat.add(bowDeck);
 
   const bowLight = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.34, 0.62), bowMarkerMaterial);
-  bowLight.position.set(7.65, 1.05, 0);
+  bowLight.position.set(7.48, 0.98, 0);
   bowLight.castShadow = true;
   boat.add(bowLight);
 
-  const keel = new THREE.Mesh(new THREE.ConeGeometry(1.15, 10.9, 4), hullMaterial);
+  const keel = new THREE.Mesh(new THREE.ConeGeometry(0.96, 10.45, 4), hullMaterial);
   keel.rotation.z = Math.PI / 2;
   keel.rotation.y = Math.PI / 4;
-  keel.scale.set(1, 0.36, 0.68);
-  keel.position.set(-0.6, -0.74, 0);
+  keel.scale.set(1, 0.32, 0.58);
+  keel.position.set(-0.72, -0.73, 0);
   keel.castShadow = true;
   boat.add(keel);
 
-  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.15, 4.35), trimMaterial);
-  stern.position.set(-6.5, 0.05, 0);
+  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.82, 2.0, 3.62), trimMaterial);
+  stern.position.set(-6.22, 0.04, 0);
   stern.castShadow = true;
   boat.add(stern);
 
-  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.42, 3.75), trimMaterial);
-  rearDeck.position.set(-4.75, 1.26, 0);
+  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.38, 3.18), trimMaterial);
+  rearDeck.position.set(-4.55, 1.18, 0);
   rearDeck.castShadow = true;
   boat.add(rearDeck);
 
   for (const side of [-1, 1]) {
-    const gunwale = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.34, 0.34), trimMaterial);
-    gunwale.position.set(-0.4, 1.24, side * 2.06);
+    const gunwale = new THREE.Mesh(new THREE.BoxGeometry(10.25, 0.3, 0.28), trimMaterial);
+    gunwale.position.set(-0.5, 1.16, side * 1.84);
     gunwale.castShadow = true;
     boat.add(gunwale);
   }
 
-  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 2.2), trimMaterial);
-  cockpit.position.set(1.2, 1.72, 0);
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.82, 1.82), trimMaterial);
+  cockpit.position.set(1.0, 1.58, 0);
   cockpit.castShadow = true;
   boat.add(cockpit);
 
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.1, 2.35), windshieldMaterial);
-  windshield.position.set(2.55, 2.28, 0);
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.98, 1.98), windshieldMaterial);
+  windshield.position.set(2.26, 2.08, 0);
   windshield.rotation.z = -0.18;
   boat.add(windshield);
 
-  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.8, 1.45), motorMaterial);
-  motor.position.set(-7.35, 0.32, 0);
+  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.22, 1.7, 1.3), motorMaterial);
+  motor.position.set(-7.0, 0.28, 0);
   motor.castShadow = true;
   boat.add(motor);
 
-  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.58, 1.04), bowMarkerMaterial);
-  motorCap.position.set(-8.02, 0.94, 0);
+  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.54, 0.94), bowMarkerMaterial);
+  motorCap.position.set(-7.62, 0.88, 0);
   motorCap.castShadow = true;
   boat.add(motorCap);
 
-  const propGuard = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.48, 1.95), motorMaterial);
-  propGuard.position.set(-8.45, -0.18, 0);
+  const propGuard = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.44, 1.68), motorMaterial);
+  propGuard.position.set(-8.02, -0.18, 0);
   propGuard.castShadow = true;
   boat.add(propGuard);
 
-  const benchA = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.28, 3.55), trimMaterial);
-  benchA.position.set(-2.25, 1.38, 0);
+  const benchA = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.25, 3.0), trimMaterial);
+  benchA.position.set(-2.1, 1.28, 0);
   benchA.castShadow = true;
   boat.add(benchA);
 
   const benchB = benchA.clone();
-  benchB.position.x = 3.05;
+  benchB.position.x = 2.74;
   boat.add(benchB);
 
   const deckLineMaterial = new THREE.MeshStandardMaterial({
@@ -1085,14 +1115,14 @@ const createBoat = () => {
     roughness: 0.38,
   });
   for (const side of [-1, 1]) {
-    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.16, 0.16), deckLineMaterial);
-    rubRail.position.set(-0.35, 0.82, side * 2.38);
+    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(10.65, 0.14, 0.14), deckLineMaterial);
+    rubRail.position.set(-0.44, 0.76, side * 2.12);
     rubRail.castShadow = true;
     boat.add(rubRail);
   }
 
-  const sternPlate = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.78, 2.6), deckLineMaterial);
-  sternPlate.position.set(-6.98, 0.92, 0);
+  const sternPlate = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, 2.2), deckLineMaterial);
+  sternPlate.position.set(-6.65, 0.84, 0);
   sternPlate.castShadow = true;
   boat.add(sternPlate);
 
@@ -1343,34 +1373,34 @@ const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xc7b474,
+    color: SCENARIO_PALETTES.Serene.sand,
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x9f9464,
+    color: 0xb9aa70,
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x557245,
+    color: 0x6c9d4d,
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x8ed0c2,
+    color: SCENARIO_PALETTES.Serene.waterShallow,
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.24,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2f563b,
+    color: 0x416f3f,
     roughness: 0.92,
   });
   const grassMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2d623e,
+    color: SCENARIO_PALETTES.Serene.shorelineGrass,
     roughness: 0.86,
   });
   const rockMaterial = new THREE.MeshStandardMaterial({
-    color: 0x6c7571,
+    color: SCENARIO_PALETTES.Serene.rock,
     roughness: 0.94,
   });
   const coveRockMaterial = new THREE.MeshStandardMaterial({
@@ -1421,6 +1451,11 @@ const createShoreline = () => {
   const treeGeometry = new THREE.ConeGeometry(3.2, 14, 8);
   const trunkGeometry = new THREE.CylinderGeometry(0.42, 0.56, 3, 7);
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6f4428, roughness: 0.82 });
+  const grassTuftGeometry = new THREE.ConeGeometry(0.75, 3.8, 5);
+  const brightGrassMaterial = new THREE.MeshStandardMaterial({
+    color: 0x75a954,
+    roughness: 0.9,
+  });
 
   for (let index = 0; index < 148; index += 1) {
     const base = LAKE_MAP.outline[(index * 7) % LAKE_MAP.outline.length];
@@ -1443,10 +1478,26 @@ const createShoreline = () => {
     group.add(tree);
   }
 
-  for (let index = 0; index < 72; index += 1) {
+  for (let index = 0; index < 96; index += 1) {
+    const base = LAKE_MAP.outline[(index * 11 + 5) % LAKE_MAP.outline.length];
+    const length = Math.max(1, Math.hypot(base.x, base.z));
+    const offset = 20 + ((index * 23) % 54);
+    const tuft = new THREE.Mesh(grassTuftGeometry, brightGrassMaterial);
+    tuft.position.set(
+      base.x + (base.x / length) * offset + Math.sin(index * 1.7) * 7,
+      1.9,
+      base.z + (base.z / length) * offset + Math.cos(index * 2.1) * 7,
+    );
+    tuft.rotation.set(Math.sin(index) * 0.12, index * 0.46, Math.cos(index) * 0.12);
+    tuft.scale.set(0.55 + (index % 5) * 0.08, 0.55 + (index % 7) * 0.06, 0.55);
+    tuft.castShadow = true;
+    group.add(tuft);
+  }
+
+  for (let index = 0; index < 88; index += 1) {
     const base = LAKE_MAP.outline[(index * 5 + 3) % LAKE_MAP.outline.length];
     const length = Math.max(1, Math.hypot(base.x, base.z));
-    const offset = 5 + ((index * 19) % 34);
+    const offset = 4 + ((index * 19) % 42);
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(2.5 + (index % 5) * 0.4), rockMaterial);
     rock.position.set(
       base.x + (base.x / length) * offset + Math.sin(index * 1.3) * 5,
@@ -1487,11 +1538,11 @@ const createShoreline = () => {
 const createMountains = () => {
   const group = new THREE.Group();
   const mountainMaterial = new THREE.MeshStandardMaterial({
-    color: 0x6f8377,
+    color: 0x778c7e,
     roughness: 0.95,
   });
   const snowMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe4ece5,
+    color: 0xf0f3ec,
     roughness: 0.74,
   });
 
@@ -1520,18 +1571,27 @@ const createDestinationMarkers = () => {
   const group = new THREE.Group();
   group.name = "Phase 12 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
-  const sandMaterial = new THREE.MeshStandardMaterial({ color: 0xd7c282, roughness: 0.92 });
+  const sandMaterial = new THREE.MeshStandardMaterial({
+    color: SCENARIO_PALETTES.Serene.sand,
+    roughness: 0.92,
+  });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0xb4d6bd,
+    color: 0x9edcc5,
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.28,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
-  const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x6f7471, roughness: 0.9 });
+  const rockMaterial = new THREE.MeshStandardMaterial({
+    color: SCENARIO_PALETTES.Serene.rock,
+    roughness: 0.9,
+  });
   const darkRockMaterial = new THREE.MeshStandardMaterial({ color: 0x4c5655, roughness: 0.96 });
-  const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x88a45c, roughness: 0.86 });
-  const pineMaterial = new THREE.MeshStandardMaterial({ color: 0x254d36, roughness: 0.88 });
+  const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x9cbf61, roughness: 0.86 });
+  const pineMaterial = new THREE.MeshStandardMaterial({
+    color: SCENARIO_PALETTES.Serene.shorelineGrass,
+    roughness: 0.88,
+  });
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x91f2bf });
   const lanternMaterial = new THREE.MeshBasicMaterial({ color: 0xffd37d });
   const dockCenter = getDestinationCenter("dock");
@@ -1667,6 +1727,25 @@ const createDestinationMarkers = () => {
     rock.castShadow = true;
     island.add(rock);
   }
+  const islandBank = new THREE.Mesh(
+    new THREE.ShapeGeometry(
+      new THREE.Shape(
+        createEllipseOutline(
+          { x: 0, z: 0 },
+          LAKE_MAP.island.radiusX + 6,
+          LAKE_MAP.island.radiusZ + 4,
+          0,
+        ).map((point) => new THREE.Vector2(point.x, point.z)),
+      ),
+      8,
+    ),
+    sandMaterial,
+  );
+  islandBank.position.set(islandCenter.x, 0.14, islandCenter.z);
+  islandBank.rotation.x = -Math.PI / 2;
+  islandBank.rotation.z = LAKE_MAP.island.rotation;
+  islandBank.receiveShadow = true;
+  island.add(islandBank);
   for (let index = 0; index < 5; index += 1) {
     const tree = new THREE.Mesh(new THREE.ConeGeometry(2.2, 8, 7), pineMaterial);
     tree.position.set(
@@ -2030,6 +2109,8 @@ type WeatherSceneTargets = {
   sunlight: THREE.DirectionalLight;
   hemisphereLight: THREE.HemisphereLight;
   water: WaterSurface;
+  lakeFill: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
+  sunDisc: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   clouds: THREE.Group;
   weather: WeatherSnapshot;
   elapsed: number;
@@ -2053,12 +2134,21 @@ const getDriveCameraPosition = (driveState: DriveState, preset: CameraPreset) =>
   );
 };
 
+const skyColorScratch = new THREE.Color();
+const horizonColorScratch = new THREE.Color();
+const fogColorScratch = new THREE.Color();
+const waterDeepScratch = new THREE.Color();
+const waterShallowScratch = new THREE.Color();
+const cloudColorScratch = new THREE.Color();
+
 const applyWeatherToScene = ({
   scene,
   camera,
   sunlight,
   hemisphereLight,
   water,
+  lakeFill,
+  sunDisc,
   clouds,
   weather,
   elapsed,
@@ -2072,37 +2162,48 @@ const applyWeatherToScene = ({
   const dark = weather.dials.skyDark;
   const fire = weather.dials.fireWeather;
   const fog = weather.dials.fog;
-  const brightSky = new THREE.Color(0xa9d3df);
-  const stormSky = new THREE.Color(0x172a31);
-  const apocalypticSky = new THREE.Color(0x1a0808);
-  const skyColor = brightSky.lerp(stormSky, dark).lerp(apocalypticSky, fire * 0.75);
-  const fogColor = new THREE.Color(0xb2c8bf).lerp(new THREE.Color(0x22383b), dark);
+  const palette = getWeatherPalette(weather.stormIndex);
+  const daylightRelief = Math.max(0, 1 - dark);
+  const skyColor = skyColorScratch.setHex(palette.skyTop);
+  horizonColorScratch.setHex(palette.skyHorizon);
+  skyColor.lerp(horizonColorScratch, 0.2 + daylightRelief * 0.18);
+  if (weather.staleData) {
+    skyColor.lerp(fogColorScratch.setHex(palette.fogColor), 0.22);
+  }
 
   scene.background = skyColor;
   if (scene.fog instanceof THREE.FogExp2) {
-    scene.fog.color.copy(fogColor.lerp(new THREE.Color(0xb9c5bd), weather.staleData ? 0.45 : 0));
-    scene.fog.density = 0.0028 + fog * 0.018 + dark * 0.0045;
+    fogColorScratch.setHex(palette.fogColor);
+    scene.fog.color.copy(fogColorScratch);
+    scene.fog.density = 0.0022 + fog * 0.017 + weather.stormDarkness * 0.004;
   }
 
-  sunlight.intensity = Math.max(0.18, 3.9 * (1 - dark * 0.88));
-  sunlight.color.set(fire > 0.08 ? 0xff6c3d : dark > 0.45 ? 0x9fb7c9 : 0xffdda8);
-  hemisphereLight.intensity = Math.max(0.24, 1.48 * (1 - dark * 0.72));
-  hemisphereLight.color.set(fire > 0.12 ? 0x7a2117 : dark > 0.45 ? 0x7ea1b7 : 0xb5ddff);
+  sunlight.intensity = Math.max(0.16, 4.25 * (1 - dark * 0.82) + daylightRelief * 0.18);
+  sunlight.color.setHex(fire > 0.08 ? palette.sunColor : palette.directionalLight);
+  hemisphereLight.intensity = Math.max(0.24, 1.64 * (1 - dark * 0.66));
+  hemisphereLight.color.setHex(palette.ambientLight);
+  hemisphereLight.groundColor.setHex(palette.shorelineGrass);
+  sunDisc.material.color.setHex(palette.sunColor);
+  sunDisc.visible = dark < 0.72 || fire > 0.38;
 
-  water.mesh.material.color
-    .set(0x1a8fbd)
-    .lerp(new THREE.Color(0x0e3442), dark)
-    .lerp(new THREE.Color(0x401514), fire * 0.45);
-  water.mesh.material.roughness = 0.18 + weather.dials.chop * 0.58;
-  water.mesh.material.clearcoat = Math.max(0.08, 0.58 - weather.dials.chop * 0.34);
+  waterDeepScratch.setHex(palette.waterDeep);
+  waterShallowScratch.setHex(palette.waterShallow);
+  water.mesh.material.color.copy(waterDeepScratch.lerp(waterShallowScratch, 0.26 - fire * 0.08));
+  water.mesh.material.emissive.setHex(palette.waterDeep);
+  water.mesh.material.emissiveIntensity = Math.max(0.03, 0.18 * (1 - dark) + 0.04);
+  lakeFill.material.color.setHex(palette.waterDeep);
+  lakeFill.material.opacity = Math.max(0.5, 0.86 - weather.stormDarkness * 0.22);
+  water.mesh.material.roughness = 0.14 + weather.dials.chop * 0.62 + weather.stormDarkness * 0.12;
+  water.mesh.material.clearcoat = Math.max(0.08, 0.68 - weather.dials.chop * 0.38);
 
   clouds.children.forEach((cloud, index) => {
     cloud.position.y = 70 - dark * 18 + Math.sin(elapsed * 0.2 + index) * 0.8;
     cloud.scale.setScalar(1 + dark * 1.35);
     cloud.children.forEach((child) => {
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-        child.material.color.set(dark > 0.45 ? 0x404c4c : 0xf4f1df);
-        child.material.opacity = 0.7 + dark * 0.25;
+        cloudColorScratch.setHex(dark > 0.48 ? palette.stormTint : 0xf5f1df);
+        child.material.color.copy(cloudColorScratch);
+        child.material.opacity = 0.62 + dark * 0.28;
       }
     });
   });
@@ -2160,7 +2261,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 15</span>
+    <span>Hashlake Phase 16</span>
   `;
   return status;
 };
