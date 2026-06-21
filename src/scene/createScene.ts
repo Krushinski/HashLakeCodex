@@ -34,7 +34,8 @@ const DRIVE_ACCELERATION_BASE = 23;
 const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
 const DRIVE_BOOST_MAX_SPEED = 80;
-const DRIVE_BOOST_MULTIPLIER = 1.22;
+const DRIVE_BOOST_MULTIPLIER = 1.36;
+const DRIVE_BOOST_IMPULSE = 7.5;
 const DRIVE_NATURAL_BRAKE_DRAG = 34;
 const DRIVE_COAST_DRAG = 0.9;
 const DRIVE_ACTIVE_BRAKE_FORCE = 82;
@@ -53,17 +54,21 @@ const DRIVE_BOW_LIFT_SCALE = 0.15;
 const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
-const WAKE_BLOCK_SIZE_MIN = 0.5;
-const WAKE_BLOCK_SIZE_MAX = 1.25;
-const WAKE_VERTICAL_VELOCITY = 0.025;
-const WAKE_BACKWARD_VELOCITY = 6.4;
-const WAKE_OUTWARD_SPREAD = 4.6;
-const WAKE_LIFETIME_SECONDS = 0.58;
-const WAKE_EMISSION_RATE = 22;
-const WAKE_BOOST_MULTIPLIER = 1.32;
-const WAKE_SURFACE_Y_OFFSET = 0.27;
-const WAKE_FADE_SPEED = 1.42;
+const WAKE_BLOCK_SIZE_MIN = 0.66;
+const WAKE_BLOCK_SIZE_MAX = 1.48;
+const WAKE_VERTICAL_VELOCITY = 0.02;
+const WAKE_BACKWARD_VELOCITY = 7.2;
+const WAKE_OUTWARD_SPREAD = 5.2;
+const WAKE_LIFETIME_SECONDS = 0.66;
+const WAKE_EMISSION_RATE = 28;
+const WAKE_BOOST_MULTIPLIER = 1.58;
+const WAKE_SURFACE_Y_OFFSET = 0.3;
+const WAKE_FADE_SPEED = 1.26;
 const WAKE_MAX_ACTIVE_BLOCKS = 192;
+const QUALITY_TARGET_FPS = 54;
+const QUALITY_MIN_PIXEL_RATIO = 0.65;
+const QUALITY_MAX_PIXEL_RATIO = 1.75;
+const QUALITY_GOVERNOR_INTERVAL = 2500;
 
 type SceneTelemetry = {
   mode: "Frame" | "Drive";
@@ -82,6 +87,7 @@ type SceneTelemetry = {
   steerInput: number;
   throttleInput: number;
   brakeInput: number;
+  boostActive: boolean;
   inputSource: "desktop" | "mobile" | "none";
   worldRotationLocked: boolean;
   headingWarning: boolean;
@@ -89,6 +95,14 @@ type SceneTelemetry = {
   cameraPreset: string;
   nearestLocation: string;
   savedTableau: boolean;
+  fps: number;
+  pixelRatio: number;
+  qualityMode: "crisp" | "balanced" | "low";
+  renderScale: number;
+  activeWakeBlocks: number;
+  activeEffectBlocks: number;
+  activeRings: number;
+  activeSplashes: number;
 };
 
 type CameraPreset = {
@@ -134,6 +148,7 @@ type DriveState = {
   wakePower: number;
   throttleInput: number;
   brakeInput: number;
+  boostActive: boolean;
   inputSource: "desktop" | "mobile" | "none";
   mobilePointerId: number | null;
   mobileOriginX: number;
@@ -141,6 +156,16 @@ type DriveState = {
   mobileThrottle: boolean;
   mobileAnchor: boolean;
   mobileSteer: number;
+};
+
+type QualityState = {
+  fps: number;
+  pixelRatio: number;
+  mode: "crisp" | "balanced" | "low";
+  effectScale: number;
+  frameAccumulator: number;
+  frameCount: number;
+  lastGovernAt: number;
 };
 
 type DriveInput = {
@@ -325,8 +350,12 @@ export const createHashlakeScene = ({
     alpha: false,
     powerPreference: "high-performance",
   });
+  const initialPixelRatio = Math.min(
+    window.devicePixelRatio || 1,
+    QUALITY_MAX_PIXEL_RATIO,
+  );
   renderer.setClearColor(SCENARIO_PALETTES.Serene.skyTop, 1);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(initialPixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.04;
@@ -348,6 +377,8 @@ export const createHashlakeScene = ({
   );
   scene.add(hemisphereLight);
 
+  const skyDome = createSkyDome();
+  scene.add(skyDome.mesh);
   const lakeFill = createLakeFill();
   scene.add(lakeFill);
   const water = createWater();
@@ -388,6 +419,7 @@ export const createHashlakeScene = ({
     wakePower: 0,
     throttleInput: 0,
     brakeInput: 0,
+    boostActive: false,
     inputSource: "none",
     mobilePointerId: null,
     mobileOriginX: 0,
@@ -431,6 +463,15 @@ export const createHashlakeScene = ({
   container.append(driveHud);
 
   const startedAt = window.performance.now();
+  const qualityState: QualityState = {
+    fps: 60,
+    pixelRatio: initialPixelRatio,
+    mode: initialPixelRatio >= 1.35 ? "crisp" : "balanced",
+    effectScale: 1,
+    frameAccumulator: 0,
+    frameCount: 0,
+    lastGovernAt: startedAt,
+  };
   let animationId = 0;
   let hasRenderedFrame = false;
   let isRunning = false;
@@ -452,6 +493,43 @@ export const createHashlakeScene = ({
     window.setTimeout(resize, 320);
   };
 
+  const getActiveWakeBlocks = () =>
+    wakeEffect.segments.reduce((count, segment) => count + Number(segment.active), 0);
+
+  const governQuality = (delta: number, now: number) => {
+    qualityState.frameAccumulator += delta;
+    qualityState.frameCount += 1;
+    if (now - qualityState.lastGovernAt < QUALITY_GOVERNOR_INTERVAL) {
+      return;
+    }
+
+    const fps =
+      qualityState.frameCount / Math.max(qualityState.frameAccumulator, 0.001);
+    qualityState.fps = fps;
+    qualityState.frameAccumulator = 0;
+    qualityState.frameCount = 0;
+    qualityState.lastGovernAt = now;
+
+    const deviceCap = Math.min(window.devicePixelRatio || 1, QUALITY_MAX_PIXEL_RATIO);
+    let nextPixelRatio = qualityState.pixelRatio;
+    if (fps < QUALITY_TARGET_FPS - 8 && nextPixelRatio > QUALITY_MIN_PIXEL_RATIO) {
+      nextPixelRatio = Math.max(QUALITY_MIN_PIXEL_RATIO, nextPixelRatio - 0.15);
+    } else if (fps > QUALITY_TARGET_FPS + 10 && nextPixelRatio < deviceCap) {
+      nextPixelRatio = Math.min(deviceCap, nextPixelRatio + 0.1);
+    }
+
+    if (Math.abs(nextPixelRatio - qualityState.pixelRatio) > 0.01) {
+      qualityState.pixelRatio = nextPixelRatio;
+      renderer.setPixelRatio(nextPixelRatio);
+    }
+
+    qualityState.mode =
+      qualityState.pixelRatio < 0.85 ? "low" : qualityState.pixelRatio < 1.25 ? "balanced" : "crisp";
+    qualityState.effectScale =
+      qualityState.mode === "low" ? 0.58 : qualityState.mode === "balanced" ? 0.78 : 1;
+    sceneEffects.setQualityScale(qualityState.effectScale);
+  };
+
   const render = () => {
     if (!isRunning) {
       return;
@@ -461,6 +539,7 @@ export const createHashlakeScene = ({
     const elapsed = (now - startedAt) / 1000;
     const delta = Math.min(0.045, Math.max(0.001, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
+    governQuality(delta, now);
     const weather = weatherStore.getSnapshot();
     updateDriveState(driveState, input, delta, weather);
     animateWater(water, elapsed, weather, driveState);
@@ -473,6 +552,7 @@ export const createHashlakeScene = ({
       camera,
       sunlight,
       hemisphereLight,
+      skyDome,
       water,
       lakeFill,
       sunDisc,
@@ -517,6 +597,7 @@ export const createHashlakeScene = ({
     driveState.wakePower = 0;
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
+    driveState.boostActive = false;
     driveState.inputSource = "none";
     driveState.cameraYaw = driveState.yaw;
     driveState.mobilePointerId = null;
@@ -544,6 +625,7 @@ export const createHashlakeScene = ({
     driveState.wakePower = 0;
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
+    driveState.boostActive = false;
     driveState.inputSource = "none";
     driveState.mobilePointerId = null;
     driveState.mobileThrottle = false;
@@ -579,6 +661,7 @@ export const createHashlakeScene = ({
     driveState.wakePower = 0;
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
+    driveState.boostActive = false;
     driveState.inputSource = "none";
     driveState.mobilePointerId = null;
     driveState.mobileThrottle = false;
@@ -634,6 +717,7 @@ export const createHashlakeScene = ({
       driveState.wakePower = 0;
       driveState.throttleInput = 0;
       driveState.brakeInput = 0;
+      driveState.boostActive = false;
       driveState.inputSource = "none";
       driveState.mobilePointerId = null;
       driveState.mobileThrottle = false;
@@ -676,6 +760,7 @@ export const createHashlakeScene = ({
     driveState.mobileSteer = 0;
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
+    driveState.boostActive = false;
     driveState.inputSource = "none";
   };
 
@@ -795,37 +880,52 @@ export const createHashlakeScene = ({
       renderer.dispose();
     },
     getTelemetry: () => ({
-      mode: driveState.mode,
-      speed: driveState.speed,
-      position: {
-        x: driveState.x,
-        z: driveState.z,
-      },
-      heading: driveState.yaw,
-      visualHeading: getHeadingFromVisualRotation(boat.rotation.y),
-      cameraHeading: driveState.yaw,
-      movementVector: {
-        x: Math.cos(driveState.yaw) * driveState.speed,
-        z: Math.sin(driveState.yaw) * driveState.speed,
-      },
-      steerInput: driveState.currentSteer,
-      throttleInput: driveState.throttleInput,
-      brakeInput: driveState.brakeInput,
-      inputSource: driveState.inputSource,
-      worldRotationLocked:
-        Math.abs(scene.rotation.x) < 0.0001 &&
-        Math.abs(scene.rotation.y) < 0.0001 &&
-        Math.abs(scene.rotation.z) < 0.0001,
-      headingWarning:
-        Math.abs(shortestAngleDelta(driveState.yaw, getHeadingFromVisualRotation(boat.rotation.y))) >
-        0.02,
-      cameraWarning: false,
-      cameraPreset: CAMERA_PRESETS[driveState.cameraPresetIndex].name,
-      nearestLocation: getNearestLocation({
-        x: driveState.x,
-        z: driveState.z,
-      }).destination.label,
-      savedTableau: driveState.hasSavedTableau,
+      ...(() => {
+        const effectStats = sceneEffects.getStats();
+        return {
+          mode: driveState.mode,
+          speed: driveState.speed,
+          position: {
+            x: driveState.x,
+            z: driveState.z,
+          },
+          heading: driveState.yaw,
+          visualHeading: getHeadingFromVisualRotation(boat.rotation.y),
+          cameraHeading: driveState.yaw,
+          movementVector: {
+            x: Math.cos(driveState.yaw) * driveState.speed,
+            z: Math.sin(driveState.yaw) * driveState.speed,
+          },
+          steerInput: driveState.currentSteer,
+          throttleInput: driveState.throttleInput,
+          brakeInput: driveState.brakeInput,
+          boostActive: driveState.boostActive,
+          inputSource: driveState.inputSource,
+          worldRotationLocked:
+            Math.abs(scene.rotation.x) < 0.0001 &&
+            Math.abs(scene.rotation.y) < 0.0001 &&
+            Math.abs(scene.rotation.z) < 0.0001,
+          headingWarning:
+            Math.abs(
+              shortestAngleDelta(driveState.yaw, getHeadingFromVisualRotation(boat.rotation.y)),
+            ) > 0.02,
+          cameraWarning: false,
+          cameraPreset: CAMERA_PRESETS[driveState.cameraPresetIndex].name,
+          nearestLocation: getNearestLocation({
+            x: driveState.x,
+            z: driveState.z,
+          }).destination.label,
+          savedTableau: driveState.hasSavedTableau,
+          fps: qualityState.fps,
+          pixelRatio: qualityState.pixelRatio,
+          qualityMode: qualityState.mode,
+          renderScale: qualityState.effectScale,
+          activeWakeBlocks: getActiveWakeBlocks(),
+          activeEffectBlocks: effectStats.splashBlocks,
+          activeRings: effectStats.rings,
+          activeSplashes: effectStats.splashes,
+        };
+      })(),
     }),
     toggleDriveMode,
   };
@@ -836,14 +936,70 @@ type WaterSurface = {
   basePositions: Float32Array;
 };
 
+type SkyDome = {
+  mesh: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
+};
+
+const createSkyDome = (): SkyDome => {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      topColor: { value: new THREE.Color(SCENARIO_PALETTES.Serene.skyTop) },
+      horizonColor: { value: new THREE.Color(SCENARIO_PALETTES.Serene.skyHorizon) },
+      fireColor: { value: new THREE.Color(0x5b160f) },
+      dark: { value: 0 },
+      fire: { value: 0 },
+      stale: { value: 0 },
+      time: { value: 0 },
+    },
+    vertexShader: `
+      varying vec3 vWorldPosition;
+
+      void main() {
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 topColor;
+      uniform vec3 horizonColor;
+      uniform vec3 fireColor;
+      uniform float dark;
+      uniform float fire;
+      uniform float stale;
+      uniform float time;
+      varying vec3 vWorldPosition;
+
+      void main() {
+        vec3 direction = normalize(vWorldPosition);
+        float height = clamp(direction.y * 0.5 + 0.5, 0.0, 1.0);
+        float horizon = 1.0 - smoothstep(0.36, 0.78, height);
+        float shimmer = sin(direction.x * 19.0 + direction.z * 11.0 + time * 0.16) * 0.018;
+        vec3 color = mix(horizonColor, topColor, smoothstep(0.16, 0.92, height) + shimmer);
+        color = mix(color, fireColor, fire * horizon * 0.58);
+        color = mix(color, vec3(0.48, 0.58, 0.58), stale * horizon * 0.28);
+        color *= 1.0 - dark * 0.22;
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+    side: THREE.BackSide,
+    depthWrite: false,
+    depthTest: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1120, 48, 24), material);
+  mesh.name = "Hashlake atmospheric sky dome";
+  mesh.renderOrder = -20;
+  return { mesh };
+};
+
 const createLakeFill = () => {
   const shape = new THREE.Shape(
     LAKE_MAP.outline.map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const material = new THREE.MeshBasicMaterial({
-    color: 0x147fb5,
+    color: 0x0d79b2,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.86,
     depthWrite: true,
     side: THREE.DoubleSide,
   });
@@ -863,9 +1019,10 @@ const createOrganicWaterGeometry = () => {
   const step = 9;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
   const deepColor = new THREE.Color(SCENARIO_PALETTES.Serene.waterDeep);
-  const midColor = new THREE.Color(0x20a5d4);
+  const midColor = new THREE.Color(0x1b9fd1);
   const shallowColor = new THREE.Color(SCENARIO_PALETTES.Serene.waterShallow);
   const sandbarColor = new THREE.Color(0xa4e1d0);
+  const coveColor = new THREE.Color(0x0c6c9f);
 
   for (let x = minX; x < maxX; x += step) {
     for (let z = minZ; z < maxZ; z += step) {
@@ -884,11 +1041,18 @@ const createOrganicWaterGeometry = () => {
       const sandbarDx = (center.x - LAKE_MAP.sandbar.center.x) / (LAKE_MAP.sandbar.radiusX + 60);
       const sandbarDz = (center.z - LAKE_MAP.sandbar.center.z) / (LAKE_MAP.sandbar.radiusZ + 42);
       const nearSandbar = clamp(1 - Math.hypot(sandbarDx, sandbarDz), 0, 1);
-      const tint = shallowColor.clone().lerp(midColor, shoreDepth).lerp(deepColor, shoreDepth * 0.42);
+      const islandDx = (center.x - LAKE_MAP.island.center.x) / (LAKE_MAP.island.radiusX + 44);
+      const islandDz = (center.z - LAKE_MAP.island.center.z) / (LAKE_MAP.island.radiusZ + 38);
+      const nearIsland = clamp(1 - Math.hypot(islandDx, islandDz), 0, 1);
+      const cove = getDestinationCenter("cove");
+      const nearCove = clamp(1 - Math.hypot(center.x - cove.x, center.z - cove.z) / 132, 0, 1);
+      const tint = shallowColor.clone().lerp(midColor, shoreDepth).lerp(deepColor, shoreDepth * 0.58);
       tint.lerp(sandbarColor, nearSandbar * 0.55);
+      tint.lerp(shallowColor, nearIsland * 0.28);
+      tint.lerp(coveColor, nearCove * 0.26);
       for (let vertex = 0; vertex < 4; vertex += 1) {
         colors.push(tint.r, tint.g, tint.b);
-        depthFactors.push(clamp(shoreDepth, 0.35, 1));
+        depthFactors.push(clamp(shoreDepth + nearCove * 0.08, 0.3, 1));
       }
       indices.push(vertexIndex, vertexIndex + 1, vertexIndex + 2);
       indices.push(vertexIndex, vertexIndex + 2, vertexIndex + 3);
@@ -907,16 +1071,16 @@ const createWater = (): WaterSurface => {
   const geometry = createOrganicWaterGeometry();
 
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x26a7d6,
-    emissive: 0x0b5c86,
-    emissiveIntensity: 0.16,
-    roughness: 0.18,
+    color: 0x1f9ed3,
+    emissive: 0x07517d,
+    emissiveIntensity: 0.18,
+    roughness: 0.16,
     metalness: 0.02,
     vertexColors: true,
     transmission: 0,
-    clearcoat: 0.56,
-    clearcoatRoughness: 0.14,
-    reflectivity: 0.82,
+    clearcoat: 0.64,
+    clearcoatRoughness: 0.12,
+    reflectivity: 0.9,
   });
 
   const mesh = new THREE.Mesh(geometry, material);
@@ -1178,6 +1342,7 @@ const updateDriveState = (
   const throttleActive = throttleAmount > 0.05;
   const brakeActive = brakeAmount > 0.05;
   const anchorActive = input.anchor || driveState.mobileAnchor;
+  const boostJustPressed = input.boost && !driveState.boostActive;
   const hasDesktopInput =
     input.forward || input.backward || input.left || input.right || input.boost || input.anchor;
   driveState.throttleInput = throttleAmount;
@@ -1192,18 +1357,25 @@ const updateDriveState = (
 
   const throttleRamp = clamp(driveState.throttleHoldTime / 1.44, 0, 1);
   const wakeTarget = clamp(
-    throttleRamp * 0.72 + Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED * 0.32,
+    throttleRamp * 0.82 +
+      Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED * 0.34 +
+      (input.boost ? 0.18 : 0),
     0,
-    input.boost ? 1.08 : 0.92,
+    input.boost ? 1.2 : 0.96,
   );
   driveState.wakePower += (wakeTarget - driveState.wakePower) * Math.min(1, delta * 4.4);
 
   if (throttleActive) {
+    if (boostJustPressed && driveState.speed > 8) {
+      driveState.speed = Math.min(maxForwardSpeed, driveState.speed + DRIVE_BOOST_IMPULSE);
+      driveState.wakePower = Math.min(1.2, driveState.wakePower + 0.22);
+    }
     const acceleration =
       (DRIVE_ACCELERATION_BASE + DRIVE_ACCELERATION_RAMP * throttleRamp) *
       (input.boost ? DRIVE_BOOST_MULTIPLIER : 1);
     driveState.speed += acceleration * throttleAmount * delta;
   }
+  driveState.boostActive = input.boost;
 
   if (anchorActive) {
     driveState.speed = approach(driveState.speed, 0, DRIVE_ANCHOR_BRAKE_FORCE * delta);
@@ -1541,27 +1713,67 @@ const createMountains = () => {
     color: 0x778c7e,
     roughness: 0.95,
   });
+  const distantMountainMaterial = new THREE.MeshStandardMaterial({
+    color: 0x5d746f,
+    roughness: 0.98,
+    transparent: true,
+    opacity: 0.78,
+  });
   const snowMaterial = new THREE.MeshStandardMaterial({
     color: 0xf0f3ec,
     roughness: 0.74,
   });
+  const forestMaterial = new THREE.MeshStandardMaterial({
+    color: 0x375d42,
+    roughness: 0.94,
+  });
 
-  for (let index = 0; index < 18; index += 1) {
-    const angle = -2.85 + index * 0.34 + Math.sin(index) * 0.08;
-    const radius = 420 + (index % 4) * 28;
-    const height = 62 + (index % 5) * 14;
-    const mountain = new THREE.Mesh(new THREE.ConeGeometry(38 + (index % 3) * 8, height, 5), mountainMaterial);
-    mountain.position.set(Math.cos(angle) * radius, height / 2 - 5, Math.sin(angle) * radius - 40);
-    mountain.rotation.y = angle;
-    mountain.castShadow = true;
-    group.add(mountain);
+  for (let layer = 0; layer < 2; layer += 1) {
+    const count = layer === 0 ? 24 : 30;
+    for (let index = 0; index < count; index += 1) {
+      const angle = -3.05 + index * (Math.PI * 2 / count) + Math.sin(index * 1.7 + layer) * 0.05;
+      const radius = layer === 0 ? 565 + (index % 5) * 34 : 760 + (index % 6) * 42;
+      const height =
+        (layer === 0 ? 74 : 96) + (index % 6) * (layer === 0 ? 13 : 18);
+      const width = (layer === 0 ? 42 : 58) + (index % 4) * 9;
+      const mountain = new THREE.Mesh(
+        new THREE.ConeGeometry(width, height, 5),
+        layer === 0 ? mountainMaterial : distantMountainMaterial,
+      );
+      mountain.position.set(
+        Math.cos(angle) * radius,
+        height / 2 - 8,
+        Math.sin(angle) * radius - 44,
+      );
+      mountain.rotation.y = angle;
+      mountain.scale.z = 0.72 + (index % 3) * 0.14;
+      mountain.castShadow = layer === 0;
+      group.add(mountain);
 
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(13, height * 0.26, 5), snowMaterial);
-    cap.position.copy(mountain.position);
-    cap.position.y += height * 0.31;
-    cap.rotation.y = angle;
-    cap.castShadow = true;
-    group.add(cap);
+      if (layer === 0 || index % 2 === 0) {
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(width * 0.32, height * 0.23, 5), snowMaterial);
+        cap.position.copy(mountain.position);
+        cap.position.y += height * 0.32;
+        cap.rotation.y = angle;
+        cap.scale.z = mountain.scale.z;
+        cap.castShadow = layer === 0;
+        group.add(cap);
+      }
+    }
+  }
+
+  for (let index = 0; index < 74; index += 1) {
+    const angle = index * 0.31 + Math.sin(index) * 0.08;
+    const radius = 492 + (index % 7) * 23;
+    const tree = new THREE.Mesh(
+      new THREE.ConeGeometry(5 + (index % 3), 22 + (index % 5) * 4, 7),
+      forestMaterial,
+    );
+    tree.position.set(Math.cos(angle) * radius, 9, Math.sin(angle) * radius - 42);
+    tree.rotation.y = angle;
+    tree.scale.z = 0.75;
+    tree.castShadow = true;
+    group.add(tree);
   }
 
   return group;
@@ -1797,15 +2009,20 @@ const createClouds = () => {
     opacity: 0.82,
   });
 
-  for (let index = 0; index < 8; index += 1) {
+  for (let index = 0; index < 14; index += 1) {
     const cloud = new THREE.Group();
     cloud.name = "Procedural cloud";
-    cloud.position.set(-120 + index * 38, 70 + (index % 3) * 5, -125 - (index % 4) * 18);
+    cloud.position.set(
+      -320 + index * 52,
+      74 + (index % 4) * 5,
+      -185 - (index % 5) * 22,
+    );
+    cloud.scale.setScalar(0.82 + (index % 5) * 0.12);
 
-    for (let puff = 0; puff < 4; puff += 1) {
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(7 + puff * 1.2, 16, 8), material);
-      sphere.position.set(puff * 7, Math.sin(puff) * 2, Math.cos(puff) * 2);
-      sphere.scale.y = 0.52;
+    for (let puff = 0; puff < 5; puff += 1) {
+      const sphere = new THREE.Mesh(new THREE.SphereGeometry(7 + puff * 1.05, 14, 8), material);
+      sphere.position.set(puff * 7.4, Math.sin(puff + index) * 2.2, Math.cos(puff) * 2.8);
+      sphere.scale.set(1.1 + puff * 0.08, 0.45 + (puff % 2) * 0.08, 0.72);
       cloud.add(sphere);
     }
 
@@ -1931,7 +2148,7 @@ const emitWakeSegment = (
       WAKE_BLOCK_SIZE_MAX * boostIntensity,
     );
   segment.heightScale = 0.1 + Math.random() * 0.12 + wakePower * 0.05;
-  segment.lengthScale = 1.28 + speedRatio * 0.92 + Math.random() * 0.56;
+  segment.lengthScale = 1.38 + speedRatio * 1.05 + Math.random() * 0.62;
   segment.driftX =
     forward.x * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
     lateral.x * side * (1.05 + speedRatio * 2.15);
@@ -1939,8 +2156,8 @@ const emitWakeSegment = (
     forward.z * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
     lateral.z * side * (1.05 + speedRatio * 2.15);
   segment.spin = (Math.random() - 0.5) * (0.58 + wakePower * 0.26);
-  segment.mesh.material.color.set(wakePower > 1 ? 0xffffff : 0xd8f5ff);
-  segment.mesh.material.opacity = 0.58 + speedRatio * 0.12 + wakePower * 0.1;
+  segment.mesh.material.color.set(speedRatio > 0.45 || wakePower > 0.55 ? 0xffffff : 0xe9fbff);
+  segment.mesh.material.opacity = clamp(0.68 + speedRatio * 0.16 + wakePower * 0.12, 0.68, 0.95);
 };
 
 const animateWakeEffect = (
@@ -1994,9 +2211,9 @@ const animateWakeEffect = (
     segment.mesh.scale.set(
       segment.baseScale * segment.lengthScale * widen,
       Math.max(0.045, segment.heightScale * settle),
-      segment.baseScale * (0.8 + segment.speedRatio * 0.28) * widen,
+      segment.baseScale * (0.92 + segment.speedRatio * 0.34) * widen,
     );
-    segment.mesh.material.opacity = fade * 0.78;
+    segment.mesh.material.opacity = fade * 0.9;
 
     if (progress >= 1) {
       segment.active = false;
@@ -2108,6 +2325,7 @@ type WeatherSceneTargets = {
   camera: THREE.PerspectiveCamera;
   sunlight: THREE.DirectionalLight;
   hemisphereLight: THREE.HemisphereLight;
+  skyDome: SkyDome;
   water: WaterSurface;
   lakeFill: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
   sunDisc: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
@@ -2146,6 +2364,7 @@ const applyWeatherToScene = ({
   camera,
   sunlight,
   hemisphereLight,
+  skyDome,
   water,
   lakeFill,
   sunDisc,
@@ -2172,6 +2391,14 @@ const applyWeatherToScene = ({
   }
 
   scene.background = skyColor;
+  skyDome.mesh.position.copy(camera.position);
+  skyDome.mesh.material.uniforms.topColor.value.setHex(palette.skyTop);
+  skyDome.mesh.material.uniforms.horizonColor.value.setHex(palette.skyHorizon);
+  skyDome.mesh.material.uniforms.fireColor.value.setHex(fire > 0.08 ? 0x5b160f : palette.sunColor);
+  skyDome.mesh.material.uniforms.dark.value = dark;
+  skyDome.mesh.material.uniforms.fire.value = fire;
+  skyDome.mesh.material.uniforms.stale.value = weather.staleData ? 1 : 0;
+  skyDome.mesh.material.uniforms.time.value = elapsed;
   if (scene.fog instanceof THREE.FogExp2) {
     fogColorScratch.setHex(palette.fogColor);
     scene.fog.color.copy(fogColorScratch);
@@ -2261,7 +2488,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 16</span>
+    <span>Hashlake Phase 17</span>
   `;
   return status;
 };

@@ -65,6 +65,7 @@ export type SceneTelemetry = {
   steerInput: number;
   throttleInput: number;
   brakeInput: number;
+  boostActive: boolean;
   inputSource: "desktop" | "mobile" | "none";
   worldRotationLocked: boolean;
   headingWarning: boolean;
@@ -72,13 +73,28 @@ export type SceneTelemetry = {
   cameraPreset: string;
   nearestLocation: string;
   savedTableau: boolean;
+  fps: number;
+  pixelRatio: number;
+  qualityMode: "crisp" | "balanced" | "low";
+  renderScale: number;
+  activeWakeBlocks: number;
+  activeEffectBlocks: number;
+  activeRings: number;
+  activeSplashes: number;
 };
 
 const metricTiles: MetricTile[] = [
   { group: "global", label: "Data mode", value: "LIVE", tone: "good" },
   { group: "global", label: "Polling", value: "active", tone: "good" },
   { group: "global", label: "Staleness", value: "0%", tone: "good" },
+  { group: "global", label: "Quality", value: "crisp", tone: "good" },
+  { group: "global", label: "Pixel ratio", value: "1.00" },
+  { group: "global", label: "Render scale", value: "1.00" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
+  { group: "weather", label: "Wake blocks", value: "0" },
+  { group: "weather", label: "Splash blocks", value: "0" },
+  { group: "weather", label: "Rings", value: "0" },
+  { group: "weather", label: "Splashes", value: "0" },
   { group: "bitcoin", label: "Price", value: "$62,989" },
   { group: "bitcoin", label: "24h", value: "+0.48%", tone: "good" },
   { group: "bitcoin", label: "7d", value: "-1.27%", tone: "bad" },
@@ -107,6 +123,7 @@ const metricTiles: MetricTile[] = [
   { group: "boat", label: "Steer", value: "0.00" },
   { group: "boat", label: "Throttle", value: "0.00" },
   { group: "boat", label: "Brake", value: "0.00" },
+  { group: "boat", label: "Boost", value: "off" },
   { group: "boat", label: "Input", value: "none" },
   { group: "boat", label: "World lock", value: "locked", tone: "good" },
   { group: "boat", label: "Nearest", value: "Dock" },
@@ -367,6 +384,7 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="whale-50">50 BTC</button>
         <button type="button" data-debug-action="whale-300">300 BTC</button>
         <button type="button" data-debug-action="block">Block</button>
+        <button type="button" data-debug-action="perf-stress">Perf Stress</button>
         <button type="button" data-debug-action="gust">Gust</button>
         <button type="button" data-debug-action="stale">Stale Fog</button>
         <button type="button" data-debug-action="resume">Resume Live</button>
@@ -571,7 +589,6 @@ export const createDebugPanel = (
     wrapper.querySelector<HTMLInputElement>("[data-debug-storm-slider]");
   const liveModeElement = wrapper.querySelector<HTMLElement>("[data-debug-live-mode]");
   const closeButton = wrapper.querySelector<HTMLButtonElement>(".debug-close");
-  const actionButtons = wrapper.querySelectorAll<HTMLButtonElement>("[data-debug-action]");
   const minimapCanvas = wrapper.querySelector<HTMLCanvasElement>("[data-debug-minimap]");
   const nearestLocationElement = wrapper.querySelector<HTMLElement>("[data-debug-nearest]");
 
@@ -928,6 +945,22 @@ export const createDebugPanel = (
       worldLockMetric.classList.toggle("debug-tone-bad", !telemetry.worldRotationLocked);
     }
 
+    setMetric(
+      "Quality",
+      telemetry.qualityMode,
+      telemetry.qualityMode === "crisp"
+        ? "good"
+        : telemetry.qualityMode === "balanced"
+          ? "warn"
+          : "bad",
+    );
+    setMetric("Pixel ratio", telemetry.pixelRatio.toFixed(2));
+    setMetric("Render scale", telemetry.renderScale.toFixed(2));
+    setMetric("Wake blocks", String(telemetry.activeWakeBlocks));
+    setMetric("Splash blocks", String(telemetry.activeEffectBlocks));
+    setMetric("Rings", String(telemetry.activeRings));
+    setMetric("Splashes", String(telemetry.activeSplashes));
+    setMetric("Boost", telemetry.boostActive ? "on" : "off", telemetry.boostActive ? "good" : "muted");
     setMetric("Nearest", telemetry.nearestLocation);
 
     if (nearestLocationElement) {
@@ -971,54 +1004,89 @@ export const createDebugPanel = (
 
   closeButton?.addEventListener("click", () => setVisible(false));
 
-  actionButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const action = button.dataset.debugAction;
-      if (action === "crash") {
-        weatherStore.triggerCrash();
-      } else if (action === "rally") {
-        weatherStore.triggerRally();
-      } else if (action === "whale") {
-        liveBitcoinStore.recordManualLargeTrade(14.7, "buy");
-      } else if (action === "whale-3") {
-        liveBitcoinStore.recordManualLargeTrade(WHALE_MIN_BTC, "buy");
-      } else if (action === "whale-10") {
-        liveBitcoinStore.recordManualLargeTrade(WHALE_MEDIUM_BTC, "sell");
-      } else if (action === "whale-50") {
-        liveBitcoinStore.recordManualLargeTrade(WHALE_LARGE_BTC, "buy");
-      } else if (action === "whale-300") {
-        liveBitcoinStore.recordManualLargeTrade(WHALE_HUGE_BTC, "sell");
-      } else if (action === "block") {
-        const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
-        const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;
+  const handleDebugAction = (action: string | undefined) => {
+    if (action === "crash") {
+      weatherStore.triggerCrash();
+    } else if (action === "rally") {
+      weatherStore.triggerRally();
+    } else if (action === "whale") {
+      liveBitcoinStore.recordManualLargeTrade(14.7, "buy");
+    } else if (action === "whale-3") {
+      liveBitcoinStore.recordManualLargeTrade(WHALE_MIN_BTC, "buy");
+    } else if (action === "whale-10") {
+      liveBitcoinStore.recordManualLargeTrade(WHALE_MEDIUM_BTC, "sell");
+    } else if (action === "whale-50") {
+      liveBitcoinStore.recordManualLargeTrade(WHALE_LARGE_BTC, "buy");
+    } else if (action === "whale-300") {
+      liveBitcoinStore.recordManualLargeTrade(WHALE_HUGE_BTC, "sell");
+    } else if (action === "block") {
+      const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
+      const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;
+      eventBus.emit({
+        type: "newBlock",
+        blockHeight: simulatedBlock,
+        intensity: 0.85,
+        message: `New block found - #${simulatedBlock}`,
+      });
+      weatherStore.setStormIndex(18, "Manual Block");
+    } else if (action === "perf-stress") {
+      const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
+      const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;
+      const stressTrades = [
+        { btcAmount: WHALE_MIN_BTC, side: "buy" as const, intensity: 0.42 },
+        { btcAmount: WHALE_MEDIUM_BTC, side: "sell" as const, intensity: 0.7 },
+        { btcAmount: WHALE_LARGE_BTC, side: "buy" as const, intensity: 1.2 },
+        { btcAmount: WHALE_HUGE_BTC, side: "sell" as const, intensity: 2.4 },
+      ];
+      stressTrades.forEach((trade) => {
         eventBus.emit({
-          type: "newBlock",
-          blockHeight: simulatedBlock,
-          intensity: 0.85,
-          message: `New block found - #${simulatedBlock}`,
+          type: "largeTrade",
+          btcAmount: trade.btcAmount,
+          side: trade.side,
+          source: "manual",
+          intensity: trade.intensity,
+          message: `Perf stress - ${trade.btcAmount} BTC`,
         });
-        weatherStore.setStormIndex(18, "Manual Block");
-      } else if (action === "gust") {
-        weatherStore.triggerGust();
-      } else if (action === "stale") {
-        weatherStore.triggerStaleFog();
-      } else {
-        weatherStore.resumeLive();
-        const liveSnapshot = liveBitcoinStore.getSnapshot();
-        const dataMode =
-          liveSnapshot.dataMode === "STALE"
-            ? "STALE"
-            : liveSnapshot.dataMode === "CACHED"
-              ? "CACHED"
-              : "LIVE";
-        weatherStore.setLiveStormIndex(
-          liveSnapshot.stormIndex,
-          dataMode,
-          liveSnapshot.dataMode === "STALE",
-        );
-      }
-    });
-  });
+      });
+      eventBus.emit({
+        type: "newBlock",
+        blockHeight: simulatedBlock,
+        intensity: 0.85,
+        message: `New block found - #${simulatedBlock}`,
+      });
+    } else if (action === "gust") {
+      weatherStore.triggerGust();
+    } else if (action === "stale") {
+      weatherStore.triggerStaleFog();
+    } else if (action === "resume") {
+      weatherStore.resumeLive();
+      const liveSnapshot = liveBitcoinStore.getSnapshot();
+      const dataMode =
+        liveSnapshot.dataMode === "STALE"
+          ? "STALE"
+          : liveSnapshot.dataMode === "CACHED"
+            ? "CACHED"
+            : "LIVE";
+      weatherStore.setLiveStormIndex(
+        liveSnapshot.stormIndex,
+        dataMode,
+        liveSnapshot.dataMode === "STALE",
+      );
+    }
+  };
+
+  const handleDebugClick = (event: MouseEvent) => {
+    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
+      "[data-debug-action]",
+    );
+    if (!button || !wrapper.contains(button)) {
+      return;
+    }
+
+    handleDebugAction(button.dataset.debugAction);
+  };
+
+  wrapper.addEventListener("click", handleDebugClick);
 
   const unsubscribe = weatherStore.subscribe(renderWeather);
   const unsubscribeLive = liveBitcoinStore.subscribe(renderLiveData);
@@ -1032,6 +1100,7 @@ export const createDebugPanel = (
     element: wrapper,
     destroy: () => {
       window.removeEventListener("keydown", handleKeydown);
+      wrapper.removeEventListener("click", handleDebugClick);
       window.clearInterval(timerId);
       window.cancelAnimationFrame(fpsFrame);
       unsubscribe();
