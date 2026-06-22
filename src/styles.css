@@ -101,6 +101,10 @@ body {
   mix-blend-mode: soft-light;
 }
 
+.hashlake-grade-overlay--disabled {
+  display: none;
+}
+
 .status-pill {
   position: fixed;
   left: clamp(12px, 2vw, 24px);
@@ -618,6 +622,13 @@ body {
   gap: 5px;
 }
 
+.debug-quality__buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.debug-quality__buttons button,
 .debug-manual__buttons button {
   min-height: 26px;
   padding: 4px 8px;
@@ -631,9 +642,16 @@ body {
   font-weight: 700;
 }
 
+.debug-quality__buttons button:hover,
 .debug-manual__buttons button:hover {
   border-color: rgba(126, 217, 218, 0.64);
   background: rgba(126, 217, 218, 0.15);
+}
+
+.debug-quality__button--active {
+  border-color: rgba(145, 242, 191, 0.74) !important;
+  background: rgba(145, 242, 191, 0.18) !important;
+  color: #ecfff2 !important;
 }
 
 .debug-minimap-section {

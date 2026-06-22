@@ -5,6 +5,7 @@ import { getWeatherPalette } from "./artDirection";
 export type PostSystem = {
   element: HTMLDivElement;
   enabled: boolean;
+  setEnabled: (enabled: boolean) => void;
   update: (weather: WeatherSnapshot, elapsed: number) => void;
   resize: () => void;
   dispose: () => void;
@@ -19,10 +20,17 @@ export const createPostSystem = (
   container.append(overlay);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.04;
+  let enabled = true;
 
   return {
     element: overlay,
-    enabled: true,
+    get enabled() {
+      return enabled;
+    },
+    setEnabled: (nextEnabled) => {
+      enabled = nextEnabled;
+      overlay.classList.toggle("hashlake-grade-overlay--disabled", !enabled);
+    },
     update: (weather, elapsed) => {
       const palette = getWeatherPalette(weather.stormIndex);
       const dark = weather.dials.skyDark;
@@ -32,10 +40,10 @@ export const createPostSystem = (
           ? weather.dials.lightning
           : 0;
       renderer.toneMappingExposure = THREE.MathUtils.lerp(1.12 + calm * 0.1, 0.66, dark);
-      overlay.style.setProperty("--grade-vignette", String(0.16 + palette.vignette * 0.56));
+      overlay.style.setProperty("--grade-vignette", String(enabled ? 0.16 + palette.vignette * 0.56 : 0));
       overlay.style.setProperty("--grade-desat", String(weather.staleData ? 0.26 : 0));
-      overlay.style.setProperty("--grade-flash", String(flash * 0.22));
-      overlay.style.setProperty("--grade-warmth", String(palette.gradeWarmth * (1 - dark * 0.55)));
+      overlay.style.setProperty("--grade-flash", String(enabled ? flash * 0.22 : 0));
+      overlay.style.setProperty("--grade-warmth", String(enabled ? palette.gradeWarmth * (1 - dark * 0.55) : 0));
     },
     resize: () => undefined,
     dispose: () => overlay.remove(),

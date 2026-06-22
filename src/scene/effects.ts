@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { HashlakeEvent, HashlakeEventBus, LargeTradeSide } from "../state/eventBus";
+import type { HashlakeEvent, HashlakeEventBus } from "../state/eventBus";
 
 type ExpandingRing = {
   mesh: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
@@ -85,20 +85,8 @@ const createSoftPointTexture = () => {
   return texture;
 };
 
-const getTradeColor = (side: LargeTradeSide | undefined) => {
-  if (side === "buy") {
-    return 0x7df6a7;
-  }
-
-  if (side === "sell") {
-    return 0xff7979;
-  }
-
-  return 0xbdefff;
-};
-
 const getTradeStrength = (btcAmount: number) =>
-  Math.min(2.6, Math.max(0.6, Math.log10(Math.max(1.01, btcAmount)) / 1.2));
+  Math.min(3.1, Math.max(0.55, Math.log10(Math.max(1.01, btcAmount)) / 1.05));
 
 const disposeRing = (group: THREE.Group, ring: ExpandingRing) => {
   group.remove(ring.mesh);
@@ -273,20 +261,18 @@ export const createSceneEffects = (
     burst.points.geometry.attributes.position.needsUpdate = true;
   };
 
-  const addLargeTradeSplash = (
-    btcAmount: number,
-    side: LargeTradeSide | undefined = "unknown",
-  ) => {
+  const addLargeTradeSplash = (btcAmount: number) => {
     // Trade/whale splash is a local event effect and must not drive global weather color.
     const strength = getTradeStrength(btcAmount);
-    const placementAngle = Math.random() * Math.PI * 2;
-    const placementDistance = 22 + Math.random() * 70;
+    const boat = getWaterPosition(getBoatPosition());
+    const placementAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 0.86;
+    const placementDistance = 24 + Math.random() * 46;
     const origin = new THREE.Vector3(
-      Math.cos(placementAngle) * placementDistance,
+      boat.x + Math.cos(placementAngle) * placementDistance + (Math.random() - 0.5) * 18,
       0.18,
-      Math.sin(placementAngle) * placementDistance - 18,
+      boat.z + Math.sin(placementAngle) * placementDistance - 8 + (Math.random() - 0.5) * 16,
     );
-    const color = getTradeColor(side);
+    const color = btcAmount >= 300 ? 0xf1fbff : btcAmount >= 50 ? 0xd7f7ff : 0xbdefff;
     addSplashBurst(origin, strength, color);
 
     addRing(color, strength * 2.2, origin, 2.4, 0.5, 1);
@@ -353,7 +339,7 @@ export const createSceneEffects = (
     }
 
     if ((event.type === "whale" || event.type === "largeTrade") && (event.btcAmount ?? 0) >= 3) {
-      addLargeTradeSplash(event.btcAmount ?? 3, event.side ?? "unknown");
+      addLargeTradeSplash(event.btcAmount ?? 3);
     }
 
     if (event.type === "newBlock") {
@@ -489,10 +475,10 @@ export const createSceneEffects = (
       qualityScale = Math.max(0.45, Math.min(1, scale));
     },
     stressTest: () => {
-      addLargeTradeSplash(3, "buy");
-      addLargeTradeSplash(10, "sell");
-      addLargeTradeSplash(50, "buy");
-      addLargeTradeSplash(300, "sell");
+      addLargeTradeSplash(3);
+      addLargeTradeSplash(10);
+      addLargeTradeSplash(50);
+      addLargeTradeSplash(300);
       addRing(0x7fd8c8, 5, getWaterPosition(getBoatPosition()), 1.08, 0.5, 0.8);
     },
     dispose: () => {

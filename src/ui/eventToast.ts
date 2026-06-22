@@ -61,15 +61,10 @@ export const createEventToasts = (
 
     if (event.type === "largeTrade" || event.type === "whale") {
       const amount = formatBtc(event.btcAmount);
-      if (event.side === "buy") {
-        pushToast(`Large buy - ${amount}`, "buy");
-      } else if (event.side === "sell") {
-        pushToast(
-          (event.btcAmount ?? 0) >= 300 ? `Whale sell - ${amount}` : `Large sell - ${amount}`,
-          "sell",
-        );
-      } else {
-        pushToast(`Whale splash - ${amount}`, "signal");
+      if ((event.btcAmount ?? 0) >= 300) {
+        pushToast(`Whale move - ${amount}`, "signal");
+      } else if ((event.btcAmount ?? 0) >= 10) {
+        pushToast(`BTC move - ${amount}`, "signal");
       }
       return;
     }

@@ -8,6 +8,7 @@ type ForestStats = {
   treeInstances: number;
   reedInstances: number;
   rockInstances: number;
+  silhouetteInstances: number;
 };
 
 export type ForestSystem = {
@@ -181,6 +182,50 @@ export const createForestSystem = (): ForestSystem => {
   }
   group.add(rocks);
 
+  const silhouetteCount = 120;
+  const silhouetteGeometry = new THREE.ConeGeometry(3.6, 18, 6, 1);
+  const silhouetteMaterial = new THREE.MeshBasicMaterial({
+    color: 0x071513,
+    transparent: true,
+    opacity: 0.78,
+    depthWrite: false,
+  });
+  const silhouettes = new THREE.InstancedMesh(
+    silhouetteGeometry,
+    silhouetteMaterial,
+    silhouetteCount,
+  );
+  silhouettes.name = "Far shore forest silhouette band";
+  silhouettes.frustumCulled = false;
+  for (let index = 0; index < silhouetteCount; index += 1) {
+    const x = -760 + (index / (silhouetteCount - 1)) * 1520 + (rng() - 0.5) * 18;
+    const z = -294 + Math.sin(index * 0.27) * 24 + (rng() - 0.5) * 16;
+    const height = 0.62 + rng() * 1.55;
+    position.set(x, 7.8 * height, z);
+    quaternion.setFromAxisAngle(up, rng() * Math.PI * 2);
+    scale.set(0.75 + rng() * 0.9, height, 0.72 + rng() * 0.5);
+    matrix.compose(position, quaternion, scale);
+    silhouettes.setMatrixAt(index, matrix);
+  }
+  silhouettes.instanceMatrix.needsUpdate = true;
+  group.add(silhouettes);
+
+  const reflectionMaterial = new THREE.MeshBasicMaterial({
+    color: 0x021313,
+    transparent: true,
+    opacity: 0.12,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  for (let index = 0; index < 5; index += 1) {
+    const reflection = new THREE.Mesh(new THREE.PlaneGeometry(260 + index * 80, 30 + index * 8), reflectionMaterial);
+    reflection.name = "Cheap treeline water reflection";
+    reflection.rotation.x = -Math.PI / 2;
+    reflection.position.set(-420 + index * 210, 0.22 + index * 0.002, -176 + Math.sin(index) * 18);
+    reflection.rotation.z = (index - 2) * 0.035;
+    group.add(reflection);
+  }
+
   return {
     group,
     update: (elapsed, weather) => {
@@ -191,11 +236,14 @@ export const createForestSystem = (): ForestSystem => {
       foliageMaterial.color.multiplyScalar(Math.max(0.18, 1 - weather.dials.skyDark * 0.48));
       reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x59613d : 0xa4b85f);
       rockMaterial.color.setHex(palette.rock);
+      silhouetteMaterial.opacity = 0.72 + weather.dials.skyDark * 0.16;
+      reflectionMaterial.opacity = 0.10 + (1 - weather.dials.skyDark) * 0.04;
     },
     getStats: () => ({
-      treeInstances: treeCount,
+      treeInstances: treeCount + silhouetteCount,
       reedInstances: reedCount,
       rockInstances: rockCount,
+      silhouetteInstances: silhouetteCount,
     }),
   };
 };

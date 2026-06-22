@@ -27,6 +27,7 @@ type HashlakeScene = {
   stop: () => void;
   getTelemetry: () => SceneTelemetry;
   toggleDriveMode: () => void;
+  setQualityPreset: (preset: QualityPreset) => void;
 };
 
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
@@ -37,7 +38,7 @@ const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
 const DRIVE_BOOST_MAX_SPEED = 90;
 const DRIVE_BOOST_MULTIPLIER = 1.58;
-const DRIVE_BOOST_IMPULSE = 13;
+const DRIVE_BOOST_IMPULSE = 16;
 const DRIVE_NATURAL_BRAKE_DRAG = 34;
 const DRIVE_COAST_DRAG = 0.9;
 const DRIVE_ACTIVE_BRAKE_FORCE = 82;
@@ -52,7 +53,7 @@ const DRIVE_STEER_SENSITIVITY = 1.1;
 const DRIVE_MAX_YAW_PER_SECOND = 1.52;
 const DRIVE_SPEED_TURN_DAMPING = 0.58;
 const DRIVE_WATER_RESISTANCE_TURN_DAMPING = 0.86;
-const DRIVE_BOW_LIFT_SCALE = 0.15;
+const DRIVE_BOW_LIFT_SCALE = 0.18;
 const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
@@ -62,15 +63,53 @@ const WAKE_VERTICAL_VELOCITY = 0.02;
 const WAKE_BACKWARD_VELOCITY = 7.2;
 const WAKE_OUTWARD_SPREAD = 5.2;
 const WAKE_LIFETIME_SECONDS = 0.66;
-const WAKE_EMISSION_RATE = 36;
+const WAKE_EMISSION_RATE = 42;
 const WAKE_BOOST_MULTIPLIER = 1.82;
 const WAKE_SURFACE_Y_OFFSET = 0.3;
 const WAKE_FADE_SPEED = 1.26;
-const WAKE_MAX_ACTIVE_BLOCKS = 192;
+const WAKE_MAX_ACTIVE_BLOCKS = 224;
 const QUALITY_TARGET_FPS = 54;
-const QUALITY_MIN_PIXEL_RATIO = 0.65;
+const QUALITY_WARMUP_MS = 4500;
+const QUALITY_MIN_DESKTOP_PIXEL_RATIO = 1;
+const QUALITY_MIN_MOBILE_PIXEL_RATIO = 0.78;
 const QUALITY_MAX_PIXEL_RATIO = 1.75;
 const QUALITY_GOVERNOR_INTERVAL = 2500;
+const QUALITY_SCENIC_DOWNGRADE_FPS = 42;
+const QUALITY_BALANCED_DOWNGRADE_FPS = 34;
+
+export type QualityPreset = "Performance" | "Balanced" | "Scenic";
+
+type QualityPresetConfig = {
+  maxPixelRatio: number;
+  effectScale: number;
+  wakeScale: number;
+  forestUpdateInterval: number;
+  postEnabled: boolean;
+};
+
+const QUALITY_PRESETS: Record<QualityPreset, QualityPresetConfig> = {
+  Performance: {
+    maxPixelRatio: 1,
+    effectScale: 0.62,
+    wakeScale: 0.72,
+    forestUpdateInterval: 0.18,
+    postEnabled: false,
+  },
+  Balanced: {
+    maxPixelRatio: 1.25,
+    effectScale: 0.84,
+    wakeScale: 1,
+    forestUpdateInterval: 0.1,
+    postEnabled: true,
+  },
+  Scenic: {
+    maxPixelRatio: 1.6,
+    effectScale: 1,
+    wakeScale: 1.16,
+    forestUpdateInterval: 0.055,
+    postEnabled: true,
+  },
+};
 
 type SceneTelemetry = {
   mode: "Frame" | "Drive";
@@ -99,7 +138,8 @@ type SceneTelemetry = {
   savedTableau: boolean;
   fps: number;
   pixelRatio: number;
-  qualityMode: "crisp" | "balanced" | "low";
+  qualityMode: QualityPreset;
+  qualityPreset: QualityPreset;
   renderScale: number;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
@@ -169,11 +209,18 @@ type DriveState = {
 type QualityState = {
   fps: number;
   pixelRatio: number;
-  mode: "crisp" | "balanced" | "low";
+  preset: QualityPreset;
   effectScale: number;
+  wakeScale: number;
+  forestUpdateInterval: number;
+  postEnabled: boolean;
   frameAccumulator: number;
   frameCount: number;
   lastGovernAt: number;
+  stableLowSamples: number;
+  stableHighSamples: number;
+  warmupUntil: number;
+  minPixelRatio: number;
 };
 
 type DriveInput = {
@@ -358,9 +405,15 @@ export const createHashlakeScene = ({
     alpha: false,
     powerPreference: "high-performance",
   });
-  const initialPixelRatio = Math.min(
-    window.devicePixelRatio || 1,
-    QUALITY_MAX_PIXEL_RATIO,
+  const isMobileViewport =
+    window.matchMedia("(pointer: coarse)").matches || Math.min(window.innerWidth, window.innerHeight) < 720;
+  const minPixelRatio = isMobileViewport
+    ? QUALITY_MIN_MOBILE_PIXEL_RATIO
+    : QUALITY_MIN_DESKTOP_PIXEL_RATIO;
+  const initialPreset: QualityPreset = "Balanced";
+  const initialPixelRatio = Math.max(
+    minPixelRatio,
+    Math.min(window.devicePixelRatio || 1, QUALITY_PRESETS[initialPreset].maxPixelRatio),
   );
   renderer.setClearColor(SCENARIO_PALETTES.Serene.skyTop, 1);
   renderer.setPixelRatio(initialPixelRatio);
@@ -464,6 +517,7 @@ export const createHashlakeScene = ({
   scene.add(weatherEffects.group);
   const wakeEffect = createWakeEffect();
   scene.add(wakeEffect.group);
+  let lastForestUpdateAt = 0;
   const sceneEffects = createSceneEffects(
     eventBus,
     () => new THREE.Vector3(driveState.x, boat.position.y, driveState.z),
@@ -482,11 +536,18 @@ export const createHashlakeScene = ({
   const qualityState: QualityState = {
     fps: 60,
     pixelRatio: initialPixelRatio,
-    mode: initialPixelRatio >= 1.35 ? "crisp" : "balanced",
-    effectScale: 1,
+    preset: initialPreset,
+    effectScale: QUALITY_PRESETS[initialPreset].effectScale,
+    wakeScale: QUALITY_PRESETS[initialPreset].wakeScale,
+    forestUpdateInterval: QUALITY_PRESETS[initialPreset].forestUpdateInterval,
+    postEnabled: QUALITY_PRESETS[initialPreset].postEnabled,
     frameAccumulator: 0,
     frameCount: 0,
     lastGovernAt: startedAt,
+    stableLowSamples: 0,
+    stableHighSamples: 0,
+    warmupUntil: startedAt + QUALITY_WARMUP_MS,
+    minPixelRatio,
   };
   let animationId = 0;
   let hasRenderedFrame = false;
@@ -513,6 +574,32 @@ export const createHashlakeScene = ({
   const getActiveWakeBlocks = () =>
     wakeEffect.segments.reduce((count, segment) => count + Number(segment.active), 0);
 
+  const applyQualityPreset = (preset: QualityPreset, manual = false) => {
+    const config = QUALITY_PRESETS[preset];
+    qualityState.preset = preset;
+    qualityState.effectScale = config.effectScale;
+    qualityState.wakeScale = config.wakeScale;
+    qualityState.forestUpdateInterval = config.forestUpdateInterval;
+    qualityState.postEnabled = config.postEnabled;
+    qualityState.stableLowSamples = 0;
+    qualityState.stableHighSamples = 0;
+    if (manual) {
+      qualityState.warmupUntil = 0;
+    }
+
+    const deviceCap = Math.min(window.devicePixelRatio || 1, QUALITY_MAX_PIXEL_RATIO);
+    const capped = Math.max(
+      qualityState.minPixelRatio,
+      Math.min(deviceCap, config.maxPixelRatio),
+    );
+    if (qualityState.pixelRatio > capped || manual) {
+      qualityState.pixelRatio = capped;
+      renderer.setPixelRatio(qualityState.pixelRatio);
+    }
+    sceneEffects.setQualityScale(qualityState.effectScale);
+    postSystem.setEnabled(qualityState.postEnabled);
+  };
+
   const governQuality = (delta: number, now: number) => {
     qualityState.frameAccumulator += delta;
     qualityState.frameCount += 1;
@@ -527,25 +614,56 @@ export const createHashlakeScene = ({
     qualityState.frameCount = 0;
     qualityState.lastGovernAt = now;
 
+    if (now < qualityState.warmupUntil) {
+      return;
+    }
+
     const deviceCap = Math.min(window.devicePixelRatio || 1, QUALITY_MAX_PIXEL_RATIO);
-    let nextPixelRatio = qualityState.pixelRatio;
-    if (fps < QUALITY_TARGET_FPS - 8 && nextPixelRatio > QUALITY_MIN_PIXEL_RATIO) {
-      nextPixelRatio = Math.max(QUALITY_MIN_PIXEL_RATIO, nextPixelRatio - 0.15);
-    } else if (fps > QUALITY_TARGET_FPS + 10 && nextPixelRatio < deviceCap) {
-      nextPixelRatio = Math.min(deviceCap, nextPixelRatio + 0.1);
+    const presetConfig = QUALITY_PRESETS[qualityState.preset];
+    const targetCap = Math.max(
+      qualityState.minPixelRatio,
+      Math.min(deviceCap, presetConfig.maxPixelRatio),
+    );
+    let nextPixelRatio = Math.min(qualityState.pixelRatio, targetCap);
+
+    const shouldReducePreset =
+      (qualityState.preset === "Scenic" && fps < QUALITY_SCENIC_DOWNGRADE_FPS) ||
+      (qualityState.preset !== "Scenic" && fps < QUALITY_BALANCED_DOWNGRADE_FPS);
+
+    if (shouldReducePreset) {
+      qualityState.stableLowSamples += 1;
+      qualityState.stableHighSamples = 0;
+    } else if (fps > QUALITY_TARGET_FPS + 8) {
+      qualityState.stableHighSamples += 1;
+      qualityState.stableLowSamples = 0;
+    } else {
+      qualityState.stableLowSamples = Math.max(0, qualityState.stableLowSamples - 1);
+      qualityState.stableHighSamples = Math.max(0, qualityState.stableHighSamples - 1);
+    }
+
+    if (qualityState.stableLowSamples >= 4) {
+      if (qualityState.preset === "Scenic") {
+        applyQualityPreset("Balanced");
+      } else if (qualityState.preset === "Balanced") {
+        applyQualityPreset("Performance");
+      } else if (nextPixelRatio > qualityState.minPixelRatio) {
+        nextPixelRatio = Math.max(qualityState.minPixelRatio, nextPixelRatio - 0.08);
+      }
+    } else if (
+      qualityState.stableHighSamples >= 4 &&
+      qualityState.preset !== "Performance" &&
+      nextPixelRatio < targetCap
+    ) {
+      nextPixelRatio = Math.min(targetCap, nextPixelRatio + 0.05);
     }
 
     if (Math.abs(nextPixelRatio - qualityState.pixelRatio) > 0.01) {
       qualityState.pixelRatio = nextPixelRatio;
       renderer.setPixelRatio(nextPixelRatio);
     }
-
-    qualityState.mode =
-      qualityState.pixelRatio < 0.85 ? "low" : qualityState.pixelRatio < 1.25 ? "balanced" : "crisp";
-    qualityState.effectScale =
-      qualityState.mode === "low" ? 0.58 : qualityState.mode === "balanced" ? 0.78 : 1;
-    sceneEffects.setQualityScale(qualityState.effectScale);
   };
+
+  applyQualityPreset(initialPreset);
 
   const render = () => {
     if (!isRunning) {
@@ -562,9 +680,12 @@ export const createHashlakeScene = ({
     animateWater(water, elapsed, weather, driveState, camera);
     animateShoreline(shoreline, elapsed, weather);
     terrainSystem.update(weather, camera);
-    forestSystem.update(elapsed, weather);
+    if (elapsed - lastForestUpdateAt >= qualityState.forestUpdateInterval) {
+      forestSystem.update(elapsed, weather);
+      lastForestUpdateAt = elapsed;
+    }
     animateBoat(boat, elapsed, weather, driveState);
-    animateWakeEffect(wakeEffect, driveState, elapsed, delta);
+    animateWakeEffect(wakeEffect, driveState, elapsed, delta, qualityState.wakeScale);
     animateWeatherEffects(weatherEffects, elapsed, weather);
     sceneEffects.update(delta);
     applyWeatherToScene({
@@ -948,7 +1069,8 @@ export const createHashlakeScene = ({
           savedTableau: driveState.hasSavedTableau,
           fps: qualityState.fps,
           pixelRatio: qualityState.pixelRatio,
-          qualityMode: qualityState.mode,
+          qualityMode: qualityState.preset,
+          qualityPreset: qualityState.preset,
           renderScale: qualityState.effectScale,
           activeWakeBlocks: getActiveWakeBlocks(),
           activeEffectBlocks: effectStats.splashBlocks,
@@ -963,6 +1085,7 @@ export const createHashlakeScene = ({
       })(),
     }),
     toggleDriveMode,
+    setQualityPreset: (preset) => applyQualityPreset(preset, true),
   };
 };
 
@@ -1517,26 +1640,26 @@ const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: SCENARIO_PALETTES.Serene.sand,
+    color: 0xc7b579,
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xb9aa70,
+    color: 0x83775a,
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x567443,
+    color: 0x334a31,
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: SCENARIO_PALETTES.Serene.waterShallow,
+    color: 0x6fa79f,
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.16,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2f6135,
+    color: 0x203923,
     roughness: 0.92,
   });
   const land = new THREE.Mesh(
@@ -2011,11 +2134,12 @@ const animateWakeEffect = (
   driveState: DriveState,
   elapsed: number,
   delta: number,
+  wakeQualityScale: number,
 ) => {
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
   const wakePower = clamp(driveState.wakePower, 0, 1.34);
   const emitCadence = clamp(
-    1 / (WAKE_EMISSION_RATE + wakePower * 24 + speedRatio * 14),
+    1 / ((WAKE_EMISSION_RATE + wakePower * 24 + speedRatio * 14) * wakeQualityScale),
     0.014,
     0.068,
   );
@@ -2341,7 +2465,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 20</span>
+    <span>Hashlake Phase 21</span>
   `;
   return status;
 };

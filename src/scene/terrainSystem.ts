@@ -164,19 +164,19 @@ const createTerrainMaterial = (
         float slope = clamp(normal.y, 0.0, 1.0);
         float roughNoise = bl_fbm(vWorldPos.xz * 0.012);
         float broadNoise = bl_fbm(vWorldPos.xz * 0.0028 + 7.0);
-        vec3 rock = mix(vec3(0.36, 0.34, 0.32), vec3(0.20, 0.20, 0.22), roughNoise)
-          * (0.82 + 0.34 * broadNoise);
+        vec3 rock = mix(vec3(0.27, 0.29, 0.27), vec3(0.15, 0.17, 0.18), roughNoise)
+          * (0.74 + 0.26 * broadNoise);
         float forest = smoothstep(0.45, 0.16, vElev) * smoothstep(0.34, 0.62, slope) * uForest;
         vec3 forestColor = vec3(0.055, 0.105, 0.062)
           * (0.75 + 0.55 * bl_fbm(vWorldPos.xz * 0.022 + 3.0));
         vec3 albedo = mix(rock, forestColor, forest);
         float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
           * smoothstep(0.18, 0.46, slope);
-        albedo = mix(albedo, vec3(0.93, 0.95, 0.985), snow);
+        albedo = mix(albedo, vec3(0.70, 0.76, 0.75), snow * 0.74);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
-        vec3 color = albedo * (uSunColor * diffuse * 1.55 + uAmbient * (0.48 + 0.52 * slope));
-        color *= 0.72 + slope * 0.28;
+        vec3 color = albedo * (uSunColor * diffuse * 1.18 + uAmbient * (0.38 + 0.44 * slope));
+        color *= 0.58 + slope * 0.24;
         color += albedo * vec3(1.0, 0.32, 0.07) * uFire * 0.42;
         color = mix(color, color * vec3(0.66, 0.70, 0.78), uDark * 0.34);
 
@@ -187,6 +187,41 @@ const createTerrainMaterial = (
       }
     `,
   });
+
+const buildMountainCurtain = (width: number, baseHeight: number, peakHeight: number, seed: number) => {
+  const noise = makeNoise2D(seed);
+  const segments = 72;
+  const vertices: number[] = [];
+  const indices: number[] = [];
+
+  for (let index = 0; index <= segments; index += 1) {
+    const t = index / segments;
+    const x = (t - 0.5) * width;
+    const ridge =
+      baseHeight +
+      peakHeight *
+        (0.35 +
+          0.65 *
+            Math.max(
+              0,
+              noise.fbm(t * 3.1 + seed * 0.01, Math.sin(t * Math.PI * 2) + 3.5, 4) + 0.56,
+            ));
+    const heroPeak = Math.exp(-((t - 0.52) * (t - 0.52)) / 0.018) * peakHeight * 0.45;
+    const top = ridge + heroPeak;
+    vertices.push(x, 0, 0, x, top, 0);
+  }
+
+  for (let index = 0; index < segments; index += 1) {
+    const base = index * 2;
+    indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
 
 export const createTerrainSystem = (): TerrainSystem => {
   const shared = {
@@ -230,10 +265,39 @@ export const createTerrainSystem = (): TerrainSystem => {
   mid.name = "Mid HashLake ridge";
   far.frustumCulled = false;
   mid.frustumCulled = false;
-  group.add(far, mid);
+  const curtainBackMaterial = new THREE.MeshBasicMaterial({
+    color: 0x263d42,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const curtainFrontMaterial = new THREE.MeshBasicMaterial({
+    color: 0x102323,
+    transparent: true,
+    opacity: 0.56,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const backCurtain = new THREE.Mesh(
+    buildMountainCurtain(1900, 58, 158, 181),
+    curtainBackMaterial,
+  );
+  backCurtain.name = "Far painterly mountain silhouette";
+  backCurtain.position.set(0, 20, -1020);
+  const frontCurtain = new THREE.Mesh(
+    buildMountainCurtain(1700, 36, 96, 331),
+    curtainFrontMaterial,
+  );
+  frontCurtain.name = "Near painterly mountain silhouette";
+  frontCurtain.position.set(0, 8, -760);
+  group.add(backCurtain, far, frontCurtain, mid);
 
   const vertexCount =
-    far.geometry.attributes.position.count + mid.geometry.attributes.position.count;
+    far.geometry.attributes.position.count +
+    mid.geometry.attributes.position.count +
+    backCurtain.geometry.attributes.position.count +
+    frontCurtain.geometry.attributes.position.count;
 
   return {
     group,
@@ -247,6 +311,10 @@ export const createTerrainSystem = (): TerrainSystem => {
       shared.hazeDensity.value = 0.00018 + weather.dials.fog * 0.0008 + weather.dials.skyDark * 0.00012;
       shared.fire.value = weather.dials.fireWeather;
       shared.dark.value = weather.dials.skyDark;
+      curtainBackMaterial.color.setHex(palette.fogColor);
+      curtainBackMaterial.opacity = 0.30 + weather.dials.fog * 0.14 + weather.dials.skyDark * 0.08;
+      curtainFrontMaterial.color.setHex(weather.dials.skyDark > 0.38 ? palette.stormTint : 0x102d2c);
+      curtainFrontMaterial.opacity = 0.48 + weather.dials.skyDark * 0.12;
     },
     getStats: () => ({
       mountainVertices: vertexCount,

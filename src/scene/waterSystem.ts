@@ -32,11 +32,11 @@ const createOrganicWaterGeometry = () => {
   const indices: number[] = [];
   const step = 18;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
-  const deepColor = new THREE.Color(0x075f99);
-  const midColor = new THREE.Color(0x168fc4);
+  const deepColor = new THREE.Color(0x032d4d);
+  const midColor = new THREE.Color(0x075c82);
   const shallowColor = new THREE.Color(SCENARIO_PALETTES.Serene.waterShallow);
-  const sandbarColor = new THREE.Color(0xaadfc7);
-  const coveColor = new THREE.Color(0x064f82);
+  const sandbarColor = new THREE.Color(0x86b8a4);
+  const coveColor = new THREE.Color(0x02233e);
 
   for (let x = minX; x < maxX; x += step) {
     for (let z = minZ; z < maxZ; z += step) {
@@ -167,16 +167,23 @@ export const createWater = (): WaterSurface => {
 
         float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 4.0);
         fresnel = clamp(mix(0.05, 0.9, fresnel) + uChop * 0.05, 0.0, 1.0);
-        vec3 deep = mix(uDeepColor, uStormColor, uDark);
-        vec3 shallow = mix(uShallowColor, vec3(0.58, 0.74, 0.70), uStale * 0.42);
+        vec3 deep = mix(uDeepColor * 0.46, uStormColor * 0.76, uDark);
+        vec3 shallow = mix(uShallowColor * 0.58, vec3(0.42, 0.54, 0.54), uStale * 0.42);
         vec3 depthColor = mix(shallow, deep, vDepth);
-        depthColor = mix(depthColor, vec3(0.62, 0.52, 0.30), vSand * (1.0 - uDark) * 0.35);
-        depthColor = mix(depthColor, vColor, 0.44);
+        depthColor = mix(depthColor, vec3(0.45, 0.41, 0.28), vSand * (1.0 - uDark) * 0.24);
+        depthColor = mix(depthColor, vColor * 0.54, 0.28);
         depthColor = mix(depthColor, vec3(0.30, 0.10, 0.035), uFire * 0.45);
 
-        vec3 reflectedSky = mix(vec3(0.60, 0.84, 0.95), uSunColor, 0.18);
-        reflectedSky = mix(reflectedSky, vec3(0.10, 0.13, 0.16), uDark * 0.9);
-        vec3 color = mix(depthColor, reflectedSky, fresnel * (0.46 + (1.0 - uDark) * 0.32));
+        vec3 reflectedSky = mix(vec3(0.17, 0.30, 0.36), uSunColor * 0.58, 0.08);
+        reflectedSky = mix(reflectedSky, vec3(0.045, 0.060, 0.076), uDark * 0.9);
+        float horizonMirror = smoothstep(-520.0, -250.0, vWorldPos.z) * (1.0 - smoothstep(20.0, 190.0, vWorldPos.z));
+        float treelineMirror = horizonMirror * (0.50 + 0.50 * smoothstep(0.18, 0.82, vDepth));
+        float streaks = sin(vWorldPos.x * 0.042 + sin(vWorldPos.z * 0.014 + uTime * 0.22) * 1.8) * 0.5 + 0.5;
+        streaks *= sin(vWorldPos.x * 0.011 - uTime * 0.09) * 0.18 + 0.82;
+        vec3 reflectedTree = mix(vec3(0.010, 0.026, 0.026), vec3(0.038, 0.060, 0.058), streaks);
+        vec3 color = mix(depthColor, reflectedSky, fresnel * (0.30 + (1.0 - uDark) * 0.20));
+        color = mix(color, reflectedTree, treelineMirror * (0.48 + fresnel * 0.34));
+        color *= 0.70 + vDepth * 0.08;
 
         vec3 sunDir = normalize(vec3(-0.36, 0.72 - uDark * 0.28, -0.44));
         vec3 halfDir = normalize(viewDir + sunDir);

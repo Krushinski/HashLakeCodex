@@ -14,6 +14,7 @@ import {
 } from "../state/liveBitcoinStore";
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { LAKE_MAP } from "../scene/lakeMap";
+import type { QualityPreset } from "../scene/createScene";
 
 type FeedRow = {
   name: FeedName;
@@ -75,7 +76,8 @@ export type SceneTelemetry = {
   savedTableau: boolean;
   fps: number;
   pixelRatio: number;
-  qualityMode: "crisp" | "balanced" | "low";
+  qualityMode: QualityPreset;
+  qualityPreset: QualityPreset;
   renderScale: number;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
@@ -93,6 +95,7 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Polling", value: "active", tone: "good" },
   { group: "global", label: "Staleness", value: "0%", tone: "good" },
   { group: "global", label: "Quality", value: "crisp", tone: "good" },
+  { group: "global", label: "Preset", value: "Balanced", tone: "good" },
   { group: "global", label: "Pixel ratio", value: "1.00" },
   { group: "global", label: "Render scale", value: "1.00" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
@@ -362,6 +365,18 @@ const renderTemplate = () => `
 
     ${createMetricSections()}
 
+    <div class="debug-section debug-quality">
+      <div class="debug-section__heading">
+        <span>Quality Preset</span>
+        <strong data-debug-quality-preset>Balanced</strong>
+      </div>
+      <div class="debug-quality__buttons" data-debug-quality-buttons>
+        <button type="button" data-debug-quality="Performance">Performance</button>
+        <button type="button" data-debug-quality="Balanced">Balanced</button>
+        <button type="button" data-debug-quality="Scenic">Scenic</button>
+      </div>
+    </div>
+
     <div class="debug-section">
       <div class="debug-section__heading">
         <span>Dials</span>
@@ -587,6 +602,7 @@ export const createDebugPanel = (
   eventBus: HashlakeEventBus,
   liveBitcoinStore: LiveBitcoinStore,
   getTelemetry: () => SceneTelemetry,
+  setQualityPreset: (preset: QualityPreset) => void,
 ): DebugPanel => {
   const wrapper = document.createElement("div");
   wrapper.className = "debug-panel-shell";
@@ -605,11 +621,10 @@ export const createDebugPanel = (
   const closeButton = wrapper.querySelector<HTMLButtonElement>(".debug-close");
   const minimapCanvas = wrapper.querySelector<HTMLCanvasElement>("[data-debug-minimap]");
   const nearestLocationElement = wrapper.querySelector<HTMLElement>("[data-debug-nearest]");
+  const qualityPresetElement = wrapper.querySelector<HTMLElement>("[data-debug-quality-preset]");
 
-  let fpsFrame = 0;
-  let fpsFrames = 0;
-  let fpsLastSample = window.performance.now();
   let timerId = 0;
+  let telemetryTimerId = 0;
   let currentWeatherDataMode: WeatherSnapshot["dataMode"] = "LIVE";
   let currentWeatherStale = false;
   const previousFeedSuccessAt = new Map<FeedName, number | null>();
@@ -618,6 +633,9 @@ export const createDebugPanel = (
     wrapper.classList.toggle("debug-panel-shell--visible", visible);
     wrapper.setAttribute("aria-hidden", String(!visible));
     if (visible) {
+      renderWeather(weatherStore.getSnapshot());
+      renderLiveData(liveBitcoinStore.getSnapshot());
+      updateFeedRows(wrapper, liveBitcoinStore.getSnapshot());
       updateTelemetry();
     }
   };
@@ -625,6 +643,9 @@ export const createDebugPanel = (
   const renderWeather = (snapshot: WeatherSnapshot) => {
     currentWeatherDataMode = snapshot.dataMode;
     currentWeatherStale = snapshot.staleData;
+    if (!wrapper.classList.contains("debug-panel-shell--visible")) {
+      return;
+    }
     if (stormValueElement) {
       stormValueElement.textContent = snapshot.stormIndex.toFixed(1);
     }
@@ -686,6 +707,9 @@ export const createDebugPanel = (
   };
 
   const updateFeedTimers = () => {
+    if (!wrapper.classList.contains("debug-panel-shell--visible")) {
+      return;
+    }
     updateFeedRows(wrapper, liveBitcoinStore.getSnapshot());
   };
 
@@ -745,6 +769,10 @@ export const createDebugPanel = (
   };
 
   const renderLiveData = (snapshot: LiveBitcoinSnapshot) => {
+    if (!wrapper.classList.contains("debug-panel-shell--visible")) {
+      return;
+    }
+
     const { metrics } = snapshot;
     pulseFreshFeeds(snapshot);
     setMetric("Price", formatCurrency(metrics.priceUsd));
@@ -965,12 +993,27 @@ export const createDebugPanel = (
     setMetric(
       "Quality",
       telemetry.qualityMode,
-      telemetry.qualityMode === "crisp"
+      telemetry.qualityMode === "Scenic"
         ? "good"
-        : telemetry.qualityMode === "balanced"
+        : telemetry.qualityMode === "Balanced"
           ? "warn"
           : "bad",
     );
+    setMetric(
+      "Preset",
+      telemetry.qualityPreset,
+      telemetry.qualityPreset === "Scenic"
+        ? "good"
+        : telemetry.qualityPreset === "Balanced"
+          ? "warn"
+          : "bad",
+    );
+    if (qualityPresetElement) {
+      qualityPresetElement.textContent = telemetry.qualityPreset;
+    }
+    wrapper.querySelectorAll<HTMLButtonElement>("[data-debug-quality]").forEach((button) => {
+      button.classList.toggle("debug-quality__button--active", button.dataset.debugQuality === telemetry.qualityPreset);
+    });
     setMetric("Pixel ratio", telemetry.pixelRatio.toFixed(2));
     setMetric("Render scale", telemetry.renderScale.toFixed(2));
     setMetric("Wake blocks", String(telemetry.activeWakeBlocks));
@@ -998,24 +1041,14 @@ export const createDebugPanel = (
     }
   };
 
-  const updateFps = (time: number) => {
-    fpsFrames += 1;
+  const updateDebugTelemetry = () => {
     const panelVisible = wrapper.classList.contains("debug-panel-shell--visible");
     if (panelVisible) {
       updateTelemetry();
-    }
-
-    if (time - fpsLastSample >= 500) {
-      const fps = Math.round((fpsFrames * 1000) / (time - fpsLastSample));
       if (fpsElement && panelVisible) {
-        fpsElement.textContent = String(fps);
+        fpsElement.textContent = String(Math.round(getTelemetry().fps));
       }
-
-      fpsFrames = 0;
-      fpsLastSample = time;
     }
-
-    fpsFrame = window.requestAnimationFrame(updateFps);
   };
 
   const handleKeydown = (event: KeyboardEvent) => {
@@ -1143,6 +1176,18 @@ export const createDebugPanel = (
   };
 
   const handleDebugClick = (event: MouseEvent) => {
+    const qualityButton = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
+      "[data-debug-quality]",
+    );
+    if (qualityButton && wrapper.contains(qualityButton)) {
+      const preset = qualityButton.dataset.debugQuality;
+      if (preset === "Performance" || preset === "Balanced" || preset === "Scenic") {
+        setQualityPreset(preset);
+        updateTelemetry();
+      }
+      return;
+    }
+
     const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
       "[data-debug-action]",
     );
@@ -1159,9 +1204,8 @@ export const createDebugPanel = (
   const unsubscribeLive = liveBitcoinStore.subscribe(renderLiveData);
   window.addEventListener("keydown", handleKeydown);
   updateFeedTimers();
-  updateTelemetry();
   timerId = window.setInterval(updateFeedTimers, 1000);
-  fpsFrame = window.requestAnimationFrame(updateFps);
+  telemetryTimerId = window.setInterval(updateDebugTelemetry, 250);
 
   return {
     element: wrapper,
@@ -1169,7 +1213,7 @@ export const createDebugPanel = (
       window.removeEventListener("keydown", handleKeydown);
       wrapper.removeEventListener("click", handleDebugClick);
       window.clearInterval(timerId);
-      window.cancelAnimationFrame(fpsFrame);
+      window.clearInterval(telemetryTimerId);
       unsubscribe();
       unsubscribeLive();
       wrapper.remove();
