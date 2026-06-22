@@ -85,8 +85,8 @@ const createSoftPointTexture = () => {
   return texture;
 };
 
-const getTradeStrength = (btcAmount: number) =>
-  Math.min(3.1, Math.max(0.55, Math.log10(Math.max(1.01, btcAmount)) / 1.05));
+const getWhaleSplashScale = (btcAmount: number) =>
+  Math.min(2.6, Math.max(0.6, Math.log10(Math.max(1.01, btcAmount)) / 1.2));
 
 const disposeRing = (group: THREE.Group, ring: ExpandingRing) => {
   group.remove(ring.mesh);
@@ -261,9 +261,46 @@ export const createSceneEffects = (
     burst.points.geometry.attributes.position.needsUpdate = true;
   };
 
-  const addLargeTradeSplash = (btcAmount: number) => {
-    // Trade/whale splash is a local event effect and must not drive global weather color.
-    const strength = getTradeStrength(btcAmount);
+  const addSplashBlocks = (origin: THREE.Vector3, strength: number, color: number) => {
+    const blockCount = Math.min(
+      Math.round((12 + strength * 18) * qualityScale),
+      splashBlocks.length,
+    );
+    for (let index = 0; index < blockCount; index += 1) {
+      const block = splashBlocks.find((candidate) => !candidate.active);
+      if (!block) {
+        return;
+      }
+
+      const angle = Math.random() * Math.PI * 2;
+      const radius = (0.9 + Math.random() * 3.6) * strength;
+      const upward = 2.8 + Math.random() * 5.2 * strength;
+      block.active = true;
+      block.age = 0;
+      block.lifetime = 0.72 + Math.random() * 0.55 + strength * 0.12;
+      block.strength = strength;
+      block.spin = (Math.random() - 0.5) * (1.2 + strength * 0.55);
+      block.velocity.set(
+        Math.cos(angle) * radius,
+        upward,
+        Math.sin(angle) * radius,
+      );
+      block.mesh.position.copy(origin);
+      block.mesh.position.x += (Math.random() - 0.5) * strength * 1.6;
+      block.mesh.position.z += (Math.random() - 0.5) * strength * 1.6;
+      block.mesh.position.y = 0.28;
+      block.mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      const scale = 0.18 + Math.random() * 0.28 + strength * 0.12;
+      block.mesh.scale.set(scale * (0.7 + Math.random() * 0.9), scale * 0.5, scale);
+      block.mesh.material.color.setHex(color);
+      block.mesh.material.opacity = 0.82;
+      block.mesh.visible = true;
+    }
+  };
+
+  const addWhaleSplash = (btcAmount: number) => {
+    // Whale splashes are local on-chain events and never drive global weather color.
+    const strength = getWhaleSplashScale(btcAmount);
     const boat = getWaterPosition(getBoatPosition());
     const placementAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 0.86;
     const placementDistance = 24 + Math.random() * 46;
@@ -274,9 +311,10 @@ export const createSceneEffects = (
     );
     const color = btcAmount >= 300 ? 0xf1fbff : btcAmount >= 50 ? 0xd7f7ff : 0xbdefff;
     addSplashBurst(origin, strength, color);
+    addSplashBlocks(origin, strength, color);
 
-    addRing(color, strength * 2.2, origin, 2.4, 0.5, 1);
-    addRing(0xdff6f8, strength * 1.1, origin, 1.48, 0.5, 1.5);
+    addRing(color, strength * 2.2, origin, 2.15, 0.42, 1.08);
+    addRing(0xdff6f8, strength * 1.1, origin, 1.36, 0.44, 1.55);
     if (btcAmount >= 300) {
       addBoatHop(1.55);
     }
@@ -338,8 +376,8 @@ export const createSceneEffects = (
       addMarketSignal(0.24 + (event.intensity ?? 0.2) * 0.36, 0x91f2bf);
     }
 
-    if ((event.type === "whale" || event.type === "largeTrade") && (event.btcAmount ?? 0) >= 3) {
-      addLargeTradeSplash(event.btcAmount ?? 3);
+    if (event.type === "whale" && (event.btcAmount ?? 0) >= 3) {
+      addWhaleSplash(event.btcAmount ?? 3);
     }
 
     if (event.type === "newBlock") {
@@ -475,10 +513,10 @@ export const createSceneEffects = (
       qualityScale = Math.max(0.45, Math.min(1, scale));
     },
     stressTest: () => {
-      addLargeTradeSplash(3);
-      addLargeTradeSplash(10);
-      addLargeTradeSplash(50);
-      addLargeTradeSplash(300);
+      addWhaleSplash(3);
+      addWhaleSplash(10);
+      addWhaleSplash(50);
+      addWhaleSplash(300);
       addRing(0x7fd8c8, 5, getWaterPosition(getBoatPosition()), 1.08, 0.5, 0.8);
     },
     dispose: () => {

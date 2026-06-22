@@ -17,10 +17,7 @@ export const createEventToasts = (
   container.append(wrapper);
   const activeToasts: HTMLDivElement[] = [];
 
-  const pushToast = (
-    message: string,
-    tone: "signal" | "buy" | "sell" | "neutral" | "stale" = "neutral",
-  ) => {
+  const pushToast = (message: string, tone: "signal" | "neutral" | "stale" = "neutral") => {
     while (activeToasts.length >= 4) {
       activeToasts.shift()?.remove();
     }
@@ -59,14 +56,14 @@ export const createEventToasts = (
       return;
     }
 
-    if (event.type === "largeTrade" || event.type === "whale") {
+    if (event.type === "whale") {
       const amount = formatBtc(event.btcAmount);
       if ((event.btcAmount ?? 0) >= 300) {
-        pushToast(`Whale move - ${amount}`, "signal");
+        pushToast(`Whale moved - ${amount}`, "signal");
       } else if ((event.btcAmount ?? 0) >= 50) {
         pushToast(`Large BTC move - ${amount}`, "signal");
       } else if ((event.btcAmount ?? 0) >= 10) {
-        pushToast(`BTC move - ${amount}`, "signal");
+        pushToast(`BTC moved - ${amount}`, "signal");
       }
       return;
     }

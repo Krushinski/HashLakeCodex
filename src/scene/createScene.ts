@@ -33,6 +33,7 @@ type HashlakeScene = {
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
 const BOAT_HOME = new THREE.Vector3(0, 2.2, 0);
 const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
+const SCENIC_CAMERA_STORAGE_KEY = "hashlake.scenicCamera.v1";
 const DRIVE_ACCELERATION_BASE = 23;
 const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
@@ -162,6 +163,12 @@ type CameraPreset = {
   lookHeight: number;
 };
 
+type ScenicCameraPreset = CameraPreset & {
+  yawOffset: number;
+  lookPitch: number;
+  sideOffset: number;
+};
+
 type SavedTableau = {
   boat: {
     x: number;
@@ -185,6 +192,8 @@ type DriveState = {
   cameraYaw: number;
   speed: number;
   cameraPresetIndex: number;
+  scenicCameraPresetIndex: number;
+  scenicCameraLabelUntil: number;
   savedTableau: SavedTableau;
   hasSavedTableau: boolean;
   lookYaw: number;
@@ -255,6 +264,49 @@ const CAMERA_PRESETS: CameraPreset[] = [
     height: 42,
     lookAhead: 9,
     lookHeight: 4.4,
+  },
+];
+
+const SCENIC_CAMERA_PRESETS: ScenicCameraPreset[] = [
+  {
+    name: "Hero Profile Low",
+    distance: 66,
+    height: 12,
+    lookAhead: 16,
+    lookHeight: 7.4,
+    yawOffset: Math.PI * 0.52,
+    lookPitch: 0.035,
+    sideOffset: 8,
+  },
+  {
+    name: "Wide Reflection",
+    distance: 104,
+    height: 30,
+    lookAhead: 24,
+    lookHeight: 6.6,
+    yawOffset: Math.PI * 0.18,
+    lookPitch: -0.02,
+    sideOffset: -4,
+  },
+  {
+    name: "Three-Quarter Boat Portrait",
+    distance: 58,
+    height: 19,
+    lookAhead: 22,
+    lookHeight: 8.8,
+    yawOffset: -Math.PI * 0.28,
+    lookPitch: 0.025,
+    sideOffset: 5,
+  },
+  {
+    name: "Cove / Environment Shot",
+    distance: 118,
+    height: 34,
+    lookAhead: 34,
+    lookHeight: 10,
+    yawOffset: Math.PI * 0.72,
+    lookPitch: -0.015,
+    sideOffset: -18,
   },
 ];
 
@@ -364,6 +416,32 @@ const loadSavedTableau = () => {
 
 const saveTableau = (tableau: SavedTableau) => {
   window.localStorage.setItem(TABLEAU_STORAGE_KEY, JSON.stringify(tableau));
+};
+
+const loadScenicCameraPresetIndex = () => {
+  try {
+    const raw = window.localStorage.getItem(SCENIC_CAMERA_STORAGE_KEY);
+    if (raw === null) {
+      return -1;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      return -1;
+    }
+
+    return clamp(Math.round(parsed), -1, SCENIC_CAMERA_PRESETS.length - 1);
+  } catch {
+    return -1;
+  }
+};
+
+const saveScenicCameraPresetIndex = (index: number) => {
+  try {
+    window.localStorage.setItem(SCENIC_CAMERA_STORAGE_KEY, String(index));
+  } catch {
+    // Camera persistence is cosmetic; private storage must not break rendering.
+  }
 };
 
 const isEditableTarget = (target: EventTarget | null) => {
@@ -477,6 +555,8 @@ export const createHashlakeScene = ({
     cameraYaw: savedTableau.tableau.boat.yaw,
     speed: 0,
     cameraPresetIndex: savedTableau.tableau.cameraPresetIndex,
+    scenicCameraPresetIndex: loadScenicCameraPresetIndex(),
+    scenicCameraLabelUntil: 0,
     savedTableau: savedTableau.tableau,
     hasSavedTableau: savedTableau.hasSavedTableau,
     lookYaw: 0,
@@ -785,6 +865,16 @@ export const createHashlakeScene = ({
     driveState.cameraPresetIndex = driveState.savedTableau.cameraPresetIndex;
   };
 
+  const cycleFrameCameraPreset = () => {
+    driveState.scenicCameraPresetIndex =
+      (driveState.scenicCameraPresetIndex + 1) % SCENIC_CAMERA_PRESETS.length;
+    driveState.lookYaw = 0;
+    driveState.lookPitch = 0;
+    driveState.scenicCameraLabelUntil = window.performance.now() + 2600;
+    saveScenicCameraPresetIndex(driveState.scenicCameraPresetIndex);
+    showDriveHud(driveHud, "Frame");
+  };
+
   const saveCurrentTableau = () => {
     const preset = CAMERA_PRESETS[driveState.cameraPresetIndex];
     const tableau: SavedTableau = {
@@ -819,6 +909,8 @@ export const createHashlakeScene = ({
     driveState.mobileSteer = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
+    driveState.scenicCameraPresetIndex = -1;
+    saveScenicCameraPresetIndex(-1);
     showDriveHud(driveHud, "Frame");
   };
 
@@ -842,8 +934,12 @@ export const createHashlakeScene = ({
 
     if (isDown && key === "c") {
       event.preventDefault();
-      driveState.cameraPresetIndex =
-        (driveState.cameraPresetIndex + 1) % CAMERA_PRESETS.length;
+      if (driveState.mode === "Drive") {
+        driveState.cameraPresetIndex =
+          (driveState.cameraPresetIndex + 1) % CAMERA_PRESETS.length;
+      } else {
+        cycleFrameCameraPreset();
+      }
       return;
     }
 
@@ -1065,7 +1161,10 @@ export const createHashlakeScene = ({
               shortestAngleDelta(driveState.yaw, getHeadingFromVisualRotation(boat.rotation.y)),
             ) > 0.02,
           cameraWarning: false,
-          cameraPreset: CAMERA_PRESETS[driveState.cameraPresetIndex].name,
+          cameraPreset:
+            driveState.mode === "Drive"
+              ? CAMERA_PRESETS[driveState.cameraPresetIndex].name
+              : getFrameCameraLabel(driveState),
           nearestLocation: getNearestLocation({
             x: driveState.x,
             z: driveState.z,
@@ -2320,6 +2419,19 @@ type WeatherSceneTargets = {
 const getCameraPresetForState = (driveState: DriveState) =>
   CAMERA_PRESETS[clamp(driveState.cameraPresetIndex, 0, CAMERA_PRESETS.length - 1)];
 
+const getScenicCameraPresetForState = (driveState: DriveState) => {
+  if (driveState.scenicCameraPresetIndex < 0) {
+    return null;
+  }
+
+  return SCENIC_CAMERA_PRESETS[
+    clamp(driveState.scenicCameraPresetIndex, 0, SCENIC_CAMERA_PRESETS.length - 1)
+  ];
+};
+
+const getFrameCameraLabel = (driveState: DriveState) =>
+  getScenicCameraPresetForState(driveState)?.name ?? "Saved Tableau";
+
 const getDriveCameraPosition = (driveState: DriveState, preset: CameraPreset) => {
   const forward = getBoatForward(driveState.yaw);
   return new THREE.Vector3(
@@ -2440,14 +2552,16 @@ const applyWeatherToScene = ({
       .multiplyScalar(preset.lookAhead)
       .add(new THREE.Vector3(driveState.x, BOAT_HOME.y + preset.lookHeight, driveState.z));
   } else {
-    const tableauPreset = driveState.savedTableau.camera;
-    const lookYaw = driveState.yaw + driveState.lookYaw;
-    tempForward.set(Math.cos(lookYaw), driveState.lookPitch, Math.sin(lookYaw)).normalize();
+    const scenicPreset = getScenicCameraPresetForState(driveState);
+    const tableauPreset = scenicPreset ?? driveState.savedTableau.camera;
+    const lookYaw = driveState.yaw + (scenicPreset?.yawOffset ?? 0) + driveState.lookYaw;
+    const lookPitch = (scenicPreset?.lookPitch ?? 0) + driveState.lookPitch;
+    tempForward.set(Math.cos(lookYaw), lookPitch, Math.sin(lookYaw)).normalize();
     tempSide.set(-tempForward.z, 0, tempForward.x);
     desiredCameraPosition
       .set(driveState.x, BOAT_HOME.y + tableauPreset.height, driveState.z)
       .addScaledVector(tempForward, -tableauPreset.distance)
-      .addScaledVector(tempSide, driveState.lookYaw * 10);
+      .addScaledVector(tempSide, scenicPreset?.sideOffset ?? driveState.lookYaw * 10);
     desiredCameraTarget
       .set(driveState.x, BOAT_HOME.y + tableauPreset.lookHeight, driveState.z)
       .addScaledVector(tempForward, tableauPreset.lookAhead);
@@ -2471,7 +2585,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 22</span>
+    <span>Hashlake Phase 23</span>
   `;
   return status;
 };
@@ -2509,6 +2623,15 @@ const animateDriveHud = (
     hud.textContent = `DRIVE MODE - Hard-lock chase / Hold-drag upward to steer / Speed ${Math.abs(
       driveState.speed,
     ).toFixed(0)}`;
+    hud.classList.add("drive-hud--visible");
+    return;
+  }
+
+  const scenicPreset = getScenicCameraPresetForState(driveState);
+  if (scenicPreset && timestamp < driveState.scenicCameraLabelUntil) {
+    hud.dataset.mode = "Frame";
+    hud.dataset.visibleUntil = String(driveState.scenicCameraLabelUntil);
+    hud.textContent = `SCENIC CAMERA - ${scenicPreset.name}`;
     hud.classList.add("drive-hud--visible");
     return;
   }

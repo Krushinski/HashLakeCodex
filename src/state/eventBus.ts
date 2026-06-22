@@ -1,6 +1,5 @@
 export type HashlakeEventType =
   | "whale"
-  | "largeTrade"
   | "marketTick"
   | "marketHeartbeat"
   | "newBlock"
@@ -9,15 +8,12 @@ export type HashlakeEventType =
   | "rally"
   | "stale";
 
-export type LargeTradeSide = "buy" | "sell" | "unknown";
-
 export type HashlakeEvent = {
   type: HashlakeEventType;
   message?: string;
   btcAmount?: number;
-  side?: LargeTradeSide;
   price?: number;
-  source?: "market-proxy" | "manual" | "sim";
+  source?: "mempool" | "manual" | "sim";
   previousPrice?: number;
   blockHeight?: number;
   intensity?: number;

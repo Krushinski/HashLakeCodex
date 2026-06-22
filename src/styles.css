@@ -1013,24 +1013,6 @@ body {
   border-color: rgba(127, 216, 200, 0.52);
 }
 
-.event-toast--buy {
-  border-color: rgba(125, 246, 167, 0.5);
-}
-
-.event-toast--buy .event-toast__dot {
-  background: #7df6a7;
-  box-shadow: 0 0 16px rgba(125, 246, 167, 0.75);
-}
-
-.event-toast--sell {
-  border-color: rgba(255, 121, 121, 0.5);
-}
-
-.event-toast--sell .event-toast__dot {
-  background: #ff7979;
-  box-shadow: 0 0 16px rgba(255, 121, 121, 0.72);
-}
-
 .event-toast--stale {
   border-color: rgba(203, 217, 209, 0.46);
   color: #e7f0ec;
