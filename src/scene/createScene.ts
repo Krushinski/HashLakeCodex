@@ -958,9 +958,12 @@ const createSkyDome = (): SkyDome => {
       topColor: { value: new THREE.Color(SCENARIO_PALETTES.Serene.skyTop) },
       horizonColor: { value: new THREE.Color(SCENARIO_PALETTES.Serene.skyHorizon) },
       fireColor: { value: new THREE.Color(0x5b160f) },
+      sunDir: { value: new THREE.Vector3(-0.36, 0.72, -0.44).normalize() },
       dark: { value: 0 },
+      fog: { value: 0 },
       fire: { value: 0 },
       stale: { value: 0 },
+      flash: { value: 0 },
       time: { value: 0 },
     },
     vertexShader: `
@@ -976,21 +979,74 @@ const createSkyDome = (): SkyDome => {
       uniform vec3 topColor;
       uniform vec3 horizonColor;
       uniform vec3 fireColor;
+      uniform vec3 sunDir;
       uniform float dark;
+      uniform float fog;
       uniform float fire;
       uniform float stale;
+      uniform float flash;
       uniform float time;
       varying vec3 vWorldPosition;
+
+      float hash(vec2 p) {
+        p = fract(p * vec2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+          mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+          u.y
+        );
+      }
+
+      float fbm(vec2 p) {
+        float value = 0.0;
+        float amplitude = 0.5;
+        for (int i = 0; i < 5; i++) {
+          value += noise(p) * amplitude;
+          p = p * 2.03 + 17.7;
+          amplitude *= 0.5;
+        }
+        return value;
+      }
 
       void main() {
         vec3 direction = normalize(vWorldPosition);
         float height = clamp(direction.y * 0.5 + 0.5, 0.0, 1.0);
-        float horizon = 1.0 - smoothstep(0.36, 0.78, height);
-        float shimmer = sin(direction.x * 19.0 + direction.z * 11.0 + time * 0.16) * 0.018;
-        vec3 color = mix(horizonColor, topColor, smoothstep(0.16, 0.92, height) + shimmer);
-        color = mix(color, fireColor, fire * horizon * 0.58);
-        color = mix(color, vec3(0.48, 0.58, 0.58), stale * horizon * 0.28);
-        color *= 1.0 - dark * 0.22;
+        float horizon = pow(1.0 - clamp(direction.y, 0.0, 1.0), 3.0);
+        float toSun = max(dot(normalize(vec3(direction.x, 0.0, direction.z) + 0.0001), normalize(vec3(sunDir.x, 0.0, sunDir.z) + 0.0001)), 0.0);
+        vec3 zen = mix(topColor * 0.86, topColor * 1.12, 1.0 - dark);
+        vec3 hor = mix(horizonColor, vec3(1.0, 0.58, 0.34), toSun * toSun * 0.18 * (1.0 - dark));
+        vec3 color = mix(zen, hor, horizon);
+
+        vec3 stormColor = mix(vec3(0.085, 0.098, 0.118), vec3(0.150, 0.163, 0.180), horizon);
+        color = mix(color, stormColor, dark);
+
+        float sunDot = max(dot(direction, sunDir), 0.0);
+        float disc = smoothstep(0.9992, 0.99965, sunDot);
+        float glow = pow(sunDot, 28.0) * 0.14 + pow(sunDot, 180.0) * 0.7;
+        color += vec3(1.0, 0.88, 0.62) * (disc * 2.6 + glow) * (1.0 - dark * 0.92);
+
+        float bend = max(direction.y + 0.14, 0.06);
+        vec2 cloudUv = direction.xz / bend * 1.55 + vec2(time * 0.0065, time * 0.0026);
+        float cloudNoise = fbm(cloudUv * 0.8 + fbm(cloudUv * 1.6) * 0.7);
+        float coverage = mix(0.66, 0.19, dark) - stale * 0.05;
+        float cloudMask = smoothstep(coverage, coverage + 0.24, cloudNoise) * smoothstep(0.0, 0.12, direction.y);
+        float cloudShade = fbm(cloudUv * 2.3 + 41.0);
+        vec3 cloudLit = vec3(1.05, 1.01, 0.96) * (0.92 + toSun * 0.12);
+        vec3 cloudDark = mix(vec3(0.50, 0.56, 0.65), vec3(0.12, 0.13, 0.15), dark);
+        vec3 cloudColor = mix(cloudLit, cloudDark, clamp(cloudShade + dark * 0.55, 0.0, 1.0));
+        color = mix(color, cloudColor, cloudMask);
+
+        color = mix(color, fireColor * (0.8 + 0.2 * sin(time * 6.0)), fire * horizon * 0.88);
+        color = mix(color, hor, clamp(fog + stale * 0.55, 0.0, 1.0) * horizon * 0.7);
+        color += vec3(0.85, 0.92, 1.1) * flash;
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -2462,9 +2518,15 @@ const applyWeatherToScene = ({
   skyDome.mesh.material.uniforms.topColor.value.setHex(palette.skyTop);
   skyDome.mesh.material.uniforms.horizonColor.value.setHex(palette.skyHorizon);
   skyDome.mesh.material.uniforms.fireColor.value.setHex(fire > 0.08 ? 0x5b160f : palette.sunColor);
+  skyDome.mesh.material.uniforms.sunDir.value.set(-0.36, 0.72 - dark * 0.28, -0.44).normalize();
   skyDome.mesh.material.uniforms.dark.value = dark;
+  skyDome.mesh.material.uniforms.fog.value = fog;
   skyDome.mesh.material.uniforms.fire.value = fire;
   skyDome.mesh.material.uniforms.stale.value = weather.staleData ? 1 : 0;
+  skyDome.mesh.material.uniforms.flash.value =
+    weather.dials.lightning > 0.08 && Math.sin(elapsed * 8.5) > 0.88
+      ? weather.dials.lightning * 0.24
+      : 0;
   skyDome.mesh.material.uniforms.time.value = elapsed;
   if (scene.fog instanceof THREE.FogExp2) {
     fogColorScratch.setHex(palette.fogColor);
@@ -2562,7 +2624,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 18</span>
+    <span>Hashlake Phase 19</span>
   `;
   return status;
 };

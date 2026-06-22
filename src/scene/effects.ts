@@ -98,7 +98,7 @@ const getTradeColor = (side: LargeTradeSide | undefined) => {
 };
 
 const getTradeStrength = (btcAmount: number) =>
-  Math.min(2.9, Math.max(0.62, Math.log10(Math.max(3, btcAmount)) / 1.05));
+  Math.min(2.6, Math.max(0.6, Math.log10(Math.max(1.01, btcAmount)) / 1.2));
 
 const disposeRing = (group: THREE.Group, ring: ExpandingRing) => {
   group.remove(ring.mesh);
@@ -232,10 +232,7 @@ export const createSceneEffects = (
       return;
     }
 
-    const activePoints = Math.min(
-      SPLASH_POINTS,
-      Math.round((70 + strength * 38) * qualityScale),
-    );
+    const activePoints = Math.min(SPLASH_POINTS, Math.round(SPLASH_POINTS * qualityScale));
     burst.age = 0;
     burst.lifetime = 2.05 + strength * 0.18;
     burst.active = true;
@@ -248,11 +245,10 @@ export const createSceneEffects = (
 
     for (let index = 0; index < SPLASH_POINTS; index += 1) {
       const offset = index * 3;
-      const crown = index > activePoints * 0.38;
+      const crown = index >= activePoints * 0.4;
       const angle = Math.random() * Math.PI * 2;
-      const spread = crown ? (5.4 + Math.random() * 7.2) * strength : (Math.random() - 0.5) * 3.4 * strength;
       burst.positions[offset] = origin.x + (Math.random() - 0.5) * 1.2 * strength;
-      burst.positions[offset + 1] = 0.22;
+      burst.positions[offset + 1] = 0.15;
       burst.positions[offset + 2] = origin.z + (Math.random() - 0.5) * 1.2 * strength;
 
       if (index >= activePoints) {
@@ -263,13 +259,14 @@ export const createSceneEffects = (
       }
 
       if (crown) {
+        const spread = (5 + Math.random() * 6) * strength;
         burst.velocities[offset] = Math.cos(angle) * spread;
-        burst.velocities[offset + 1] = (5.2 + Math.random() * 6.5) * strength;
+        burst.velocities[offset + 1] = (5 + Math.random() * 5.5) * strength;
         burst.velocities[offset + 2] = Math.sin(angle) * spread;
       } else {
-        burst.velocities[offset] = (Math.random() - 0.5) * 3.7 * strength;
-        burst.velocities[offset + 1] = (13.5 + Math.random() * 13.5) * strength;
-        burst.velocities[offset + 2] = (Math.random() - 0.5) * 3.7 * strength;
+        burst.velocities[offset] = (Math.random() - 0.5) * 3.5 * strength;
+        burst.velocities[offset + 1] = (13 + Math.random() * 13) * strength;
+        burst.velocities[offset + 2] = (Math.random() - 0.5) * 3.5 * strength;
       }
     }
 
@@ -282,57 +279,19 @@ export const createSceneEffects = (
   ) => {
     // Trade/whale splash is a local event effect and must not drive global weather color.
     const strength = getTradeStrength(btcAmount);
-    const count = Math.min(96, Math.round((16 + strength * 16) * qualityScale));
-    const origin = getWaterPosition(getBoatPosition());
-    const placementAngle =
-      side === "buy"
-        ? -Math.PI * 0.24
-        : side === "sell"
-          ? Math.PI * 0.2
-          : Math.random() * Math.PI * 2;
-    const placementDistance = 18 + Math.min(58, 12 + strength * 18) + Math.random() * 18;
-    origin.x += Math.cos(placementAngle) * placementDistance + (Math.random() - 0.5) * 8;
-    origin.z += Math.sin(placementAngle) * placementDistance - 14 + (Math.random() - 0.5) * 8;
+    const placementAngle = Math.random() * Math.PI * 2;
+    const placementDistance = 22 + Math.random() * 70;
+    const origin = new THREE.Vector3(
+      Math.cos(placementAngle) * placementDistance,
+      0.18,
+      Math.sin(placementAngle) * placementDistance - 18,
+    );
     const color = getTradeColor(side);
     addSplashBurst(origin, strength, color);
 
-    for (let index = 0; index < count; index += 1) {
-      const block = splashBlocks.find((candidate) => !candidate.active);
-      if (!block) {
-        break;
-      }
-      const angle = (index / count) * Math.PI * 2 + Math.random() * 0.6;
-      const radius = Math.random() * (2.4 + strength * 1.9);
-      block.active = true;
-      block.age = 0;
-      block.lifetime = 1.15 + strength * 0.18 + Math.random() * 0.3;
-      block.strength = strength;
-      block.spin = (Math.random() - 0.5) * (0.55 + strength * 0.2);
-      block.mesh.visible = true;
-      block.mesh.position.set(
-        origin.x + Math.cos(angle) * radius,
-        0.24 + Math.random() * 0.18,
-        origin.z + Math.sin(angle) * radius,
-      );
-      const size = 0.52 + Math.random() * 0.78 + strength * 0.12;
-      block.mesh.scale.set(size * (1.35 + Math.random() * 0.7), size * 0.2, size);
-      block.mesh.rotation.set(Math.random() * 0.12, angle, Math.random() * Math.PI);
-      block.mesh.material.color.set(index % 4 === 0 ? color : 0xe7fbff);
-      block.mesh.material.opacity = 0.78;
-      block.velocity.set(
-        Math.cos(angle) * (4.8 + strength * 2.8) * (0.4 + Math.random() * 0.8),
-        0.1 + Math.random() * 0.32 + strength * 0.08,
-        Math.sin(angle) * (4.8 + strength * 2.8) * (0.4 + Math.random() * 0.8),
-      );
-    }
-
-    addRing(color, strength * 2.2, origin, 1.05 + strength * 0.14, 0.5, 1);
-    addRing(0xdff6f8, strength * 1.1, origin, 0.92 + strength * 0.1, 0.34, 1.55);
-    if (btcAmount >= 50) {
-      addRing(color, strength * 1.45, origin, 1.2 + strength * 0.12, 0.2, 0.86);
-    }
+    addRing(color, strength * 2.2, origin, 2.4, 0.5, 1);
+    addRing(0xdff6f8, strength * 1.1, origin, 1.48, 0.5, 1.5);
     if (btcAmount >= 300) {
-      addRing(0xf4fdff, strength * 1.65, origin, 1.35 + strength * 0.1, 0.24, 0.76);
       addBoatHop(1.55);
     }
   };
@@ -399,8 +358,7 @@ export const createSceneEffects = (
 
     if (event.type === "newBlock") {
       const origin = getWaterPosition(getBoatPosition());
-      addRing(0x7fd8c8, 5, origin, 0.88, 0.34, 0.82);
-      addRing(0xd8fbff, 2.6, origin, 0.58, 0.18, 1.35);
+      addRing(0x7fd8c8, 5, origin, 1.08, 0.5, 0.8);
       addBoatHop(1.32);
     }
 
@@ -535,7 +493,7 @@ export const createSceneEffects = (
       addLargeTradeSplash(10, "sell");
       addLargeTradeSplash(50, "buy");
       addLargeTradeSplash(300, "sell");
-      addRing(0x8df7ff, 0.9, getWaterPosition(getBoatPosition()), 0.42, 0.14);
+      addRing(0x7fd8c8, 5, getWaterPosition(getBoatPosition()), 1.08, 0.5, 0.8);
     },
     dispose: () => {
       unsubscribe();

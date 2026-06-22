@@ -27,16 +27,17 @@ export const createEventToasts = (
 
     const toast = document.createElement("div");
     toast.className = `event-toast event-toast--${tone}`;
-    toast.innerHTML = `
-      <span class="event-toast__dot"></span>
-      <span>${message}</span>
-    `;
+    const dot = document.createElement("span");
+    dot.className = "event-toast__dot";
+    const label = document.createElement("span");
+    label.textContent = message;
+    toast.append(dot, label);
     wrapper.append(toast);
     activeToasts.push(toast);
 
     window.setTimeout(() => {
       toast.classList.add("event-toast--leaving");
-    }, 3600);
+    }, 5200);
 
     window.setTimeout(() => {
       toast.remove();
@@ -44,7 +45,7 @@ export const createEventToasts = (
       if (index >= 0) {
         activeToasts.splice(index, 1);
       }
-    }, 4500);
+    }, 6100);
   };
 
   const formatBtc = (amount: number | undefined) =>

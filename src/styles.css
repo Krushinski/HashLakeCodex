@@ -913,21 +913,24 @@ body {
 
 .event-toasts {
   position: fixed;
-  right: clamp(12px, 2vw, 24px);
-  top: clamp(76px, 10vh, 118px);
+  top: clamp(70px, 9vh, 104px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 64;
   display: grid;
   gap: 8px;
-  width: min(340px, calc(100vw - 24px));
+  width: min(520px, calc(100vw - 24px));
   pointer-events: none;
 }
 
 .event-toast {
-  display: flex;
+  justify-self: center;
+  display: inline-flex;
   align-items: center;
   gap: 9px;
   min-height: 38px;
-  padding: 9px 12px;
+  max-width: 100%;
+  padding: 9px 14px;
   border: 1px solid rgba(164, 237, 236, 0.34);
   border-radius: 8px;
   background:
@@ -937,12 +940,13 @@ body {
   font-size: 13px;
   font-weight: 750;
   line-height: 1.24;
+  text-align: center;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
-  opacity: 1;
-  transform: translateY(0);
+  opacity: 0.95;
+  transform: translateY(0) scale(1);
   transition:
-    opacity 360ms ease,
-    transform 360ms ease;
+    opacity 900ms ease,
+    transform 900ms ease;
   backdrop-filter: blur(12px);
 }
 
@@ -989,7 +993,7 @@ body {
 
 .event-toast--leaving {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(-8px) scale(0.98);
 }
 
 .mobile-mode-controls {
