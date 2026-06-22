@@ -83,6 +83,8 @@ export type SceneTelemetry = {
   activeEffectBlocks: number;
   activeRings: number;
   activeSplashes: number;
+  lastSplashDistanceToBoat: number | null;
+  lastBoatImpulseStrength: number;
   treeInstances: number;
   forestBandInstances: number;
   forestBandMethod: string;
@@ -105,6 +107,8 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Splash blocks", value: "0" },
   { group: "weather", label: "Rings", value: "0" },
   { group: "weather", label: "Splashes", value: "0" },
+  { group: "weather", label: "Splash dist", value: "--" },
+  { group: "weather", label: "Boat impulse", value: "0.00" },
   { group: "weather", label: "Trees", value: "0" },
   { group: "weather", label: "Forest band", value: "0" },
   { group: "weather", label: "Band method", value: "instanced", tone: "muted" },
@@ -439,6 +443,8 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="whale-10">10 BTC</button>
         <button type="button" data-debug-action="whale-50">50 BTC</button>
         <button type="button" data-debug-action="whale-300">300 BTC</button>
+        <button type="button" data-debug-action="whale-1000">1000 BTC</button>
+        <button type="button" data-debug-action="whale-1750">1750 BTC</button>
         <button type="button" data-debug-action="block">Block</button>
         <button type="button" data-debug-action="perf-stress">Perf Stress</button>
         <button type="button" data-debug-action="toast-block">Toast Block</button>
@@ -1065,6 +1071,13 @@ export const createDebugPanel = (
     setMetric("Splash blocks", String(telemetry.activeEffectBlocks));
     setMetric("Rings", String(telemetry.activeRings));
     setMetric("Splashes", String(telemetry.activeSplashes));
+    setMetric(
+      "Splash dist",
+      telemetry.lastSplashDistanceToBoat === null
+        ? "--"
+        : `${telemetry.lastSplashDistanceToBoat.toFixed(0)}u`,
+    );
+    setMetric("Boat impulse", telemetry.lastBoatImpulseStrength.toFixed(2));
     setMetric("Trees", String(telemetry.treeInstances));
     setMetric("Forest band", String(telemetry.forestBandInstances));
     setMetric("Band method", telemetry.forestBandMethod, "muted");
@@ -1134,6 +1147,10 @@ export const createDebugPanel = (
       emitManualWhale(WHALE_LARGE_BTC);
     } else if (action === "whale-300") {
       emitManualWhale(WHALE_HUGE_BTC);
+    } else if (action === "whale-1000") {
+      emitManualWhale(1000);
+    } else if (action === "whale-1750") {
+      emitManualWhale(1750);
     } else if (action === "block") {
       const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
       const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;

@@ -65,6 +65,36 @@ const installWindShader = (
   };
 };
 
+const buildForestMassGeometry = (width: number, baseHeight: number, peakHeight: number) => {
+  const segments = 120;
+  const vertices: number[] = [];
+  const indices: number[] = [];
+
+  for (let index = 0; index <= segments; index += 1) {
+    const t = index / segments;
+    const x = (t - 0.5) * width;
+    const skyline =
+      baseHeight +
+      peakHeight *
+        (0.42 +
+          0.28 * Math.sin(t * Math.PI * 9.0 + 0.8) +
+          0.18 * Math.sin(t * Math.PI * 23.0 + 1.9) +
+          0.12 * Math.sin(t * Math.PI * 47.0));
+    vertices.push(x, 0, 0, x, Math.max(baseHeight * 0.62, skyline), 0);
+  }
+
+  for (let index = 0; index < segments; index += 1) {
+    const base = index * 2;
+    indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 export const createForestSystem = (): ForestSystem => {
   const group = new THREE.Group();
   group.name = "HashLake3-adapted forest and reeds";
@@ -214,6 +244,21 @@ export const createForestSystem = (): ForestSystem => {
     silhouettes.setMatrixAt(index, matrix);
   }
   silhouettes.instanceMatrix.needsUpdate = true;
+  const forestMassMaterial = new THREE.MeshBasicMaterial({
+    color: 0x020c0b,
+    transparent: true,
+    opacity: 0.62,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const forestMass = new THREE.Mesh(
+    buildForestMassGeometry(1680, 22, 34),
+    forestMassMaterial,
+  );
+  forestMass.name = "Continuous far treeline silhouette mass";
+  forestMass.position.set(0, 0.4, -338);
+  forestMass.frustumCulled = false;
+  group.add(forestMass);
   group.add(silhouettes);
 
   const scenicSilhouetteCount = 90;
@@ -270,6 +315,13 @@ export const createForestSystem = (): ForestSystem => {
       silhouetteMaterial.opacity =
         (activePreset === "Scenic" ? 0.92 : activePreset === "Performance" ? 0.68 : 0.82) +
         weather.dials.skyDark * 0.1;
+      forestMassMaterial.opacity =
+        activePreset === "Performance"
+          ? 0.42 + weather.dials.skyDark * 0.08
+          : activePreset === "Scenic"
+            ? 0.76 + weather.dials.skyDark * 0.08
+            : 0.62 + weather.dials.skyDark * 0.08;
+      forestMassMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x010607 : 0x020c0b);
       reflectionMaterial.opacity =
         activePreset === "Performance"
           ? 0
@@ -284,7 +336,7 @@ export const createForestSystem = (): ForestSystem => {
       rockInstances: rockCount,
       silhouetteInstances: silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
       forestBandInstances: silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
-      forestBandMethod: scenicSilhouettes.visible ? "instanced x2" : "instanced",
+      forestBandMethod: scenicSilhouettes.visible ? "mass + instanced x2" : "mass + instanced",
     }),
     setQualityPreset: (preset) => {
       activePreset = preset;

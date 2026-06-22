@@ -57,7 +57,11 @@ const buildRidgeRing = ({
     const sin = Math.sin(theta);
     let ridge =
       noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 4) * 0.9 + 0.55;
-    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), 1.58);
+    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.92 : 1.68);
+    const jag =
+      (Math.sin(theta * 13.0 + seed) * 0.5 + 0.5) *
+      Math.max(0, noise.fbm(cos * 8.2 + seed, sin * 8.2 + 2.4, 3));
+    ridge += jag * (hero ? 0.16 : 0.08);
 
     if (hero) {
       const centerPeak = angleDiff(theta, viewTheta + 0.1);
@@ -77,7 +81,7 @@ const buildRidgeRing = ({
       const detail =
         noise.fbm(cos * radius * 0.004 + 31, sin * radius * 0.004 + 17, 4) *
         peakHeight *
-        0.22 *
+        (hero ? 0.28 : 0.2) *
         Math.max(rise, 0);
       const y = Math.max(0, peakHeight * Math.max(rise, 0) + detail);
       vertices.push(cos * radius, y, sin * radius);
@@ -164,15 +168,15 @@ const createTerrainMaterial = (
         float slope = clamp(normal.y, 0.0, 1.0);
         float roughNoise = bl_fbm(vWorldPos.xz * 0.012);
         float broadNoise = bl_fbm(vWorldPos.xz * 0.0028 + 7.0);
-        vec3 rock = mix(vec3(0.27, 0.29, 0.27), vec3(0.15, 0.17, 0.18), roughNoise)
+        vec3 rock = mix(vec3(0.31, 0.33, 0.32), vec3(0.13, 0.16, 0.18), roughNoise)
           * (0.74 + 0.26 * broadNoise);
         float forest = smoothstep(0.45, 0.16, vElev) * smoothstep(0.34, 0.62, slope) * uForest;
-        vec3 forestColor = vec3(0.055, 0.105, 0.062)
+        vec3 forestColor = vec3(0.035, 0.080, 0.050)
           * (0.75 + 0.55 * bl_fbm(vWorldPos.xz * 0.022 + 3.0));
         vec3 albedo = mix(rock, forestColor, forest);
         float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
           * smoothstep(0.18, 0.46, slope);
-        albedo = mix(albedo, vec3(0.70, 0.76, 0.75), snow * 0.74);
+        albedo = mix(albedo, vec3(0.78, 0.83, 0.82), snow * 0.7);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.18 + uAmbient * (0.38 + 0.44 * slope));
@@ -214,8 +218,12 @@ const buildMountainCurtain = (width: number, baseHeight: number, peakHeight: num
       (Math.sin(t * Math.PI * 18 + seed) * 0.5 + 0.5) *
       Math.max(0, noise.fbm(t * 9.0 + seed, 5.1, 3)) *
       peakHeight *
-      0.18;
-    const top = ridge + heroPeak + tooth;
+      0.28;
+    const blade =
+      Math.pow(Math.max(0, Math.sin(t * Math.PI * 31 + seed * 0.1)), 4) *
+      peakHeight *
+      0.16;
+    const top = ridge + heroPeak + tooth + blade;
     vertices.push(x, 0, 0, x, top, 0);
   }
 
@@ -274,16 +282,16 @@ export const createTerrainSystem = (): TerrainSystem => {
   far.frustumCulled = false;
   mid.frustumCulled = false;
   const curtainBackMaterial = new THREE.MeshBasicMaterial({
-    color: 0x263d42,
+    color: 0x2b4349,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.46,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const curtainFrontMaterial = new THREE.MeshBasicMaterial({
-    color: 0x102323,
+    color: 0x0a1e20,
     transparent: true,
-    opacity: 0.56,
+    opacity: 0.66,
     depthWrite: false,
     side: THREE.DoubleSide,
   });

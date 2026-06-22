@@ -58,15 +58,15 @@ const DRIVE_BOW_LIFT_SCALE = 0.18;
 const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
-const WAKE_BLOCK_SIZE_MIN = 0.78;
-const WAKE_BLOCK_SIZE_MAX = 1.72;
-const WAKE_VERTICAL_VELOCITY = 0.02;
-const WAKE_BACKWARD_VELOCITY = 7.2;
-const WAKE_OUTWARD_SPREAD = 5.2;
-const WAKE_LIFETIME_SECONDS = 0.66;
-const WAKE_EMISSION_RATE = 42;
-const WAKE_BOOST_MULTIPLIER = 1.82;
-const WAKE_SURFACE_Y_OFFSET = 0.3;
+const WAKE_BLOCK_SIZE_MIN = 0.46;
+const WAKE_BLOCK_SIZE_MAX = 1.28;
+const WAKE_VERTICAL_VELOCITY = 0.12;
+const WAKE_BACKWARD_VELOCITY = 5.4;
+const WAKE_OUTWARD_SPREAD = 3.25;
+const WAKE_LIFETIME_SECONDS = 0.82;
+const WAKE_EMISSION_RATE = 50;
+const WAKE_BOOST_MULTIPLIER = 1.58;
+const WAKE_SURFACE_Y_OFFSET = 0.2;
 const WAKE_FADE_SPEED = 1.26;
 const WAKE_MAX_ACTIVE_BLOCKS = 224;
 const QUALITY_TARGET_FPS = 54;
@@ -146,6 +146,8 @@ type SceneTelemetry = {
   activeEffectBlocks: number;
   activeRings: number;
   activeSplashes: number;
+  lastSplashDistanceToBoat: number | null;
+  lastBoatImpulseStrength: number;
   treeInstances: number;
   forestBandInstances: number;
   forestBandMethod: string;
@@ -194,6 +196,7 @@ type DriveState = {
   cameraPresetIndex: number;
   scenicCameraPresetIndex: number;
   scenicCameraLabelUntil: number;
+  scenicCameraManualLook: boolean;
   savedTableau: SavedTableau;
   hasSavedTableau: boolean;
   lookYaw: number;
@@ -274,9 +277,9 @@ const SCENIC_CAMERA_PRESETS: ScenicCameraPreset[] = [
     height: 12,
     lookAhead: 16,
     lookHeight: 7.4,
-    yawOffset: Math.PI * 0.52,
+    yawOffset: -Math.PI * 0.48,
     lookPitch: 0.035,
-    sideOffset: 8,
+    sideOffset: -10,
   },
   {
     name: "Wide Reflection",
@@ -557,6 +560,7 @@ export const createHashlakeScene = ({
     cameraPresetIndex: savedTableau.tableau.cameraPresetIndex,
     scenicCameraPresetIndex: loadScenicCameraPresetIndex(),
     scenicCameraLabelUntil: 0,
+    scenicCameraManualLook: false,
     savedTableau: savedTableau.tableau,
     hasSavedTableau: savedTableau.hasSavedTableau,
     lookYaw: 0,
@@ -604,7 +608,7 @@ export const createHashlakeScene = ({
     eventBus,
     () => new THREE.Vector3(driveState.x, boat.position.y, driveState.z),
     (strength) => {
-      driveState.boatHop = Math.min(1, Math.max(driveState.boatHop, strength));
+      driveState.boatHop = Math.min(2.35, Math.max(driveState.boatHop, strength));
     },
   );
   scene.add(sceneEffects.group);
@@ -862,14 +866,18 @@ export const createHashlakeScene = ({
     driveState.mobileSteer = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
+    driveState.scenicCameraManualLook = false;
     driveState.cameraPresetIndex = driveState.savedTableau.cameraPresetIndex;
   };
 
   const cycleFrameCameraPreset = () => {
     driveState.scenicCameraPresetIndex =
-      (driveState.scenicCameraPresetIndex + 1) % SCENIC_CAMERA_PRESETS.length;
+      driveState.scenicCameraPresetIndex >= SCENIC_CAMERA_PRESETS.length - 1
+        ? -1
+        : driveState.scenicCameraPresetIndex + 1;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
+    driveState.scenicCameraManualLook = false;
     driveState.scenicCameraLabelUntil = window.performance.now() + 2600;
     saveScenicCameraPresetIndex(driveState.scenicCameraPresetIndex);
     showDriveHud(driveHud, "Frame");
@@ -909,6 +917,7 @@ export const createHashlakeScene = ({
     driveState.mobileSteer = 0;
     driveState.lookYaw = 0;
     driveState.lookPitch = 0;
+    driveState.scenicCameraManualLook = false;
     driveState.scenicCameraPresetIndex = -1;
     saveScenicCameraPresetIndex(-1);
     showDriveHud(driveHud, "Frame");
@@ -974,6 +983,18 @@ export const createHashlakeScene = ({
       Object.keys(input).forEach((name) => {
         input[name as keyof DriveInput] = false;
       });
+      return;
+    }
+
+    if (isDown && key === "escape") {
+      event.preventDefault();
+      driveState.scenicCameraPresetIndex = -1;
+      driveState.lookYaw = 0;
+      driveState.lookPitch = 0;
+      driveState.scenicCameraManualLook = false;
+      driveState.scenicCameraLabelUntil = window.performance.now() + 2200;
+      saveScenicCameraPresetIndex(-1);
+      showDriveHud(driveHud, "Frame");
       return;
     }
 
@@ -1072,6 +1093,8 @@ export const createHashlakeScene = ({
     lastPointerY = event.clientY;
     driveState.lookYaw = clamp(driveState.lookYaw - deltaX * 0.0025, -0.48, 0.48);
     driveState.lookPitch = clamp(driveState.lookPitch + deltaY * 0.002, -0.22, 0.22);
+    driveState.scenicCameraManualLook = true;
+    driveState.scenicCameraLabelUntil = window.performance.now() + 1800;
   };
 
   const handlePointerUp = (event: PointerEvent) => {
@@ -1179,6 +1202,8 @@ export const createHashlakeScene = ({
           activeEffectBlocks: effectStats.splashBlocks,
           activeRings: effectStats.rings,
           activeSplashes: effectStats.splashes,
+          lastSplashDistanceToBoat: effectStats.lastSplashDistanceToBoat,
+          lastBoatImpulseStrength: effectStats.lastBoatImpulseStrength,
           treeInstances: forestStats.treeInstances,
           forestBandInstances: forestStats.forestBandInstances,
           forestBandMethod: forestStats.forestBandMethod,
@@ -1311,9 +1336,9 @@ const createLakeFill = () => {
     LAKE_MAP.outline.map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const material = new THREE.MeshBasicMaterial({
-    color: 0x0d79b2,
+    color: 0x075f96,
     transparent: true,
-    opacity: 0.86,
+    opacity: 0.9,
     depthWrite: true,
     side: THREE.DoubleSide,
   });
@@ -1745,26 +1770,26 @@ const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xbca96f,
+    color: 0xc4b27b,
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x5f5c45,
+    color: 0x67634e,
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x253c29,
+    color: 0x213b2a,
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x567f7b,
+    color: 0x3f827d,
     transparent: true,
-    opacity: 0.1,
+    opacity: 0.13,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x172c1c,
+    color: 0x14291c,
     roughness: 0.92,
   });
   const land = new THREE.Mesh(
@@ -1791,6 +1816,17 @@ const createShoreline = () => {
   shoreline.position.y = 0.025;
   shoreline.receiveShadow = true;
   group.add(shoreline);
+
+  const grassTransition = new THREE.Mesh(
+    createStripGeometry(getExpandedOutline(48), getExpandedOutline(82)),
+    new THREE.MeshStandardMaterial({
+      color: 0x1b3321,
+      roughness: 0.96,
+    }),
+  );
+  grassTransition.position.y = 0.006;
+  grassTransition.receiveShadow = true;
+  group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
     createStripGeometry(getExpandedOutline(34), getExpandedOutline(62)),
@@ -1832,13 +1868,13 @@ const createDestinationMarkers = () => {
   group.name = "Phase 12 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xbca96f,
+    color: 0xc4b27b,
     roughness: 0.92,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x658f85,
+    color: 0x4e8c86,
     transparent: true,
-    opacity: 0.16,
+    opacity: 0.14,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -2177,6 +2213,7 @@ const emitWakeSegment = (
 ) => {
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
   const wakePower = clamp(driveState.wakePower, 0, 1.34);
+  const reverseChurn = driveState.speed < -1;
   const forward = getBoatForward(driveState.yaw);
   const lateral = new THREE.Vector3(-forward.z, 0, forward.x);
   const segment = wake.segments[wake.cursor];
@@ -2187,12 +2224,12 @@ const emitWakeSegment = (
       : 1;
   const spread =
     side === 0
-      ? (Math.random() - 0.5) * WAKE_OUTWARD_SPREAD * 0.34
-      : 1.35 + speedRatio * WAKE_OUTWARD_SPREAD + wakePower * 1.45;
+      ? (Math.random() - 0.5) * WAKE_OUTWARD_SPREAD * (reverseChurn ? 0.18 : 0.28)
+      : 0.78 + speedRatio * WAKE_OUTWARD_SPREAD * (reverseChurn ? 0.32 : 0.82) + wakePower * 0.9;
   const rearDistance =
     side === 0
-      ? 6.95 + Math.random() * 1.05
-      : 8.15 + speedRatio * WAKE_BACKWARD_VELOCITY * 1.5 + Math.random() * 2.45;
+      ? 6.28 + Math.random() * 0.88
+      : 7.15 + speedRatio * WAKE_BACKWARD_VELOCITY * (reverseChurn ? 0.5 : 1.05) + Math.random() * 1.65;
   segment.mesh.position
     .set(
       driveState.x,
@@ -2209,7 +2246,7 @@ const emitWakeSegment = (
   segment.mesh.scale.set(1, 1, 1);
   segment.age = 0;
   segment.lifetime =
-    WAKE_LIFETIME_SECONDS + speedRatio * 0.22 + wakePower * 0.12;
+    WAKE_LIFETIME_SECONDS + speedRatio * 0.18 + wakePower * 0.1;
   segment.active = true;
   segment.side = side;
   segment.speedRatio = speedRatio;
@@ -2217,21 +2254,21 @@ const emitWakeSegment = (
     clamp(
       WAKE_BLOCK_SIZE_MIN +
         Math.random() * (WAKE_BLOCK_SIZE_MAX - WAKE_BLOCK_SIZE_MIN) +
-        wakePower * 0.28,
+        wakePower * 0.2,
       WAKE_BLOCK_SIZE_MIN,
       WAKE_BLOCK_SIZE_MAX * boostIntensity,
     );
-  segment.heightScale = 0.08 + Math.random() * 0.1 + wakePower * 0.04;
-  segment.lengthScale = 1.58 + speedRatio * 1.28 + Math.random() * 0.72;
+  segment.heightScale = 0.075 + Math.random() * 0.085 + wakePower * 0.028;
+  segment.lengthScale = (reverseChurn ? 0.9 : 1.18) + speedRatio * 1.05 + Math.random() * 0.5;
   segment.driftX =
-    forward.x * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
-    lateral.x * side * (1.05 + speedRatio * 2.15);
+    forward.x * -(WAKE_BACKWARD_VELOCITY + speedRatio * 2.4) * boostIntensity * (reverseChurn ? 0.36 : 1) +
+    lateral.x * side * (0.68 + speedRatio * 1.42);
   segment.driftZ =
-    forward.z * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
-    lateral.z * side * (1.05 + speedRatio * 2.15);
+    forward.z * -(WAKE_BACKWARD_VELOCITY + speedRatio * 2.4) * boostIntensity * (reverseChurn ? 0.36 : 1) +
+    lateral.z * side * (0.68 + speedRatio * 1.42);
   segment.spin = (Math.random() - 0.5) * (0.58 + wakePower * 0.26);
-  segment.mesh.material.color.set(speedRatio > 0.45 || wakePower > 0.55 ? 0xffffff : 0xe9fbff);
-  segment.mesh.material.opacity = clamp(0.68 + speedRatio * 0.16 + wakePower * 0.12, 0.68, 0.95);
+  segment.mesh.material.color.set(speedRatio > 0.45 || wakePower > 0.55 ? 0xffffff : 0xf0fbff);
+  segment.mesh.material.opacity = clamp(0.58 + speedRatio * 0.18 + wakePower * 0.1, 0.56, 0.9);
 };
 
 const animateWakeEffect = (
@@ -2280,12 +2317,12 @@ const animateWakeEffect = (
     segment.mesh.position.z += segment.driftZ * delta;
     segment.mesh.position.y =
       WAKE_SURFACE_Y_OFFSET +
-      Math.sin(segment.age * 10 + segment.side) * WAKE_VERTICAL_VELOCITY;
+      Math.sin(segment.age * 14 + segment.side * 1.7) * WAKE_VERTICAL_VELOCITY;
     segment.mesh.rotation.x += segment.spin * 0.04 * delta;
     segment.mesh.rotation.z += segment.spin * 0.48 * delta;
     segment.mesh.scale.set(
       segment.baseScale * segment.lengthScale * widen,
-      Math.max(0.045, segment.heightScale * settle),
+      Math.max(0.035, segment.heightScale * settle),
       segment.baseScale * (0.92 + segment.speedRatio * 0.34) * widen,
     );
     segment.mesh.material.opacity = fade * 0.9;
@@ -2429,8 +2466,13 @@ const getScenicCameraPresetForState = (driveState: DriveState) => {
   ];
 };
 
-const getFrameCameraLabel = (driveState: DriveState) =>
-  getScenicCameraPresetForState(driveState)?.name ?? "Saved Tableau";
+const getFrameCameraLabel = (driveState: DriveState) => {
+  if (driveState.scenicCameraManualLook) {
+    return "Manual Look";
+  }
+
+  return getScenicCameraPresetForState(driveState)?.name ?? "Standard Frame View";
+};
 
 const getDriveCameraPosition = (driveState: DriveState, preset: CameraPreset) => {
   const forward = getBoatForward(driveState.yaw);
@@ -2585,7 +2627,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 23</span>
+    <span>Hashlake Phase 24</span>
   `;
   return status;
 };
@@ -2627,11 +2669,15 @@ const animateDriveHud = (
     return;
   }
 
-  const scenicPreset = getScenicCameraPresetForState(driveState);
-  if (scenicPreset && timestamp < driveState.scenicCameraLabelUntil) {
+  if (timestamp < driveState.scenicCameraLabelUntil) {
+    const scenicPreset = getScenicCameraPresetForState(driveState);
     hud.dataset.mode = "Frame";
     hud.dataset.visibleUntil = String(driveState.scenicCameraLabelUntil);
-    hud.textContent = `SCENIC CAMERA - ${scenicPreset.name}`;
+    hud.textContent = `Frame Camera - ${
+      driveState.scenicCameraManualLook
+        ? "Manual Look"
+        : scenicPreset?.name ?? "Standard"
+    }`;
     hud.classList.add("drive-hud--visible");
     return;
   }

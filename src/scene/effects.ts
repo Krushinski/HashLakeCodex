@@ -37,11 +37,11 @@ type Firework = {
   velocity: Float32Array;
 };
 
-const MAX_ACTIVE_RINGS = 14;
+const MAX_ACTIVE_RINGS = 18;
 const MAX_ACTIVE_FIREWORKS = 5;
-const MAX_SPLASH_BLOCKS = 220;
+const MAX_SPLASH_BLOCKS = 280;
 const SPLASH_POOL = 5;
-const SPLASH_POINTS = 160;
+const SPLASH_POINTS = 192;
 
 export type SceneEffectStats = {
   rings: number;
@@ -49,6 +49,8 @@ export type SceneEffectStats = {
   splashBlocks: number;
   fireworks: number;
   qualityScale: number;
+  lastSplashDistanceToBoat: number | null;
+  lastBoatImpulseStrength: number;
 };
 
 export type SceneEffects = {
@@ -85,8 +87,14 @@ const createSoftPointTexture = () => {
   return texture;
 };
 
-const getWhaleSplashScale = (btcAmount: number) =>
-  Math.min(2.6, Math.max(0.6, Math.log10(Math.max(1.01, btcAmount)) / 1.2));
+const getWhaleSplashScale = (btcAmount: number) => {
+  const baseScale = Math.min(
+    3.4,
+    Math.max(0.6, Math.log10(Math.max(1.01, btcAmount)) / 1.15),
+  );
+  const megaBoost = btcAmount >= 1000 ? 1.25 : 1;
+  return Math.min(4.25, Math.max(0.6, baseScale * megaBoost));
+};
 
 const disposeRing = (group: THREE.Group, ring: ExpandingRing) => {
   group.remove(ring.mesh);
@@ -111,6 +119,8 @@ export const createSceneEffects = (
   const splashBursts: SplashBurst[] = [];
   const fireworks: Firework[] = [];
   let qualityScale = 1;
+  let lastSplashDistanceToBoat: number | null = null;
+  let lastBoatImpulseStrength = 0;
   const splashTexture = createSoftPointTexture();
 
   for (let index = 0; index < SPLASH_POOL; index += 1) {
@@ -222,12 +232,12 @@ export const createSceneEffects = (
 
     const activePoints = Math.min(SPLASH_POINTS, Math.round(SPLASH_POINTS * qualityScale));
     burst.age = 0;
-    burst.lifetime = 2.05 + strength * 0.18;
+    burst.lifetime = 1.78 + strength * 0.28;
     burst.active = true;
     burst.strength = strength;
     burst.points.visible = true;
     burst.points.material.color.setHex(color);
-    burst.points.material.size = 0.95 + strength * 0.42;
+    burst.points.material.size = 0.9 + strength * 0.48;
     burst.points.material.opacity = 0.98;
     burst.points.geometry.setDrawRange(0, activePoints);
 
@@ -235,7 +245,7 @@ export const createSceneEffects = (
       const offset = index * 3;
       const crown = index >= activePoints * 0.4;
       const angle = Math.random() * Math.PI * 2;
-      burst.positions[offset] = origin.x + (Math.random() - 0.5) * 1.2 * strength;
+      burst.positions[offset] = origin.x + (Math.random() - 0.5) * 1.05 * strength;
       burst.positions[offset + 1] = 0.15;
       burst.positions[offset + 2] = origin.z + (Math.random() - 0.5) * 1.2 * strength;
 
@@ -247,13 +257,13 @@ export const createSceneEffects = (
       }
 
       if (crown) {
-        const spread = (5 + Math.random() * 6) * strength;
+        const spread = (4.8 + Math.random() * 8) * strength;
         burst.velocities[offset] = Math.cos(angle) * spread;
-        burst.velocities[offset + 1] = (5 + Math.random() * 5.5) * strength;
+        burst.velocities[offset + 1] = (4.5 + Math.random() * 6.5) * strength;
         burst.velocities[offset + 2] = Math.sin(angle) * spread;
       } else {
         burst.velocities[offset] = (Math.random() - 0.5) * 3.5 * strength;
-        burst.velocities[offset + 1] = (13 + Math.random() * 13) * strength;
+        burst.velocities[offset + 1] = (13 + Math.random() * 15) * strength;
         burst.velocities[offset + 2] = (Math.random() - 0.5) * 3.5 * strength;
       }
     }
@@ -273,11 +283,11 @@ export const createSceneEffects = (
       }
 
       const angle = Math.random() * Math.PI * 2;
-      const radius = (0.9 + Math.random() * 3.6) * strength;
-      const upward = 2.8 + Math.random() * 5.2 * strength;
+      const radius = (0.85 + Math.random() * 4.8) * strength;
+      const upward = 2.5 + Math.random() * 6.6 * strength;
       block.active = true;
       block.age = 0;
-      block.lifetime = 0.72 + Math.random() * 0.55 + strength * 0.12;
+      block.lifetime = 0.78 + Math.random() * 0.6 + strength * 0.16;
       block.strength = strength;
       block.spin = (Math.random() - 0.5) * (1.2 + strength * 0.55);
       block.velocity.set(
@@ -290,7 +300,7 @@ export const createSceneEffects = (
       block.mesh.position.z += (Math.random() - 0.5) * strength * 1.6;
       block.mesh.position.y = 0.28;
       block.mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      const scale = 0.18 + Math.random() * 0.28 + strength * 0.12;
+      const scale = 0.16 + Math.random() * 0.3 + strength * 0.13;
       block.mesh.scale.set(scale * (0.7 + Math.random() * 0.9), scale * 0.5, scale);
       block.mesh.material.color.setHex(color);
       block.mesh.material.opacity = 0.82;
@@ -303,20 +313,39 @@ export const createSceneEffects = (
     const strength = getWhaleSplashScale(btcAmount);
     const boat = getWaterPosition(getBoatPosition());
     const placementAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 0.86;
-    const placementDistance = 24 + Math.random() * 46;
+    const placementDistance = btcAmount >= 300 ? 20 + Math.random() * 34 : 24 + Math.random() * 48;
     const origin = new THREE.Vector3(
       boat.x + Math.cos(placementAngle) * placementDistance + (Math.random() - 0.5) * 18,
       0.18,
       boat.z + Math.sin(placementAngle) * placementDistance - 8 + (Math.random() - 0.5) * 16,
     );
-    const color = btcAmount >= 300 ? 0xf1fbff : btcAmount >= 50 ? 0xd7f7ff : 0xbdefff;
+    lastSplashDistanceToBoat = origin.distanceTo(boat);
+    const proximity = Math.max(0, 1 - lastSplashDistanceToBoat / 92);
+    lastBoatImpulseStrength =
+      btcAmount >= 10 ? Math.min(2.35, strength * proximity * (btcAmount >= 300 ? 0.68 : 0.38)) : 0;
+    const color = btcAmount >= 1000
+      ? 0xffffff
+      : btcAmount >= 300
+        ? 0xf1fbff
+        : btcAmount >= 50
+          ? 0xd7f7ff
+          : 0xbdefff;
     addSplashBurst(origin, strength, color);
     addSplashBlocks(origin, strength, color);
 
-    addRing(color, strength * 2.2, origin, 2.15, 0.42, 1.08);
-    addRing(0xdff6f8, strength * 1.1, origin, 1.36, 0.44, 1.55);
+    addRing(color, strength * 2.45, origin, 1.72 + strength * 0.13, 0.38, 1.34);
+    addRing(0xdff6f8, strength * 1.26, origin, 1.08 + strength * 0.08, 0.34, 1.92);
+    if (btcAmount >= 50) {
+      addRing(0x7deaff, strength * 0.92, origin, 0.86 + strength * 0.08, 0.22, 2.28);
+    }
     if (btcAmount >= 300) {
-      addBoatHop(1.55);
+      addRing(0xffffff, strength * 3.1, origin, 1.95, 0.26, 1.48);
+    }
+    if (btcAmount >= 1000) {
+      addRing(0x9ff8ff, strength * 3.8, origin, 2.08, 0.2, 1.62);
+    }
+    if (lastBoatImpulseStrength > 0.08) {
+      addBoatHop(lastBoatImpulseStrength);
     }
   };
 
@@ -448,9 +477,9 @@ export const createSceneEffects = (
 
       block.age += delta;
       const progress = Math.min(1, block.age / block.lifetime);
-      block.velocity.y -= 2.1 * delta;
-      block.velocity.x *= Math.pow(0.88, delta);
-      block.velocity.z *= Math.pow(0.88, delta);
+      block.velocity.y -= 3.2 * delta;
+      block.velocity.x *= Math.pow(0.84, delta);
+      block.velocity.z *= Math.pow(0.84, delta);
       block.mesh.position.x += block.velocity.x * delta;
       block.mesh.position.z += block.velocity.z * delta;
       block.mesh.position.y = Math.max(0.18, block.mesh.position.y + block.velocity.y * delta);
@@ -460,7 +489,7 @@ export const createSceneEffects = (
       block.mesh.scale.y = Math.max(0.025, block.mesh.scale.y * (1 - delta * 0.45));
       block.mesh.scale.x *= 1 + delta * 0.08;
       block.mesh.scale.z *= 1 + delta * 0.04;
-      block.mesh.material.opacity = (1 - progress) ** 1.45 * 0.78;
+      block.mesh.material.opacity = (1 - progress) ** 1.65 * 0.82;
       block.mesh.scale.multiplyScalar(0.997 + settle * 0.003);
 
       if (progress >= 1) {
@@ -508,6 +537,8 @@ export const createSceneEffects = (
       splashBlocks: splashBlocks.filter((block) => block.active).length,
       fireworks: fireworks.length,
       qualityScale,
+      lastSplashDistanceToBoat,
+      lastBoatImpulseStrength,
     }),
     setQualityScale: (scale) => {
       qualityScale = Math.max(0.45, Math.min(1, scale));
@@ -517,6 +548,7 @@ export const createSceneEffects = (
       addWhaleSplash(10);
       addWhaleSplash(50);
       addWhaleSplash(300);
+      addWhaleSplash(1000);
       addRing(0x7fd8c8, 5, getWaterPosition(getBoatPosition()), 1.08, 0.5, 0.8);
     },
     dispose: () => {
