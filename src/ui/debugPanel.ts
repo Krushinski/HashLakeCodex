@@ -81,6 +81,11 @@ export type SceneTelemetry = {
   activeEffectBlocks: number;
   activeRings: number;
   activeSplashes: number;
+  treeInstances: number;
+  reedInstances: number;
+  mountainVertices: number;
+  postEnabled: boolean;
+  reflectionEnabled: boolean;
 };
 
 const metricTiles: MetricTile[] = [
@@ -95,6 +100,11 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Splash blocks", value: "0" },
   { group: "weather", label: "Rings", value: "0" },
   { group: "weather", label: "Splashes", value: "0" },
+  { group: "weather", label: "Trees", value: "0" },
+  { group: "weather", label: "Reeds", value: "0" },
+  { group: "weather", label: "Mount verts", value: "0" },
+  { group: "weather", label: "Post", value: "on", tone: "good" },
+  { group: "weather", label: "Reflection", value: "off", tone: "muted" },
   { group: "bitcoin", label: "Price", value: "$62,989" },
   { group: "bitcoin", label: "24h", value: "+0.48%", tone: "good" },
   { group: "bitcoin", label: "7d", value: "-1.27%", tone: "bad" },
@@ -607,6 +617,9 @@ export const createDebugPanel = (
   const setVisible = (visible: boolean) => {
     wrapper.classList.toggle("debug-panel-shell--visible", visible);
     wrapper.setAttribute("aria-hidden", String(!visible));
+    if (visible) {
+      updateTelemetry();
+    }
   };
 
   const renderWeather = (snapshot: WeatherSnapshot) => {
@@ -964,6 +977,15 @@ export const createDebugPanel = (
     setMetric("Splash blocks", String(telemetry.activeEffectBlocks));
     setMetric("Rings", String(telemetry.activeRings));
     setMetric("Splashes", String(telemetry.activeSplashes));
+    setMetric("Trees", String(telemetry.treeInstances));
+    setMetric("Reeds", String(telemetry.reedInstances));
+    setMetric("Mount verts", String(telemetry.mountainVertices));
+    setMetric("Post", telemetry.postEnabled ? "on" : "off", telemetry.postEnabled ? "good" : "muted");
+    setMetric(
+      "Reflection",
+      telemetry.reflectionEnabled ? "on" : "off",
+      telemetry.reflectionEnabled ? "good" : "muted",
+    );
     setMetric("Boost", telemetry.boostActive ? "on" : "off", telemetry.boostActive ? "good" : "muted");
     setMetric("Nearest", telemetry.nearestLocation);
 
@@ -978,11 +1000,14 @@ export const createDebugPanel = (
 
   const updateFps = (time: number) => {
     fpsFrames += 1;
-    updateTelemetry();
+    const panelVisible = wrapper.classList.contains("debug-panel-shell--visible");
+    if (panelVisible) {
+      updateTelemetry();
+    }
 
     if (time - fpsLastSample >= 500) {
       const fps = Math.round((fpsFrames * 1000) / (time - fpsLastSample));
-      if (fpsElement) {
+      if (fpsElement && panelVisible) {
         fpsElement.textContent = String(fps);
       }
 

@@ -1,0 +1,201 @@
+import * as THREE from "three";
+import type { WeatherSnapshot } from "../state/weatherEngine";
+import { getWeatherPalette } from "./artDirection";
+import { LAKE_MAP, getExpandedOutline } from "./lakeMap";
+import { makeRng } from "./scenicUtils";
+
+type ForestStats = {
+  treeInstances: number;
+  reedInstances: number;
+  rockInstances: number;
+};
+
+export type ForestSystem = {
+  group: THREE.Group;
+  update: (elapsed: number, weather: WeatherSnapshot) => void;
+  getStats: () => ForestStats;
+};
+
+const outlinePosition = (index: number, offset: number, jitter: number) => {
+  const outline = getExpandedOutline(offset);
+  const base = outline[index % outline.length];
+  const previous = outline[(index - 1 + outline.length) % outline.length];
+  const next = outline[(index + 1) % outline.length];
+  const tangent = Math.atan2(next.z - previous.z, next.x - previous.x);
+  return {
+    x: base.x + Math.cos(tangent + Math.PI / 2) * jitter,
+    z: base.z + Math.sin(tangent + Math.PI / 2) * jitter,
+    tangent,
+  };
+};
+
+const installWindShader = (
+  material: THREE.MeshStandardMaterial,
+  uniforms: { time: { value: number }; wind: { value: number } },
+) => {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = uniforms.time;
+    shader.uniforms.uWind = uniforms.wind;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        uniform float uTime;
+        uniform float uWind;`,
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+        {
+          vec3 instancePos = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+          float phase = instancePos.x * 0.083 + instancePos.z * 0.117;
+          float height = clamp(position.y / 10.0, 0.0, 1.0);
+          float sway = height * height * height * uWind;
+          float gust = sin(uTime * 1.7 + phase) + 0.5 * sin(uTime * 3.9 + phase * 1.7);
+          transformed.x += gust * sway * 0.55;
+          transformed.z += cos(uTime * 1.3 + phase * 0.8) * sway * 0.34;
+        }`,
+      );
+  };
+};
+
+export const createForestSystem = (): ForestSystem => {
+  const group = new THREE.Group();
+  group.name = "HashLake3-adapted forest and reeds";
+  const rng = makeRng(4242);
+  const windUniforms = {
+    time: { value: 0 },
+    wind: { value: 0.15 },
+  };
+
+  const treeCount = 200;
+  const foliageGeometry = new THREE.ConeGeometry(2.8, 12, 9, 2);
+  const trunkGeometry = new THREE.CylinderGeometry(0.16, 0.34, 3.2, 7, 1);
+  const foliageMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1f4c31,
+    vertexColors: true,
+    roughness: 0.94,
+    metalness: 0,
+  });
+  const trunkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x5b3824,
+    roughness: 0.9,
+  });
+  installWindShader(foliageMaterial, windUniforms);
+
+  const foliage = new THREE.InstancedMesh(foliageGeometry, foliageMaterial, treeCount);
+  const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, treeCount);
+  foliage.name = "Wind-swayed conifers";
+  trunks.name = "Conifer trunks";
+  foliage.castShadow = false;
+  trunks.castShadow = false;
+  foliage.frustumCulled = false;
+  trunks.frustumCulled = false;
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  const color = new THREE.Color();
+
+  for (let index = 0; index < treeCount; index += 1) {
+    const offset = 76 + Math.pow(rng(), 0.7) * 280;
+    const shore = outlinePosition(index * 7 + Math.floor(rng() * 12), offset, (rng() - 0.5) * 48);
+    const size = 0.72 + rng() * 1.55;
+    position.set(shore.x, 5.4 + rng() * 2.6, shore.z);
+    quaternion.setFromAxisAngle(up, rng() * Math.PI * 2);
+    scale.set(size * (0.84 + rng() * 0.28), size, size * (0.84 + rng() * 0.28));
+    matrix.compose(position, quaternion, scale);
+    foliage.setMatrixAt(index, matrix);
+    position.y = 1.36;
+    scale.set(size * 0.8, size, size * 0.8);
+    matrix.compose(position, quaternion, scale);
+    trunks.setMatrixAt(index, matrix);
+    foliage.setColorAt(
+      index,
+      color.setHSL(0.34 + (rng() - 0.5) * 0.08, 0.24 + rng() * 0.22, 0.18 + rng() * 0.08),
+    );
+  }
+  foliage.instanceMatrix.needsUpdate = true;
+  trunks.instanceMatrix.needsUpdate = true;
+  if (foliage.instanceColor) {
+    foliage.instanceColor.needsUpdate = true;
+  }
+  group.add(foliage, trunks);
+
+  const reedCount = 100;
+  const reedGeometry = new THREE.CylinderGeometry(0.08, 0.16, 4.8, 5, 1);
+  const reedMaterial = new THREE.MeshStandardMaterial({
+    color: 0x95aa55,
+    roughness: 0.88,
+  });
+  installWindShader(reedMaterial, windUniforms);
+  const reeds = new THREE.InstancedMesh(reedGeometry, reedMaterial, reedCount);
+  reeds.name = "Shoreline reeds";
+  reeds.frustumCulled = false;
+  const reedBase = LAKE_MAP.destinations.find((destination) => destination.key === "reeds")?.center ?? {
+    x: -492,
+    z: 204,
+  };
+  for (let index = 0; index < reedCount; index += 1) {
+    const angle = rng() * Math.PI * 2;
+    const radius = Math.sqrt(rng()) * 92;
+    position.set(
+      reedBase.x + Math.cos(angle) * radius,
+      2.2,
+      reedBase.z + Math.sin(angle) * radius * 0.55,
+    );
+    quaternion.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.18, rng() * Math.PI * 2, (rng() - 0.5) * 0.18));
+    const reedScale = 0.62 + rng() * 0.82;
+    scale.set(reedScale, reedScale, reedScale);
+    matrix.compose(position, quaternion, scale);
+    reeds.setMatrixAt(index, matrix);
+  }
+  reeds.instanceMatrix.needsUpdate = true;
+  group.add(reeds);
+
+  const rockCount = 56;
+  const rockGeometry = new THREE.DodecahedronGeometry(1, 1);
+  const rockMaterial = new THREE.MeshStandardMaterial({
+    color: 0x64675f,
+    vertexColors: true,
+    roughness: 0.95,
+  });
+  const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, rockCount);
+  rocks.name = "Shoreline boulders";
+  rocks.frustumCulled = false;
+  for (let index = 0; index < rockCount; index += 1) {
+    const offset = 10 + rng() * 42;
+    const shore = outlinePosition(index * 5 + 3, offset, (rng() - 0.5) * 18);
+    const rockScale = 1.2 + rng() * 4.1;
+    position.set(shore.x, 0.8 + rng() * 0.55, shore.z);
+    quaternion.setFromEuler(new THREE.Euler(rng() * 0.6, rng() * Math.PI * 2, rng() * 0.6));
+    scale.set(rockScale, rockScale * (0.45 + rng() * 0.36), rockScale * (0.8 + rng() * 0.5));
+    matrix.compose(position, quaternion, scale);
+    rocks.setMatrixAt(index, matrix);
+    rocks.setColorAt(index, color.setHSL(0.10 + rng() * 0.06, 0.05, 0.28 + rng() * 0.14));
+  }
+  rocks.instanceMatrix.needsUpdate = true;
+  if (rocks.instanceColor) {
+    rocks.instanceColor.needsUpdate = true;
+  }
+  group.add(rocks);
+
+  return {
+    group,
+    update: (elapsed, weather) => {
+      const palette = getWeatherPalette(weather.stormIndex);
+      windUniforms.time.value = elapsed;
+      windUniforms.wind.value = 0.15 + weather.dials.wind * 1.35;
+      foliageMaterial.color.setHex(palette.shorelineGrass);
+      foliageMaterial.color.multiplyScalar(Math.max(0.18, 1 - weather.dials.skyDark * 0.48));
+      reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x59613d : 0xa4b85f);
+      rockMaterial.color.setHex(palette.rock);
+    },
+    getStats: () => ({
+      treeInstances: treeCount,
+      reedInstances: reedCount,
+      rockInstances: rockCount,
+    }),
+  };
+};

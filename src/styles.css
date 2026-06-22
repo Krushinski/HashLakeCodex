@@ -69,6 +69,38 @@ body {
   touch-action: none;
 }
 
+.hashlake-grade-overlay {
+  --grade-vignette: 0.18;
+  --grade-desat: 0;
+  --grade-flash: 0;
+  --grade-warmth: 0.45;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 50% 44%,
+      rgba(255, 232, 176, calc(var(--grade-warmth) * 0.08)),
+      rgba(255, 232, 176, 0) 40%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, calc(var(--grade-flash))),
+      rgba(255, 255, 255, 0) 52%
+    ),
+    radial-gradient(
+      circle at 50% 52%,
+      rgba(0, 0, 0, 0) 42%,
+      rgba(0, 6, 10, calc(var(--grade-vignette))) 100%
+    ),
+    linear-gradient(
+      rgba(166, 181, 176, calc(var(--grade-desat) * 0.16)),
+      rgba(166, 181, 176, calc(var(--grade-desat) * 0.16))
+    );
+  mix-blend-mode: soft-light;
+}
+
 .status-pill {
   position: fixed;
   left: clamp(12px, 2vw, 24px);

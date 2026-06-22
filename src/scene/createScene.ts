@@ -3,14 +3,16 @@ import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { SCENARIO_PALETTES, getWeatherPalette } from "./artDirection";
 import { createSceneEffects } from "./effects";
+import { createForestSystem } from "./forestSystem";
 import {
   LAKE_MAP,
   clampBoatToWater,
-  distanceToShore,
   getExpandedOutline,
   getNearestLocation,
-  isWater,
 } from "./lakeMap";
+import { createPostSystem } from "./postSystem";
+import { createTerrainSystem } from "./terrainSystem";
+import { type WaterSurface, animateWater, createWater } from "./waterSystem";
 
 type HashlakeSceneOptions = {
   container: HTMLElement;
@@ -103,6 +105,11 @@ type SceneTelemetry = {
   activeEffectBlocks: number;
   activeRings: number;
   activeSplashes: number;
+  treeInstances: number;
+  reedInstances: number;
+  mountainVertices: number;
+  postEnabled: boolean;
+  reflectionEnabled: boolean;
 };
 
 type CameraPreset = {
@@ -336,9 +343,9 @@ export const createHashlakeScene = ({
 }: HashlakeSceneOptions): HashlakeScene => {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(SCENARIO_PALETTES.Serene.skyTop);
-  scene.fog = new THREE.FogExp2(SCENARIO_PALETTES.Serene.fogColor, 0.0042);
+  scene.fog = new THREE.FogExp2(SCENARIO_PALETTES.Serene.fogColor, 0.00058);
 
-  const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
+  const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 2600);
   camera.position.copy(CAMERA_HOME);
   camera.lookAt(0, 6, 0);
   const cameraTarget = new THREE.Vector3(0, 6, 0);
@@ -360,7 +367,7 @@ export const createHashlakeScene = ({
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.04;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = false;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.domElement.className = "hashlake-canvas";
   renderer.domElement.setAttribute("aria-label", "Realtime Hashlake scene");
@@ -386,14 +393,18 @@ export const createHashlakeScene = ({
   scene.add(water.mesh);
   const shoreline = createShoreline();
   scene.add(shoreline);
+  const terrainSystem = createTerrainSystem();
+  scene.add(terrainSystem.group);
+  const forestSystem = createForestSystem();
+  scene.add(forestSystem.group);
   const horizonHaze = createHorizonHaze();
   scene.add(horizonHaze);
-  scene.add(createMountains());
   scene.add(createDestinationMarkers());
   const sunDisc = createSunDisc();
   scene.add(sunDisc);
   const clouds = createClouds();
   scene.add(clouds);
+  const postSystem = createPostSystem(container, renderer);
 
   const boat = createBoat();
   scene.add(boat);
@@ -488,6 +499,7 @@ export const createHashlakeScene = ({
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
+    postSystem.resize();
   };
 
   const scheduleResize = () => {
@@ -547,8 +559,10 @@ export const createHashlakeScene = ({
     governQuality(delta, now);
     const weather = weatherStore.getSnapshot();
     updateDriveState(driveState, input, delta, weather);
-    animateWater(water, elapsed, weather, driveState);
+    animateWater(water, elapsed, weather, driveState, camera);
     animateShoreline(shoreline, elapsed, weather);
+    terrainSystem.update(weather, camera);
+    forestSystem.update(elapsed, weather);
     animateBoat(boat, elapsed, weather, driveState);
     animateWakeEffect(wakeEffect, driveState, elapsed, delta);
     animateWeatherEffects(weatherEffects, elapsed, weather);
@@ -573,6 +587,7 @@ export const createHashlakeScene = ({
       tempForward,
       tempSide,
     });
+    postSystem.update(weather, elapsed);
     animateStatus(status, elapsed);
     animateDriveHud(driveHud, driveState, now);
     renderer.render(scene, camera);
@@ -888,12 +903,15 @@ export const createHashlakeScene = ({
       renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
       status.remove();
       driveHud.remove();
+      postSystem.dispose();
       sceneEffects.dispose();
       renderer.dispose();
     },
     getTelemetry: () => ({
       ...(() => {
         const effectStats = sceneEffects.getStats();
+        const forestStats = forestSystem.getStats();
+        const terrainStats = terrainSystem.getStats();
         return {
           mode: driveState.mode,
           speed: driveState.speed,
@@ -936,16 +954,16 @@ export const createHashlakeScene = ({
           activeEffectBlocks: effectStats.splashBlocks,
           activeRings: effectStats.rings,
           activeSplashes: effectStats.splashes,
+          treeInstances: forestStats.treeInstances,
+          reedInstances: forestStats.reedInstances,
+          mountainVertices: terrainStats.mountainVertices,
+          postEnabled: postSystem.enabled && terrainStats.postEnabled,
+          reflectionEnabled: water.reflectionEnabled || terrainStats.reflectionEnabled,
         };
       })(),
     }),
     toggleDriveMode,
   };
-};
-
-type WaterSurface = {
-  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhysicalMaterial>;
-  basePositions: Float32Array;
 };
 
 type SkyDome = {
@@ -1076,126 +1094,6 @@ const createLakeFill = () => {
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = -0.08;
   return mesh;
-};
-
-const createOrganicWaterGeometry = () => {
-  const geometry = new THREE.BufferGeometry();
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const depthFactors: number[] = [];
-  const indices: number[] = [];
-  const step = 9;
-  const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
-  const deepColor = new THREE.Color(SCENARIO_PALETTES.Serene.waterDeep);
-  const midColor = new THREE.Color(0x1b9fd1);
-  const shallowColor = new THREE.Color(SCENARIO_PALETTES.Serene.waterShallow);
-  const sandbarColor = new THREE.Color(0xa4e1d0);
-  const coveColor = new THREE.Color(0x0c6c9f);
-
-  for (let x = minX; x < maxX; x += step) {
-    for (let z = minZ; z < maxZ; z += step) {
-      const center = {
-        x: x + step * 0.5,
-        z: z + step * 0.5,
-      };
-
-      if (!isWater(center)) {
-        continue;
-      }
-
-      const vertexIndex = positions.length / 3;
-      positions.push(x, 0, z, x + step, 0, z, x + step, 0, z + step, x, 0, z + step);
-      const shoreDepth = clamp(distanceToShore(center) / 74, 0, 1);
-      const sandbarDx = (center.x - LAKE_MAP.sandbar.center.x) / (LAKE_MAP.sandbar.radiusX + 60);
-      const sandbarDz = (center.z - LAKE_MAP.sandbar.center.z) / (LAKE_MAP.sandbar.radiusZ + 42);
-      const nearSandbar = clamp(1 - Math.hypot(sandbarDx, sandbarDz), 0, 1);
-      const islandDx = (center.x - LAKE_MAP.island.center.x) / (LAKE_MAP.island.radiusX + 44);
-      const islandDz = (center.z - LAKE_MAP.island.center.z) / (LAKE_MAP.island.radiusZ + 38);
-      const nearIsland = clamp(1 - Math.hypot(islandDx, islandDz), 0, 1);
-      const cove = getDestinationCenter("cove");
-      const nearCove = clamp(1 - Math.hypot(center.x - cove.x, center.z - cove.z) / 132, 0, 1);
-      const tint = shallowColor.clone().lerp(midColor, shoreDepth).lerp(deepColor, shoreDepth * 0.58);
-      tint.lerp(sandbarColor, nearSandbar * 0.55);
-      tint.lerp(shallowColor, nearIsland * 0.28);
-      tint.lerp(coveColor, nearCove * 0.26);
-      for (let vertex = 0; vertex < 4; vertex += 1) {
-        colors.push(tint.r, tint.g, tint.b);
-        depthFactors.push(clamp(shoreDepth + nearCove * 0.08, 0.3, 1));
-      }
-      indices.push(vertexIndex, vertexIndex + 1, vertexIndex + 2);
-      indices.push(vertexIndex, vertexIndex + 2, vertexIndex + 3);
-    }
-  }
-
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setAttribute("depthFactor", new THREE.Float32BufferAttribute(depthFactors, 1));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-};
-
-const createWater = (): WaterSurface => {
-  const geometry = createOrganicWaterGeometry();
-
-  const material = new THREE.MeshPhysicalMaterial({
-    color: 0x1f9ed3,
-    emissive: 0x07517d,
-    emissiveIntensity: 0.18,
-    roughness: 0.16,
-    metalness: 0.02,
-    vertexColors: true,
-    transmission: 0,
-    clearcoat: 0.64,
-    clearcoatRoughness: 0.12,
-    reflectivity: 0.9,
-  });
-
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.receiveShadow = true;
-  mesh.position.y = 0;
-
-  const position = geometry.attributes.position;
-  return {
-    mesh,
-    basePositions: new Float32Array(position.array),
-  };
-};
-
-const animateWater = (
-  water: WaterSurface,
-  elapsed: number,
-  weather: WeatherSnapshot,
-  driveState: DriveState,
-) => {
-  const position = water.mesh.geometry.attributes.position;
-  const values = position.array as Float32Array;
-  const depthFactors = water.mesh.geometry.attributes.depthFactor.array as Float32Array;
-  const waveHeight = 0.12 + weather.dials.chop * 2.45;
-  const waveSpeed = 0.45 + weather.dials.wind * 1.85;
-  const chop = weather.dials.chop;
-  const speedWake = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
-
-  for (let index = 0; index < values.length; index += 3) {
-    const x = water.basePositions[index];
-    const z = water.basePositions[index + 2];
-    const distanceToBoat = Math.hypot(x - driveState.x, z - driveState.z);
-    const localWake =
-      Math.max(0, 1 - distanceToBoat / 30) *
-      speedWake *
-      Math.sin(distanceToBoat * 0.56 - elapsed * 10);
-    const shoreDepth = depthFactors[index / 3] ?? 1;
-    const longWave = Math.sin(x * 0.026 + elapsed * waveSpeed) * waveHeight * shoreDepth;
-    const crossWave =
-      Math.cos(z * 0.034 + elapsed * (waveSpeed * 0.72)) * waveHeight * 0.48 * shoreDepth;
-    const shimmer =
-      Math.sin((x + z) * (0.052 + chop * 0.07) + elapsed * (0.82 + chop * 2.3)) *
-      (0.035 + chop * 0.38);
-    values[index + 1] = longWave + crossWave + shimmer + localWake * 0.62;
-  }
-
-  position.needsUpdate = true;
-  water.mesh.geometry.computeVertexNormals();
 };
 
 const createBoat = () => {
@@ -1641,19 +1539,6 @@ const createShoreline = () => {
     color: 0x2f6135,
     roughness: 0.92,
   });
-  const grassMaterial = new THREE.MeshStandardMaterial({
-    color: SCENARIO_PALETTES.Serene.shorelineGrass,
-    roughness: 0.86,
-  });
-  const rockMaterial = new THREE.MeshStandardMaterial({
-    color: SCENARIO_PALETTES.Serene.rock,
-    roughness: 0.94,
-  });
-  const coveRockMaterial = new THREE.MeshStandardMaterial({
-    color: 0x4f5b58,
-    roughness: 0.98,
-  });
-
   const land = new THREE.Mesh(
     new THREE.CircleGeometry(LAKE_MAP.worldRadius, 128),
     landMaterial,
@@ -1694,94 +1579,6 @@ const createShoreline = () => {
   shallow.position.y = 0.11;
   group.add(shallow);
 
-  const treeGeometry = new THREE.ConeGeometry(3.2, 14, 8);
-  const trunkGeometry = new THREE.CylinderGeometry(0.42, 0.56, 3, 7);
-  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6f4428, roughness: 0.82 });
-  const grassTuftGeometry = new THREE.ConeGeometry(0.75, 3.8, 5);
-  const brightGrassMaterial = new THREE.MeshStandardMaterial({
-    color: 0x78a74d,
-    roughness: 0.9,
-  });
-
-  for (let index = 0; index < 148; index += 1) {
-    const base = LAKE_MAP.outline[(index * 7) % LAKE_MAP.outline.length];
-    const length = Math.max(1, Math.hypot(base.x, base.z));
-    const shoreOffset = 34 + ((index * 37) % 118);
-    const angleJitter = Math.sin(index * 2.17) * 14;
-    const x = base.x + (base.x / length) * shoreOffset + Math.cos(index * 1.91) * angleJitter;
-    const z = base.z + (base.z / length) * shoreOffset + Math.sin(index * 2.29) * angleJitter;
-
-    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-    trunk.position.set(x, 1.4, z);
-    trunk.castShadow = true;
-    group.add(trunk);
-
-    const tree = new THREE.Mesh(treeGeometry, grassMaterial);
-    tree.position.set(x, 9, z);
-    tree.rotation.y = index * 0.41;
-    tree.scale.setScalar(0.75 + ((index * 13) % 9) / 18);
-    tree.userData.swayPhase = index * 0.47;
-    tree.userData.baseRotationZ = tree.rotation.z;
-    tree.castShadow = true;
-    group.add(tree);
-  }
-
-  for (let index = 0; index < 96; index += 1) {
-    const base = LAKE_MAP.outline[(index * 11 + 5) % LAKE_MAP.outline.length];
-    const length = Math.max(1, Math.hypot(base.x, base.z));
-    const offset = 20 + ((index * 23) % 54);
-    const tuft = new THREE.Mesh(grassTuftGeometry, brightGrassMaterial);
-    tuft.position.set(
-      base.x + (base.x / length) * offset + Math.sin(index * 1.7) * 7,
-      1.9,
-      base.z + (base.z / length) * offset + Math.cos(index * 2.1) * 7,
-    );
-    tuft.rotation.set(Math.sin(index) * 0.12, index * 0.46, Math.cos(index) * 0.12);
-    tuft.scale.set(0.55 + (index % 5) * 0.08, 0.55 + (index % 7) * 0.06, 0.55);
-    tuft.userData.swayPhase = index * 0.78;
-    tuft.userData.baseRotationZ = tuft.rotation.z;
-    tuft.castShadow = true;
-    group.add(tuft);
-  }
-
-  for (let index = 0; index < 88; index += 1) {
-    const base = LAKE_MAP.outline[(index * 5 + 3) % LAKE_MAP.outline.length];
-    const length = Math.max(1, Math.hypot(base.x, base.z));
-    const offset = 4 + ((index * 19) % 42);
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(2.5 + (index % 5) * 0.4), rockMaterial);
-    rock.position.set(
-      base.x + (base.x / length) * offset + Math.sin(index * 1.3) * 5,
-      1.1,
-      base.z + (base.z / length) * offset + Math.cos(index * 1.7) * 5,
-    );
-    rock.scale.y = 0.55 + (index % 4) * 0.12;
-    rock.rotation.set(index * 0.4, index * 0.33, index * 0.17);
-    rock.castShadow = true;
-    group.add(rock);
-  }
-
-  for (let index = 0; index < 28; index += 1) {
-    const base = LAKE_MAP.outline[(index * 3 + 12) % LAKE_MAP.outline.length];
-    if (base.x < 350) {
-      continue;
-    }
-
-    const length = Math.max(1, Math.hypot(base.x, base.z));
-    const ridge = new THREE.Mesh(
-      new THREE.ConeGeometry(8 + (index % 4) * 2.4, 14 + (index % 5) * 3.5, 5),
-      coveRockMaterial,
-    );
-    ridge.position.set(
-      base.x + (base.x / length) * (22 + (index % 3) * 8),
-      6.8,
-      base.z + (base.z / length) * (22 + (index % 3) * 8),
-    );
-    ridge.rotation.y = index * 0.48;
-    ridge.scale.z = 0.78;
-    ridge.castShadow = true;
-    group.add(ridge);
-  }
-
   return group;
 };
 
@@ -1800,78 +1597,6 @@ const animateShoreline = (
     const baseRotationZ = Number(child.userData.baseRotationZ ?? 0);
     child.rotation.z = baseRotationZ + Math.sin(elapsed * (0.9 + weather.dials.wind) + phase) * sway;
   });
-};
-
-const createMountains = () => {
-  const group = new THREE.Group();
-  const mountainMaterial = new THREE.MeshStandardMaterial({
-    color: 0x778c7e,
-    roughness: 0.95,
-  });
-  const distantMountainMaterial = new THREE.MeshStandardMaterial({
-    color: 0x5d746f,
-    roughness: 0.98,
-    transparent: true,
-    opacity: 0.78,
-  });
-  const snowMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf0f3ec,
-    roughness: 0.74,
-  });
-  const forestMaterial = new THREE.MeshStandardMaterial({
-    color: 0x375d42,
-    roughness: 0.94,
-  });
-
-  for (let layer = 0; layer < 2; layer += 1) {
-    const count = layer === 0 ? 24 : 30;
-    for (let index = 0; index < count; index += 1) {
-      const angle = -3.05 + index * (Math.PI * 2 / count) + Math.sin(index * 1.7 + layer) * 0.05;
-      const radius = layer === 0 ? 565 + (index % 5) * 34 : 760 + (index % 6) * 42;
-      const height =
-        (layer === 0 ? 74 : 96) + (index % 6) * (layer === 0 ? 13 : 18);
-      const width = (layer === 0 ? 42 : 58) + (index % 4) * 9;
-      const mountain = new THREE.Mesh(
-        new THREE.ConeGeometry(width, height, 5),
-        layer === 0 ? mountainMaterial : distantMountainMaterial,
-      );
-      mountain.position.set(
-        Math.cos(angle) * radius,
-        height / 2 - 8,
-        Math.sin(angle) * radius - 44,
-      );
-      mountain.rotation.y = angle;
-      mountain.scale.z = 0.72 + (index % 3) * 0.14;
-      mountain.castShadow = layer === 0;
-      group.add(mountain);
-
-      if (layer === 0 || index % 2 === 0) {
-        const cap = new THREE.Mesh(new THREE.ConeGeometry(width * 0.32, height * 0.23, 5), snowMaterial);
-        cap.position.copy(mountain.position);
-        cap.position.y += height * 0.32;
-        cap.rotation.y = angle;
-        cap.scale.z = mountain.scale.z;
-        cap.castShadow = layer === 0;
-        group.add(cap);
-      }
-    }
-  }
-
-  for (let index = 0; index < 74; index += 1) {
-    const angle = index * 0.31 + Math.sin(index) * 0.08;
-    const radius = 492 + (index % 7) * 23;
-    const tree = new THREE.Mesh(
-      new THREE.ConeGeometry(5 + (index % 3), 22 + (index % 5) * 4, 7),
-      forestMaterial,
-    );
-    tree.position.set(Math.cos(angle) * radius, 9, Math.sin(angle) * radius - 42);
-    tree.rotation.y = angle;
-    tree.scale.z = 0.75;
-    tree.castShadow = true;
-    group.add(tree);
-  }
-
-  return group;
 };
 
 const createDestinationMarkers = () => {
@@ -2104,18 +1829,18 @@ const createClouds = () => {
     opacity: 0.82,
   });
 
-  for (let index = 0; index < 14; index += 1) {
+  for (let index = 0; index < 8; index += 1) {
     const cloud = new THREE.Group();
     cloud.name = "Procedural cloud";
     cloud.position.set(
-      -320 + index * 52,
-      74 + (index % 4) * 5,
+      -270 + index * 74,
+      82 + (index % 4) * 6,
       -185 - (index % 5) * 22,
     );
-    cloud.scale.setScalar(0.82 + (index % 5) * 0.12);
+    cloud.scale.setScalar(0.68 + (index % 5) * 0.1);
 
-    for (let puff = 0; puff < 5; puff += 1) {
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(7 + puff * 1.05, 14, 8), material);
+    for (let puff = 0; puff < 4; puff += 1) {
+      const sphere = new THREE.Mesh(new THREE.SphereGeometry(6 + puff * 0.9, 10, 6), material);
       sphere.position.set(puff * 7.4, Math.sin(puff + index) * 2.2, Math.cos(puff) * 2.8);
       sphere.scale.set(1.1 + puff * 0.08, 0.45 + (puff % 2) * 0.08, 0.72);
       cloud.add(sphere);
@@ -2477,8 +2202,6 @@ const getDriveCameraPosition = (driveState: DriveState, preset: CameraPreset) =>
 const skyColorScratch = new THREE.Color();
 const horizonColorScratch = new THREE.Color();
 const fogColorScratch = new THREE.Color();
-const waterDeepScratch = new THREE.Color();
-const waterShallowScratch = new THREE.Color();
 const cloudColorScratch = new THREE.Color();
 
 const applyWeatherToScene = ({
@@ -2531,7 +2254,7 @@ const applyWeatherToScene = ({
   if (scene.fog instanceof THREE.FogExp2) {
     fogColorScratch.setHex(palette.fogColor);
     scene.fog.color.copy(fogColorScratch);
-    scene.fog.density = 0.0022 + fog * 0.017 + weather.stormDarkness * 0.004;
+    scene.fog.density = 0.00046 + fog * 0.012 + weather.stormDarkness * 0.0028;
   }
 
   sunlight.intensity = Math.max(0.16, 4.25 * (1 - dark * 0.82) + daylightRelief * 0.18);
@@ -2542,15 +2265,9 @@ const applyWeatherToScene = ({
   sunDisc.material.color.setHex(palette.sunColor);
   sunDisc.visible = dark < 0.72 || fire > 0.38;
 
-  waterDeepScratch.setHex(palette.waterDeep);
-  waterShallowScratch.setHex(palette.waterShallow);
-  water.mesh.material.color.copy(waterDeepScratch.lerp(waterShallowScratch, 0.26 - fire * 0.08));
-  water.mesh.material.emissive.setHex(palette.waterDeep);
-  water.mesh.material.emissiveIntensity = Math.max(0.03, 0.18 * (1 - dark) + 0.04);
   lakeFill.material.color.setHex(palette.waterDeep);
   lakeFill.material.opacity = Math.max(0.5, 0.86 - weather.stormDarkness * 0.22);
-  water.mesh.material.roughness = 0.14 + weather.dials.chop * 0.62 + weather.stormDarkness * 0.12;
-  water.mesh.material.clearcoat = Math.max(0.08, 0.68 - weather.dials.chop * 0.38);
+  water.mesh.visible = true;
 
   clouds.children.forEach((cloud, index) => {
     cloud.position.y = 70 - dark * 18 + Math.sin(elapsed * 0.2 + index) * 0.8;
@@ -2624,7 +2341,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 19</span>
+    <span>Hashlake Phase 20</span>
   `;
   return status;
 };
