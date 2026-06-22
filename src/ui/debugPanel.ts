@@ -84,6 +84,8 @@ export type SceneTelemetry = {
   activeRings: number;
   activeSplashes: number;
   treeInstances: number;
+  forestBandInstances: number;
+  forestBandMethod: string;
   reedInstances: number;
   mountainVertices: number;
   postEnabled: boolean;
@@ -104,10 +106,14 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Rings", value: "0" },
   { group: "weather", label: "Splashes", value: "0" },
   { group: "weather", label: "Trees", value: "0" },
+  { group: "weather", label: "Forest band", value: "0" },
+  { group: "weather", label: "Band method", value: "instanced", tone: "muted" },
   { group: "weather", label: "Reeds", value: "0" },
   { group: "weather", label: "Mount verts", value: "0" },
   { group: "weather", label: "Post", value: "on", tone: "good" },
-  { group: "weather", label: "Reflection", value: "off", tone: "muted" },
+  { group: "weather", label: "Fake reflect", value: "off", tone: "muted" },
+  { group: "weather", label: "Debug UI", value: "hidden", tone: "muted" },
+  { group: "weather", label: "DOM cadence", value: "hidden idle", tone: "muted" },
   { group: "bitcoin", label: "Price", value: "$62,989" },
   { group: "bitcoin", label: "24h", value: "+0.48%", tone: "good" },
   { group: "bitcoin", label: "7d", value: "-1.27%", tone: "bad" },
@@ -115,11 +121,14 @@ const metricTiles: MetricTile[] = [
   { group: "bitcoin", label: "Tick age", value: "--" },
   { group: "bitcoin", label: "Heartbeat", value: "--" },
   { group: "bitcoin", label: "Price shown", value: "--" },
-  { group: "bitcoin", label: "Whale min", value: "3 BTC" },
-  { group: "bitcoin", label: "Last trade", value: "--" },
-  { group: "bitcoin", label: "Trade side", value: "--" },
-  { group: "bitcoin", label: "Trade price", value: "--" },
-  { group: "bitcoin", label: "Whale source", value: "proxy", tone: "muted" },
+  { group: "bitcoin", label: "FX status", value: "listening", tone: "muted" },
+  { group: "bitcoin", label: "Trade msgs", value: "0" },
+  { group: "bitcoin", label: "Trade msg age", value: "--" },
+  { group: "bitcoin", label: "Last msg size", value: "--" },
+  { group: "bitcoin", label: "Last msg price", value: "--" },
+  { group: "bitcoin", label: "Last large size", value: "--" },
+  { group: "bitcoin", label: "Large threshold", value: "3 BTC" },
+  { group: "bitcoin", label: "Splash source", value: "none", tone: "muted" },
   { group: "network", label: "Fastest fee", value: "3 sat/vB" },
   { group: "network", label: "Mempool", value: "113,080 tx" },
   { group: "network", label: "Block", value: "#954,434" },
@@ -177,7 +186,7 @@ const feedRows: FeedRow[] = [
   { name: "mempool", status: "offline", source: "none" },
   { name: "fees", status: "offline", source: "none" },
   { name: "block", status: "offline", source: "none" },
-  { name: "whales", status: "ok", source: "sim" },
+  { name: "whales", status: "ok", source: "live" },
   { name: "market", status: "offline", source: "none" },
   { name: "difficulty", status: "offline", source: "none" },
   { name: "hashrate", status: "offline", source: "none" },
@@ -192,7 +201,14 @@ const metricLabelsByFeed: Record<FeedName, string[]> = {
   block: ["Block", "Block age"],
   difficulty: ["Difficulty"],
   hashrate: ["Hashrate dip"],
-  whales: [],
+  whales: [
+    "FX status",
+    "Trade msgs",
+    "Trade msg age",
+    "Last msg size",
+    "Last large size",
+    "Splash source",
+  ],
   websocket: ["WebSocket"],
 };
 
@@ -251,6 +267,30 @@ const formatPercent = (value: number | null) => {
   }
 
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+};
+
+const getFeedDisplayName = (name: FeedName) =>
+  name === "whales" ? "Large Trade FX" : name;
+
+const getLargeTradeStatusTone = (status: LiveBitcoinSnapshot["largeTrade"]["detectorStatus"]) => {
+  if (status === "websocket unavailable") {
+    return "bad";
+  }
+
+  if (status === "event detected" || status === "manual test") {
+    return "good";
+  }
+
+  return "muted";
+};
+
+const getLargeTradeStatusLabel = (snapshot: LiveBitcoinSnapshot) => {
+  const status = snapshot.largeTrade.detectorStatus;
+  if (status === "listening" || status === "no recent event") {
+    return `listening - no recent >=${snapshot.largeTrade.thresholdBtc} BTC event`;
+  }
+
+  return status;
 };
 
 const createMetricCards = (group: MetricTile["group"]) =>
@@ -322,7 +362,7 @@ const createFeeds = () =>
       (feed) => `
         <div class="debug-feed" data-feed="${feed.name}">
           <span class="debug-feed__dot debug-feed__dot--${feed.status}"></span>
-          <span class="debug-feed__name">${feed.name}</span>
+          <span class="debug-feed__name">${getFeedDisplayName(feed.name)}</span>
           <span class="debug-feed__status">${feed.status}</span>
           <span class="debug-feed__source">${feed.source}</span>
           <time class="debug-feed__timer" data-feed-timer="${feed.name}">0s ago</time>
@@ -403,7 +443,7 @@ const renderTemplate = () => `
       <div class="debug-manual__buttons">
         <button type="button" data-debug-action="crash">Crash</button>
         <button type="button" data-debug-action="rally">Rally</button>
-        <button type="button" data-debug-action="whale">Whale</button>
+        <button type="button" data-debug-action="whale">FX 14.7</button>
         <button type="button" data-debug-action="whale-3">3 BTC</button>
         <button type="button" data-debug-action="whale-10">10 BTC</button>
         <button type="button" data-debug-action="whale-50">50 BTC</button>
@@ -456,11 +496,32 @@ const updateFeedRows = (wrapper: HTMLElement, snapshot: LiveBitcoinSnapshot) => 
       continue;
     }
 
-    const nextStatus = liveFeed.status;
+    const isLargeTradeFx = feed.name === "whales";
+    const nextStatus = isLargeTradeFx
+      ? snapshot.largeTrade.detectorStatus === "websocket unavailable"
+        ? "offline"
+        : "ok"
+      : liveFeed.status;
     dot.className = `debug-feed__dot debug-feed__dot--${nextStatus}`;
-    status.textContent = nextStatus;
-    source.textContent = liveFeed.source;
-    timer.textContent = formatLastSeen(liveFeed.lastSuccessAt);
+    if (isLargeTradeFx) {
+      status.textContent =
+        snapshot.largeTrade.detectorStatus === "no recent event"
+          ? "listening"
+          : snapshot.largeTrade.detectorStatus;
+      source.textContent =
+        snapshot.largeTrade.lastSplashSource === "manual"
+          ? "manual test"
+          : snapshot.marketWebSocket.status === "ok"
+            ? "market stream"
+            : "none";
+      timer.textContent = formatLastSeen(
+        snapshot.largeTrade.lastDetectedAt ?? snapshot.largeTrade.lastTradeMessageAt,
+      );
+    } else {
+      status.textContent = nextStatus;
+      source.textContent = liveFeed.source;
+      timer.textContent = formatLastSeen(liveFeed.lastSuccessAt);
+    }
   }
 };
 
@@ -823,26 +884,25 @@ export const createDebugPanel = (
     setMetric("Tick age", formatLastSeen(snapshot.marketWebSocket.lastTickAt));
     setMetric("Heartbeat", formatLastSeen(snapshot.marketWebSocket.lastHeartbeatAt));
     setMetric("Price shown", formatLastSeen(snapshot.marketWebSocket.lastPriceDisplayAt));
-    setMetric("Whale min", `${WHALE_MIN_BTC} BTC`);
-    setMetric("Last trade", formatBtcAmount(snapshot.largeTrade.btcAmount));
     setMetric(
-      "Trade side",
-      snapshot.largeTrade.side,
-      snapshot.largeTrade.side === "buy"
-        ? "good"
-        : snapshot.largeTrade.side === "sell"
-          ? "bad"
-          : "muted",
+      "FX status",
+      getLargeTradeStatusLabel(snapshot),
+      getLargeTradeStatusTone(snapshot.largeTrade.detectorStatus),
     );
-    setMetric("Trade price", formatCurrency(snapshot.largeTrade.price));
+    setMetric("Trade msgs", new Intl.NumberFormat("en-US").format(snapshot.largeTrade.tradeMessageCount));
+    setMetric("Trade msg age", formatLastSeen(snapshot.largeTrade.lastTradeMessageAt));
+    setMetric("Last msg size", formatBtcAmount(snapshot.largeTrade.lastTradeBtcAmount));
+    setMetric("Last msg price", formatCurrency(snapshot.largeTrade.lastTradePrice));
+    setMetric("Last large size", formatBtcAmount(snapshot.largeTrade.btcAmount));
+    setMetric("Large threshold", `${snapshot.largeTrade.thresholdBtc} BTC`);
     setMetric(
-      "Whale source",
-      snapshot.largeTrade.source === "none"
-        ? "proxy/manual"
-        : snapshot.largeTrade.source === "market-proxy"
-          ? "market proxy"
-          : snapshot.largeTrade.source,
-      snapshot.largeTrade.source === "market-proxy" ? "good" : "muted",
+      "Splash source",
+      snapshot.largeTrade.lastSplashSource,
+      snapshot.largeTrade.lastSplashSource === "live"
+        ? "good"
+        : snapshot.largeTrade.lastSplashSource === "manual" || snapshot.largeTrade.lastSplashSource === "test"
+          ? "warn"
+          : "muted",
     );
     setMetric(
       "Polling",
@@ -1021,14 +1081,18 @@ export const createDebugPanel = (
     setMetric("Rings", String(telemetry.activeRings));
     setMetric("Splashes", String(telemetry.activeSplashes));
     setMetric("Trees", String(telemetry.treeInstances));
+    setMetric("Forest band", String(telemetry.forestBandInstances));
+    setMetric("Band method", telemetry.forestBandMethod, "muted");
     setMetric("Reeds", String(telemetry.reedInstances));
     setMetric("Mount verts", String(telemetry.mountainVertices));
     setMetric("Post", telemetry.postEnabled ? "on" : "off", telemetry.postEnabled ? "good" : "muted");
     setMetric(
-      "Reflection",
+      "Fake reflect",
       telemetry.reflectionEnabled ? "on" : "off",
       telemetry.reflectionEnabled ? "good" : "muted",
     );
+    setMetric("Debug UI", "visible", "good");
+    setMetric("DOM cadence", "250ms visible / hidden idle", "muted");
     setMetric("Boost", telemetry.boostActive ? "on" : "off", telemetry.boostActive ? "good" : "muted");
     setMetric("Nearest", telemetry.nearestLocation);
 
@@ -1068,13 +1132,7 @@ export const createDebugPanel = (
 
   const handleDebugAction = (action: string | undefined) => {
     const emitManualTrade = (btcAmount: number, side: "buy" | "sell" | "unknown") => {
-      eventBus.emit({
-        type: "largeTrade",
-        btcAmount,
-        side,
-        source: "manual",
-        intensity: Math.max(0.25, Math.min(4, btcAmount / WHALE_LARGE_BTC)),
-      });
+      liveBitcoinStore.recordManualLargeTrade(btcAmount, side);
     };
 
     if (action === "crash") {
@@ -1084,13 +1142,13 @@ export const createDebugPanel = (
     } else if (action === "whale") {
       emitManualTrade(14.7, "unknown");
     } else if (action === "whale-3") {
-      emitManualTrade(WHALE_MIN_BTC, "buy");
+      emitManualTrade(WHALE_MIN_BTC, "unknown");
     } else if (action === "whale-10") {
-      emitManualTrade(WHALE_MEDIUM_BTC, "sell");
+      emitManualTrade(WHALE_MEDIUM_BTC, "unknown");
     } else if (action === "whale-50") {
-      emitManualTrade(WHALE_LARGE_BTC, "buy");
+      emitManualTrade(WHALE_LARGE_BTC, "unknown");
     } else if (action === "whale-300") {
-      emitManualTrade(WHALE_HUGE_BTC, "sell");
+      emitManualTrade(WHALE_HUGE_BTC, "unknown");
     } else if (action === "block") {
       const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
       const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;

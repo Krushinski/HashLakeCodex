@@ -57,7 +57,7 @@ const buildRidgeRing = ({
     const sin = Math.sin(theta);
     let ridge =
       noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 4) * 0.9 + 0.55;
-    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), 1.35);
+    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), 1.58);
 
     if (hero) {
       const centerPeak = angleDiff(theta, viewTheta + 0.1);
@@ -77,7 +77,7 @@ const buildRidgeRing = ({
       const detail =
         noise.fbm(cos * radius * 0.004 + 31, sin * radius * 0.004 + 17, 4) *
         peakHeight *
-        0.16 *
+        0.22 *
         Math.max(rise, 0);
       const y = Math.max(0, peakHeight * Math.max(rise, 0) + detail);
       vertices.push(cos * radius, y, sin * radius);
@@ -177,6 +177,9 @@ const createTerrainMaterial = (
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.18 + uAmbient * (0.38 + 0.44 * slope));
         color *= 0.58 + slope * 0.24;
+        float valleyShade = smoothstep(0.08, 0.52, vElev);
+        float shadowBand = smoothstep(0.22, 0.82, bl_fbm(vec2(vWorldPos.x * 0.006, vWorldPos.y * 0.013) + 12.0));
+        color *= (0.64 + valleyShade * 0.30) * (0.86 + shadowBand * 0.14);
         color += albedo * vec3(1.0, 0.32, 0.07) * uFire * 0.42;
         color = mix(color, color * vec3(0.66, 0.70, 0.78), uDark * 0.34);
 
@@ -207,7 +210,12 @@ const buildMountainCurtain = (width: number, baseHeight: number, peakHeight: num
               noise.fbm(t * 3.1 + seed * 0.01, Math.sin(t * Math.PI * 2) + 3.5, 4) + 0.56,
             ));
     const heroPeak = Math.exp(-((t - 0.52) * (t - 0.52)) / 0.018) * peakHeight * 0.45;
-    const top = ridge + heroPeak;
+    const tooth =
+      (Math.sin(t * Math.PI * 18 + seed) * 0.5 + 0.5) *
+      Math.max(0, noise.fbm(t * 9.0 + seed, 5.1, 3)) *
+      peakHeight *
+      0.18;
+    const top = ridge + heroPeak + tooth;
     vertices.push(x, 0, 0, x, top, 0);
   }
 

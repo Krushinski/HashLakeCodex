@@ -28,7 +28,7 @@ const visualEffects = [
   "lightning",
   "sky darkness",
   "fog",
-  "market whale ripples",
+  "large trade ripples",
   "fire weather",
   "boat instability",
   "camera shake",
@@ -40,7 +40,7 @@ const driveControls = [
   ["X", "Toggle Drive Mode"],
   ["F", "Fullscreen"],
   ["R", "Reset camera"],
-  ["C", "Cycle fixed chase preset"],
+  ["C", "Cycle Chase / Low Chase / High Map"],
   ["Arrow keys", "Drive boat"],
   ["Touch/drag", "Hold upward to throttle, angle left/right to steer"],
   ["Shift", "Boost"],
@@ -52,13 +52,13 @@ const driveControls = [
 const bitcoinSignals = [
   "Price trend shapes weather pressure.",
   "Fees and mempool add network stress.",
-  "Whales create local ripples only.",
+  "Large Trade FX creates local ripples only.",
   "New blocks create a teal signal pulse.",
 ];
 
 const debugManual = [
   "Crash and Gust affect weather.",
-  "Whale buttons test local splash scale.",
+  "Large Trade FX buttons test local splash scale.",
   "Resume Live returns to feed-driven state.",
   "300 BTC should not darken the sky.",
 ];

@@ -146,6 +146,8 @@ type SceneTelemetry = {
   activeRings: number;
   activeSplashes: number;
   treeInstances: number;
+  forestBandInstances: number;
+  forestBandMethod: string;
   reedInstances: number;
   mountainVertices: number;
   postEnabled: boolean;
@@ -241,18 +243,18 @@ const CAMERA_PRESETS: CameraPreset[] = [
     lookHeight: 6.4,
   },
   {
-    name: "High",
+    name: "Low Chase",
+    distance: 38,
+    height: 12.4,
+    lookAhead: 56,
+    lookHeight: 11.6,
+  },
+  {
+    name: "High Map",
     distance: 64,
     height: 42,
     lookAhead: 9,
     lookHeight: 4.4,
-  },
-  {
-    name: "Close",
-    distance: 36,
-    height: 17,
-    lookAhead: 21,
-    lookHeight: 5.4,
   },
 ];
 
@@ -598,6 +600,8 @@ export const createHashlakeScene = ({
     }
     sceneEffects.setQualityScale(qualityState.effectScale);
     postSystem.setEnabled(qualityState.postEnabled);
+    forestSystem.setQualityPreset(preset);
+    water.setQualityPreset(preset);
   };
 
   const governQuality = (delta: number, now: number) => {
@@ -1077,6 +1081,8 @@ export const createHashlakeScene = ({
           activeRings: effectStats.rings,
           activeSplashes: effectStats.splashes,
           treeInstances: forestStats.treeInstances,
+          forestBandInstances: forestStats.forestBandInstances,
+          forestBandMethod: forestStats.forestBandMethod,
           reedInstances: forestStats.reedInstances,
           mountainVertices: terrainStats.mountainVertices,
           postEnabled: postSystem.enabled && terrainStats.postEnabled,
@@ -1640,26 +1646,26 @@ const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xc7b579,
+    color: 0xbca96f,
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x83775a,
+    color: 0x5f5c45,
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x334a31,
+    color: 0x253c29,
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x6fa79f,
+    color: 0x567f7b,
     transparent: true,
-    opacity: 0.16,
+    opacity: 0.1,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x203923,
+    color: 0x172c1c,
     roughness: 0.92,
   });
   const land = new THREE.Mesh(
@@ -1727,13 +1733,13 @@ const createDestinationMarkers = () => {
   group.name = "Phase 12 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: SCENARIO_PALETTES.Serene.sand,
+    color: 0xbca96f,
     roughness: 0.92,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x9edcc5,
+    color: 0x658f85,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.16,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -1742,9 +1748,9 @@ const createDestinationMarkers = () => {
     roughness: 0.9,
   });
   const darkRockMaterial = new THREE.MeshStandardMaterial({ color: 0x4c5655, roughness: 0.96 });
-  const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x9cbf61, roughness: 0.86 });
+  const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x6f8147, roughness: 0.86 });
   const pineMaterial = new THREE.MeshStandardMaterial({
-    color: SCENARIO_PALETTES.Serene.shorelineGrass,
+    color: 0x24492b,
     roughness: 0.88,
   });
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x91f2bf });
@@ -2465,7 +2471,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 21</span>
+    <span>Hashlake Phase 22</span>
   `;
   return status;
 };

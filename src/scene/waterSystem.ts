@@ -18,7 +18,10 @@ export type WaterSurface = {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   basePositions: Float32Array;
   reflectionEnabled: boolean;
+  setQualityPreset: (preset: WaterQualityPreset) => void;
 };
+
+type WaterQualityPreset = "Performance" | "Balanced" | "Scenic";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
@@ -109,6 +112,7 @@ export const createWater = (): WaterSurface => {
       uStormColor: { value: new THREE.Color(0x061924) },
       uSunColor: { value: new THREE.Color(SCENARIO_PALETTES.Serene.sunColor) },
       uCamPos: { value: new THREE.Vector3() },
+      uReflectionStrength: { value: 0.88 },
     },
     vertexShader: `
       attribute float depthFactor;
@@ -142,6 +146,7 @@ export const createWater = (): WaterSurface => {
       uniform vec3 uStormColor;
       uniform vec3 uSunColor;
       uniform vec3 uCamPos;
+      uniform float uReflectionStrength;
       varying vec3 vColor;
       varying vec3 vWorldPos;
       varying float vDepth;
@@ -174,16 +179,20 @@ export const createWater = (): WaterSurface => {
         depthColor = mix(depthColor, vColor * 0.54, 0.28);
         depthColor = mix(depthColor, vec3(0.30, 0.10, 0.035), uFire * 0.45);
 
-        vec3 reflectedSky = mix(vec3(0.17, 0.30, 0.36), uSunColor * 0.58, 0.08);
+        vec3 reflectedSky = mix(vec3(0.15, 0.27, 0.33), uSunColor * 0.50, 0.08);
         reflectedSky = mix(reflectedSky, vec3(0.045, 0.060, 0.076), uDark * 0.9);
-        float horizonMirror = smoothstep(-520.0, -250.0, vWorldPos.z) * (1.0 - smoothstep(20.0, 190.0, vWorldPos.z));
-        float treelineMirror = horizonMirror * (0.50 + 0.50 * smoothstep(0.18, 0.82, vDepth));
+        float horizonMirror = smoothstep(-620.0, -270.0, vWorldPos.z) * (1.0 - smoothstep(40.0, 230.0, vWorldPos.z));
+        float treelineMirror = horizonMirror * (0.58 + 0.42 * smoothstep(0.18, 0.82, vDepth));
         float streaks = sin(vWorldPos.x * 0.042 + sin(vWorldPos.z * 0.014 + uTime * 0.22) * 1.8) * 0.5 + 0.5;
         streaks *= sin(vWorldPos.x * 0.011 - uTime * 0.09) * 0.18 + 0.82;
         vec3 reflectedTree = mix(vec3(0.010, 0.026, 0.026), vec3(0.038, 0.060, 0.058), streaks);
-        vec3 color = mix(depthColor, reflectedSky, fresnel * (0.30 + (1.0 - uDark) * 0.20));
-        color = mix(color, reflectedTree, treelineMirror * (0.48 + fresnel * 0.34));
-        color *= 0.70 + vDepth * 0.08;
+        vec3 mountainReflection = mix(vec3(0.040, 0.075, 0.082), vec3(0.10, 0.135, 0.13), streaks);
+        float horizontalShimmer = sin(vWorldPos.x * 0.018 + uTime * 0.16) * 0.5 + 0.5;
+        vec3 color = mix(depthColor, reflectedSky, fresnel * (0.27 + (1.0 - uDark) * 0.17));
+        color = mix(color, mountainReflection, horizonMirror * 0.18 * uReflectionStrength);
+        color = mix(color, reflectedTree, treelineMirror * (0.58 + fresnel * 0.34) * uReflectionStrength);
+        color += vec3(0.010, 0.020, 0.022) * horizontalShimmer * horizonMirror * uReflectionStrength;
+        color *= 0.64 + vDepth * 0.09;
 
         vec3 sunDir = normalize(vec3(-0.36, 0.72 - uDark * 0.28, -0.44));
         vec3 halfDir = normalize(viewDir + sunDir);
@@ -208,11 +217,17 @@ export const createWater = (): WaterSurface => {
   mesh.receiveShadow = true;
   mesh.position.y = 0;
   const position = geometry.attributes.position;
-  return {
+  const surface: WaterSurface = {
     mesh,
     basePositions: new Float32Array(position.array),
-    reflectionEnabled: false,
+    reflectionEnabled: true,
+    setQualityPreset: (preset) => {
+      surface.reflectionEnabled = preset !== "Performance";
+      material.uniforms.uReflectionStrength.value =
+        preset === "Scenic" ? 1.18 : preset === "Performance" ? 0.42 : 0.88;
+    },
   };
+  return surface;
 };
 
 export const animateWater = (

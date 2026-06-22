@@ -9,13 +9,18 @@ type ForestStats = {
   reedInstances: number;
   rockInstances: number;
   silhouetteInstances: number;
+  forestBandInstances: number;
+  forestBandMethod: string;
 };
 
 export type ForestSystem = {
   group: THREE.Group;
   update: (elapsed: number, weather: WeatherSnapshot) => void;
   getStats: () => ForestStats;
+  setQualityPreset: (preset: ForestQualityPreset) => void;
 };
+
+type ForestQualityPreset = "Performance" | "Balanced" | "Scenic";
 
 const outlinePosition = (index: number, offset: number, jitter: number) => {
   const outline = getExpandedOutline(offset);
@@ -182,12 +187,13 @@ export const createForestSystem = (): ForestSystem => {
   }
   group.add(rocks);
 
-  const silhouetteCount = 120;
+  let activePreset: ForestQualityPreset = "Balanced";
+  const silhouetteCount = 190;
   const silhouetteGeometry = new THREE.ConeGeometry(3.6, 18, 6, 1);
   const silhouetteMaterial = new THREE.MeshBasicMaterial({
-    color: 0x071513,
+    color: 0x05110f,
     transparent: true,
-    opacity: 0.78,
+    opacity: 0.84,
     depthWrite: false,
   });
   const silhouettes = new THREE.InstancedMesh(
@@ -210,21 +216,46 @@ export const createForestSystem = (): ForestSystem => {
   silhouettes.instanceMatrix.needsUpdate = true;
   group.add(silhouettes);
 
+  const scenicSilhouetteCount = 90;
+  const scenicSilhouettes = new THREE.InstancedMesh(
+    silhouetteGeometry,
+    silhouetteMaterial,
+    scenicSilhouetteCount,
+  );
+  scenicSilhouettes.name = "Scenic far forest massing band";
+  scenicSilhouettes.frustumCulled = false;
+  scenicSilhouettes.visible = false;
+  for (let index = 0; index < scenicSilhouetteCount; index += 1) {
+    const x = -820 + (index / (scenicSilhouetteCount - 1)) * 1640 + (rng() - 0.5) * 24;
+    const z = -330 + Math.sin(index * 0.41) * 18 + (rng() - 0.5) * 22;
+    const height = 0.58 + rng() * 1.28;
+    position.set(x, 7.3 * height, z);
+    quaternion.setFromAxisAngle(up, rng() * Math.PI * 2);
+    scale.set(0.65 + rng() * 0.8, height, 0.58 + rng() * 0.44);
+    matrix.compose(position, quaternion, scale);
+    scenicSilhouettes.setMatrixAt(index, matrix);
+  }
+  scenicSilhouettes.instanceMatrix.needsUpdate = true;
+  group.add(scenicSilhouettes);
+
   const reflectionMaterial = new THREE.MeshBasicMaterial({
-    color: 0x021313,
+    color: 0x010b0c,
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.16,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
-  for (let index = 0; index < 5; index += 1) {
-    const reflection = new THREE.Mesh(new THREE.PlaneGeometry(260 + index * 80, 30 + index * 8), reflectionMaterial);
+  const reflectionGroup = new THREE.Group();
+  reflectionGroup.name = "Treeline fake reflection strips";
+  for (let index = 0; index < 7; index += 1) {
+    const reflection = new THREE.Mesh(new THREE.PlaneGeometry(240 + index * 74, 24 + index * 7), reflectionMaterial);
     reflection.name = "Cheap treeline water reflection";
     reflection.rotation.x = -Math.PI / 2;
-    reflection.position.set(-420 + index * 210, 0.22 + index * 0.002, -176 + Math.sin(index) * 18);
-    reflection.rotation.z = (index - 2) * 0.035;
-    group.add(reflection);
+    reflection.position.set(-520 + index * 176, 0.22 + index * 0.002, -188 + Math.sin(index) * 18);
+    reflection.rotation.z = (index - 3) * 0.032;
+    reflectionGroup.add(reflection);
   }
+  group.add(reflectionGroup);
 
   return {
     group,
@@ -236,14 +267,29 @@ export const createForestSystem = (): ForestSystem => {
       foliageMaterial.color.multiplyScalar(Math.max(0.18, 1 - weather.dials.skyDark * 0.48));
       reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x59613d : 0xa4b85f);
       rockMaterial.color.setHex(palette.rock);
-      silhouetteMaterial.opacity = 0.72 + weather.dials.skyDark * 0.16;
-      reflectionMaterial.opacity = 0.10 + (1 - weather.dials.skyDark) * 0.04;
+      silhouetteMaterial.opacity =
+        (activePreset === "Scenic" ? 0.92 : activePreset === "Performance" ? 0.68 : 0.82) +
+        weather.dials.skyDark * 0.1;
+      reflectionMaterial.opacity =
+        activePreset === "Performance"
+          ? 0
+          : activePreset === "Scenic"
+            ? 0.19 + (1 - weather.dials.skyDark) * 0.04
+            : 0.13 + (1 - weather.dials.skyDark) * 0.03;
     },
     getStats: () => ({
-      treeInstances: treeCount + silhouetteCount,
+      treeInstances:
+        treeCount + silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
       reedInstances: reedCount,
       rockInstances: rockCount,
-      silhouetteInstances: silhouetteCount,
+      silhouetteInstances: silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
+      forestBandInstances: silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
+      forestBandMethod: scenicSilhouettes.visible ? "instanced x2" : "instanced",
     }),
+    setQualityPreset: (preset) => {
+      activePreset = preset;
+      scenicSilhouettes.visible = preset === "Scenic";
+      reflectionGroup.visible = preset !== "Performance";
+    },
   };
 };

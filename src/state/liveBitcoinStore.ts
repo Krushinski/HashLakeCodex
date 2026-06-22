@@ -4,6 +4,12 @@ export type FeedStatus = "ok" | "stale" | "error" | "offline" | "reconnecting";
 export type FeedSource = "live" | "cached" | "sim" | "none";
 export type DataMode = "LIVE" | "MANUAL" | "CACHED" | "STALE";
 export type PollingMode = "active" | "slowed" | "backoff";
+export type LargeTradeDetectorStatus =
+  | "listening"
+  | "event detected"
+  | "no recent event"
+  | "websocket unavailable"
+  | "manual test";
 
 export type FeedName =
   | "price"
@@ -52,6 +58,12 @@ export type LargeTradeState = {
   side: LargeTradeSide;
   price: number | null;
   source: "market-proxy" | "manual" | "none";
+  detectorStatus: LargeTradeDetectorStatus;
+  tradeMessageCount: number;
+  lastTradeMessageAt: number | null;
+  lastTradeBtcAmount: number | null;
+  lastTradePrice: number | null;
+  lastSplashSource: "live" | "manual" | "test" | "none";
 };
 
 export type StormContributions = {
@@ -137,6 +149,7 @@ export const WHALE_MIN_BTC = 3;
 export const WHALE_MEDIUM_BTC = 10;
 export const WHALE_LARGE_BTC = 50;
 export const WHALE_HUGE_BTC = 300;
+const LARGE_TRADE_RECENT_MS = 30000;
 
 const FEED_NAMES: FeedName[] = [
   "price",
@@ -170,10 +183,10 @@ const now = () => Date.now();
 const createFeed = (name: FeedName, source: FeedSource = "none"): FeedHealth => ({
   name,
   status: name === "whales" ? "ok" : "offline",
-  source: name === "whales" ? "sim" : source,
+  source: name === "whales" ? "live" : source,
   lastSuccessAt: name === "whales" ? now() : null,
   lastAttemptAt: null,
-  message: name === "whales" ? "Simulated manual whale hook" : "Waiting for first update",
+  message: name === "whales" ? "Large Trade FX armed" : "Waiting for first update",
 });
 
 const readCache = <T>(name: FeedName): StoredFeed<T> | null => {
@@ -359,6 +372,12 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     side: "unknown",
     price: null,
     source: "none",
+    detectorStatus: "no recent event",
+    tradeMessageCount: 0,
+    lastTradeMessageAt: null,
+    lastTradeBtcAmount: null,
+    lastTradePrice: null,
+    lastSplashSource: "none",
   };
   let lastLargeTradeEmitAt = 0;
   let lastMarketPriceAppliedAt = 0;
@@ -625,6 +644,24 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     }
   };
 
+  const recordMarketTradeMessage = (
+    btcAmount: number | null,
+    price: number | null,
+  ) => {
+    const timestamp = now();
+    largeTradeState.tradeMessageCount += 1;
+    largeTradeState.lastTradeMessageAt = timestamp;
+    largeTradeState.lastTradeBtcAmount = btcAmount;
+    largeTradeState.lastTradePrice = price;
+    feeds.whales.status = "ok";
+    feeds.whales.source = "live";
+    feeds.whales.lastSuccessAt = timestamp;
+    feeds.whales.message =
+      btcAmount !== null && btcAmount >= WHALE_MIN_BTC
+        ? "Large Trade FX event detected"
+        : "Large Trade FX listening";
+  };
+
   const applyLargeTrade = (
     btcAmount: number,
     side: LargeTradeSide,
@@ -637,17 +674,23 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     largeTradeState.side = side;
     largeTradeState.price = price;
     largeTradeState.source = source;
+    largeTradeState.lastSplashSource = source === "market-proxy" ? "live" : "manual";
     feeds.whales.status = "ok";
     feeds.whales.source = source === "market-proxy" ? "live" : "sim";
     feeds.whales.lastSuccessAt = timestamp;
     feeds.whales.message =
-      source === "market-proxy" ? "Market whale proxy" : "Manual large trade test";
+      source === "market-proxy" ? "Large Trade FX event" : "Manual large trade test";
 
-    if (btcAmount < WHALE_MIN_BTC || timestamp - lastLargeTradeEmitAt < 1400) {
+    if (
+      btcAmount < WHALE_MIN_BTC ||
+      (source === "market-proxy" && timestamp - lastLargeTradeEmitAt < 1400)
+    ) {
       return;
     }
 
-    lastLargeTradeEmitAt = timestamp;
+    if (source === "market-proxy") {
+      lastLargeTradeEmitAt = timestamp;
+    }
     const amountLabel = `${btcAmount.toLocaleString("en-US", {
       maximumFractionDigits: btcAmount >= 100 ? 0 : 1,
     })} BTC`;
@@ -661,12 +704,10 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
           }).format(price)}`;
     const sideLabel =
       btcAmount >= WHALE_HUGE_BTC
-        ? "Whale splash"
-        : side === "buy"
-          ? "Large buy"
-          : side === "sell"
-            ? "Large sell"
-            : "Large trade";
+        ? "Whale move"
+        : btcAmount >= WHALE_LARGE_BTC
+          ? "Large BTC move"
+          : "BTC move";
 
     eventBus.emit({
       type: "largeTrade",
@@ -723,6 +764,8 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
           }
 
           const btcAmount = numberLikeFrom(trade.size);
+          const price = numberLikeFrom(trade.price);
+          recordMarketTradeMessage(btcAmount, price);
           if (btcAmount === null || btcAmount < WHALE_MIN_BTC) {
             return;
           }
@@ -733,7 +776,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
           applyLargeTrade(
             btcAmount,
             side,
-            numberLikeFrom(trade.price),
+            price,
             "market-proxy",
           );
         });
@@ -779,6 +822,53 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     return FEED_NAMES.some((name) => name !== "whales" && failures[name] > 0)
       ? "backoff"
       : "active";
+  };
+
+  const getLargeTradeDetectorStatus = (): LargeTradeDetectorStatus => {
+    const timestamp = now();
+    if (
+      largeTradeState.source === "manual" &&
+      largeTradeState.lastDetectedAt !== null &&
+      timestamp - largeTradeState.lastDetectedAt < LARGE_TRADE_RECENT_MS
+    ) {
+      return "manual test";
+    }
+
+    if (
+      largeTradeState.source === "market-proxy" &&
+      largeTradeState.lastDetectedAt !== null &&
+      timestamp - largeTradeState.lastDetectedAt < LARGE_TRADE_RECENT_MS
+    ) {
+      return "event detected";
+    }
+
+    if (marketWebSocketState.status === "ok") {
+      return largeTradeState.lastTradeMessageAt === null ? "no recent event" : "listening";
+    }
+
+    return "websocket unavailable";
+  };
+
+  const syncLargeTradeFeedStatus = () => {
+    const detectorStatus = getLargeTradeDetectorStatus();
+    largeTradeState.detectorStatus = detectorStatus;
+    if (detectorStatus === "websocket unavailable") {
+      feeds.whales.status = "offline";
+      feeds.whales.source = "none";
+      feeds.whales.message = "Market websocket unavailable";
+      return;
+    }
+
+    feeds.whales.status = "ok";
+    feeds.whales.source = largeTradeState.lastSplashSource === "manual" ? "sim" : "live";
+    feeds.whales.lastSuccessAt =
+      largeTradeState.lastTradeMessageAt ?? largeTradeState.lastDetectedAt ?? feeds.whales.lastSuccessAt;
+    feeds.whales.message =
+      detectorStatus === "manual test"
+        ? "Manual Large Trade FX test"
+        : detectorStatus === "event detected"
+          ? "Large Trade FX event detected"
+          : "Listening - no recent >=3 BTC event";
   };
 
   const runHeartbeat = () => {
@@ -947,6 +1037,7 @@ export const createLiveBitcoinStore = (eventBus: HashlakeEventBus): LiveBitcoinS
     FEED_NAMES.forEach((name) => {
       feeds[name].status = statusForCurrentAge(feeds[name]);
     });
+    syncLargeTradeFeedStatus();
     const scored = scoreFromMetrics(metrics, feeds);
     return {
       metrics: { ...metrics },
