@@ -33,9 +33,9 @@ const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
 const DRIVE_ACCELERATION_BASE = 23;
 const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
-const DRIVE_BOOST_MAX_SPEED = 80;
-const DRIVE_BOOST_MULTIPLIER = 1.36;
-const DRIVE_BOOST_IMPULSE = 7.5;
+const DRIVE_BOOST_MAX_SPEED = 90;
+const DRIVE_BOOST_MULTIPLIER = 1.58;
+const DRIVE_BOOST_IMPULSE = 13;
 const DRIVE_NATURAL_BRAKE_DRAG = 34;
 const DRIVE_COAST_DRAG = 0.9;
 const DRIVE_ACTIVE_BRAKE_FORCE = 82;
@@ -54,14 +54,14 @@ const DRIVE_BOW_LIFT_SCALE = 0.15;
 const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
-const WAKE_BLOCK_SIZE_MIN = 0.66;
-const WAKE_BLOCK_SIZE_MAX = 1.48;
+const WAKE_BLOCK_SIZE_MIN = 0.78;
+const WAKE_BLOCK_SIZE_MAX = 1.72;
 const WAKE_VERTICAL_VELOCITY = 0.02;
 const WAKE_BACKWARD_VELOCITY = 7.2;
 const WAKE_OUTWARD_SPREAD = 5.2;
 const WAKE_LIFETIME_SECONDS = 0.66;
-const WAKE_EMISSION_RATE = 28;
-const WAKE_BOOST_MULTIPLIER = 1.58;
+const WAKE_EMISSION_RATE = 36;
+const WAKE_BOOST_MULTIPLIER = 1.82;
 const WAKE_SURFACE_Y_OFFSET = 0.3;
 const WAKE_FADE_SPEED = 1.26;
 const WAKE_MAX_ACTIVE_BLOCKS = 192;
@@ -149,6 +149,7 @@ type DriveState = {
   throttleInput: number;
   brakeInput: number;
   boostActive: boolean;
+  boostKick: number;
   inputSource: "desktop" | "mobile" | "none";
   mobilePointerId: number | null;
   mobileOriginX: number;
@@ -383,7 +384,10 @@ export const createHashlakeScene = ({
   scene.add(lakeFill);
   const water = createWater();
   scene.add(water.mesh);
-  scene.add(createShoreline());
+  const shoreline = createShoreline();
+  scene.add(shoreline);
+  const horizonHaze = createHorizonHaze();
+  scene.add(horizonHaze);
   scene.add(createMountains());
   scene.add(createDestinationMarkers());
   const sunDisc = createSunDisc();
@@ -420,6 +424,7 @@ export const createHashlakeScene = ({
     throttleInput: 0,
     brakeInput: 0,
     boostActive: false,
+    boostKick: 0,
     inputSource: "none",
     mobilePointerId: null,
     mobileOriginX: 0,
@@ -543,6 +548,7 @@ export const createHashlakeScene = ({
     const weather = weatherStore.getSnapshot();
     updateDriveState(driveState, input, delta, weather);
     animateWater(water, elapsed, weather, driveState);
+    animateShoreline(shoreline, elapsed, weather);
     animateBoat(boat, elapsed, weather, driveState);
     animateWakeEffect(wakeEffect, driveState, elapsed, delta);
     animateWeatherEffects(weatherEffects, elapsed, weather);
@@ -553,6 +559,7 @@ export const createHashlakeScene = ({
       sunlight,
       hemisphereLight,
       skyDome,
+      horizonHaze,
       water,
       lakeFill,
       sunDisc,
@@ -598,6 +605,7 @@ export const createHashlakeScene = ({
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
     driveState.boostActive = false;
+    driveState.boostKick = 0;
     driveState.inputSource = "none";
     driveState.cameraYaw = driveState.yaw;
     driveState.mobilePointerId = null;
@@ -626,6 +634,7 @@ export const createHashlakeScene = ({
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
     driveState.boostActive = false;
+    driveState.boostKick = 0;
     driveState.inputSource = "none";
     driveState.mobilePointerId = null;
     driveState.mobileThrottle = false;
@@ -662,6 +671,7 @@ export const createHashlakeScene = ({
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
     driveState.boostActive = false;
+    driveState.boostKick = 0;
     driveState.inputSource = "none";
     driveState.mobilePointerId = null;
     driveState.mobileThrottle = false;
@@ -718,6 +728,7 @@ export const createHashlakeScene = ({
       driveState.throttleInput = 0;
       driveState.brakeInput = 0;
       driveState.boostActive = false;
+      driveState.boostKick = 0;
       driveState.inputSource = "none";
       driveState.mobilePointerId = null;
       driveState.mobileThrottle = false;
@@ -761,6 +772,7 @@ export const createHashlakeScene = ({
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
     driveState.boostActive = false;
+    driveState.boostKick = 0;
     driveState.inputSource = "none";
   };
 
@@ -1322,6 +1334,8 @@ const updateDriveState = (
     driveState.mobileSteer = 0;
     driveState.throttleInput = 0;
     driveState.brakeInput = 0;
+    driveState.boostActive = false;
+    driveState.boostKick = 0;
     driveState.inputSource = "none";
     return;
   }
@@ -1359,16 +1373,17 @@ const updateDriveState = (
   const wakeTarget = clamp(
     throttleRamp * 0.82 +
       Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED * 0.34 +
-      (input.boost ? 0.18 : 0),
+      (input.boost ? 0.32 : 0),
     0,
-    input.boost ? 1.2 : 0.96,
+    input.boost ? 1.34 : 1.04,
   );
   driveState.wakePower += (wakeTarget - driveState.wakePower) * Math.min(1, delta * 4.4);
 
   if (throttleActive) {
     if (boostJustPressed && driveState.speed > 8) {
       driveState.speed = Math.min(maxForwardSpeed, driveState.speed + DRIVE_BOOST_IMPULSE);
-      driveState.wakePower = Math.min(1.2, driveState.wakePower + 0.22);
+      driveState.wakePower = Math.min(1.32, driveState.wakePower + 0.36);
+      driveState.boostKick = 1;
     }
     const acceleration =
       (DRIVE_ACCELERATION_BASE + DRIVE_ACCELERATION_RAMP * throttleRamp) *
@@ -1478,10 +1493,13 @@ const animateBoat = (
   const hop = Math.sin(hopProgress * Math.PI) * hopProgress;
   driveState.boatHop = Math.max(0, driveState.boatHop - 2.7 / 60);
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
+  const boostTorque = driveState.boostKick;
   const bowLift =
     (clamp(driveState.accelerationForce, 0, 1) * 0.82 + driveState.throttleInput * 0.18) *
       DRIVE_BOW_LIFT_SCALE +
-    speedRatio * 0.075;
+    speedRatio * 0.075 +
+    boostTorque * 0.22;
+  driveState.boostKick = Math.max(0, driveState.boostKick - 2.8 / 60);
   const turnBank = driveState.currentSteer * (0.06 + speedRatio * DRIVE_BANK_SCALE);
   boat.position.x = driveState.x;
   boat.position.z = driveState.z;
@@ -1553,7 +1571,7 @@ const createShoreline = () => {
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x6c9d4d,
+    color: 0x567443,
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
@@ -1564,7 +1582,7 @@ const createShoreline = () => {
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x416f3f,
+    color: 0x2f6135,
     roughness: 0.92,
   });
   const grassMaterial = new THREE.MeshStandardMaterial({
@@ -1625,7 +1643,7 @@ const createShoreline = () => {
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6f4428, roughness: 0.82 });
   const grassTuftGeometry = new THREE.ConeGeometry(0.75, 3.8, 5);
   const brightGrassMaterial = new THREE.MeshStandardMaterial({
-    color: 0x75a954,
+    color: 0x78a74d,
     roughness: 0.9,
   });
 
@@ -1646,6 +1664,8 @@ const createShoreline = () => {
     tree.position.set(x, 9, z);
     tree.rotation.y = index * 0.41;
     tree.scale.setScalar(0.75 + ((index * 13) % 9) / 18);
+    tree.userData.swayPhase = index * 0.47;
+    tree.userData.baseRotationZ = tree.rotation.z;
     tree.castShadow = true;
     group.add(tree);
   }
@@ -1662,6 +1682,8 @@ const createShoreline = () => {
     );
     tuft.rotation.set(Math.sin(index) * 0.12, index * 0.46, Math.cos(index) * 0.12);
     tuft.scale.set(0.55 + (index % 5) * 0.08, 0.55 + (index % 7) * 0.06, 0.55);
+    tuft.userData.swayPhase = index * 0.78;
+    tuft.userData.baseRotationZ = tuft.rotation.z;
     tuft.castShadow = true;
     group.add(tuft);
   }
@@ -1705,6 +1727,23 @@ const createShoreline = () => {
   }
 
   return group;
+};
+
+const animateShoreline = (
+  shoreline: THREE.Group,
+  elapsed: number,
+  weather: WeatherSnapshot,
+) => {
+  const sway = 0.018 + weather.dials.wind * 0.045;
+  shoreline.children.forEach((child) => {
+    const phase = Number(child.userData.swayPhase);
+    if (!Number.isFinite(phase)) {
+      return;
+    }
+
+    const baseRotationZ = Number(child.userData.baseRotationZ ?? 0);
+    child.rotation.z = baseRotationZ + Math.sin(elapsed * (0.9 + weather.dials.wind) + phase) * sway;
+  });
 };
 
 const createMountains = () => {
@@ -2032,6 +2071,32 @@ const createClouds = () => {
   return group;
 };
 
+const createHorizonHaze = () => {
+  const group = new THREE.Group();
+  group.name = "Atmospheric horizon haze";
+  const bands = [
+    { y: 32, z: -540, height: 70, opacity: 0.22 },
+    { y: 70, z: -690, height: 108, opacity: 0.16 },
+    { y: 120, z: -840, height: 150, opacity: 0.1 },
+  ];
+
+  bands.forEach((band, index) => {
+    const material = new THREE.MeshBasicMaterial({
+      color: index === 0 ? 0xc9e4e9 : 0x9fc2cc,
+      transparent: true,
+      opacity: band.opacity,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1700, band.height), material);
+    mesh.position.set(0, band.y, band.z);
+    mesh.name = "Horizon haze band";
+    group.add(mesh);
+  });
+
+  return group;
+};
+
 type WeatherEffects = {
   group: THREE.Group;
   rain: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
@@ -2102,7 +2167,7 @@ const emitWakeSegment = (
   side: number,
 ) => {
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
-  const wakePower = clamp(driveState.wakePower, 0, 1.2);
+  const wakePower = clamp(driveState.wakePower, 0, 1.34);
   const forward = getBoatForward(driveState.yaw);
   const lateral = new THREE.Vector3(-forward.z, 0, forward.x);
   const segment = wake.segments[wake.cursor];
@@ -2147,8 +2212,8 @@ const emitWakeSegment = (
       WAKE_BLOCK_SIZE_MIN,
       WAKE_BLOCK_SIZE_MAX * boostIntensity,
     );
-  segment.heightScale = 0.1 + Math.random() * 0.12 + wakePower * 0.05;
-  segment.lengthScale = 1.38 + speedRatio * 1.05 + Math.random() * 0.62;
+  segment.heightScale = 0.08 + Math.random() * 0.1 + wakePower * 0.04;
+  segment.lengthScale = 1.58 + speedRatio * 1.28 + Math.random() * 0.72;
   segment.driftX =
     forward.x * -(WAKE_BACKWARD_VELOCITY + speedRatio * 3.4) * boostIntensity +
     lateral.x * side * (1.05 + speedRatio * 2.15);
@@ -2167,10 +2232,10 @@ const animateWakeEffect = (
   delta: number,
 ) => {
   const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
-  const wakePower = clamp(driveState.wakePower, 0, 1.2);
+  const wakePower = clamp(driveState.wakePower, 0, 1.34);
   const emitCadence = clamp(
-    1 / (WAKE_EMISSION_RATE + wakePower * 18 + speedRatio * 10),
-    0.018,
+    1 / (WAKE_EMISSION_RATE + wakePower * 24 + speedRatio * 14),
+    0.014,
     0.068,
   );
   if (
@@ -2326,6 +2391,7 @@ type WeatherSceneTargets = {
   sunlight: THREE.DirectionalLight;
   hemisphereLight: THREE.HemisphereLight;
   skyDome: SkyDome;
+  horizonHaze: THREE.Group;
   water: WaterSurface;
   lakeFill: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
   sunDisc: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
@@ -2365,6 +2431,7 @@ const applyWeatherToScene = ({
   sunlight,
   hemisphereLight,
   skyDome,
+  horizonHaze,
   water,
   lakeFill,
   sunDisc,
@@ -2435,6 +2502,13 @@ const applyWeatherToScene = ({
     });
   });
 
+  horizonHaze.children.forEach((band, index) => {
+    if (band instanceof THREE.Mesh && band.material instanceof THREE.MeshBasicMaterial) {
+      band.material.color.setHex(fire > 0.25 ? palette.skyHorizon : palette.fogColor);
+      band.material.opacity = (0.1 + index * 0.045) + fog * 0.24 + dark * 0.08;
+    }
+  });
+
   const shake = weather.dials.cameraShake;
   const preset = getCameraPresetForState(driveState);
   if (driveState.mode === "Drive") {
@@ -2488,7 +2562,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 17</span>
+    <span>Hashlake Phase 18</span>
   `;
   return status;
 };

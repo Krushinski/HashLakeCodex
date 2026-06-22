@@ -2,16 +2,21 @@ import * as THREE from "three";
 import type { HashlakeEvent, HashlakeEventBus, LargeTradeSide } from "../state/eventBus";
 
 type ExpandingRing = {
-  mesh: THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>;
+  mesh: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   age: number;
   lifetime: number;
-  maxScale: number;
+  baseScale: number;
+  speed: number;
   baseOpacity: number;
 };
 
-type Splash = {
+type SplashBurst = {
+  points: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  positions: Float32Array;
+  velocities: Float32Array;
   age: number;
   lifetime: number;
+  active: boolean;
   strength: number;
 };
 
@@ -33,9 +38,10 @@ type Firework = {
 };
 
 const MAX_ACTIVE_RINGS = 14;
-const MAX_ACTIVE_SPLASHES = 5;
 const MAX_ACTIVE_FIREWORKS = 5;
 const MAX_SPLASH_BLOCKS = 220;
+const SPLASH_POOL = 5;
+const SPLASH_POINTS = 160;
 
 export type SceneEffectStats = {
   rings: number;
@@ -57,6 +63,28 @@ export type SceneEffects = {
 const getWaterPosition = (source: THREE.Vector3) =>
   new THREE.Vector3(source.x, 0.18, source.z);
 
+const createSoftPointTexture = () => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return null;
+  }
+
+  const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 31);
+  gradient.addColorStop(0, "rgba(255,255,255,1)");
+  gradient.addColorStop(0.36, "rgba(226,249,255,0.8)");
+  gradient.addColorStop(0.74, "rgba(190,235,244,0.22)");
+  gradient.addColorStop(1, "rgba(190,235,244,0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 64, 64);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+};
+
 const getTradeColor = (side: LargeTradeSide | undefined) => {
   if (side === "buy") {
     return 0x7df6a7;
@@ -70,17 +98,12 @@ const getTradeColor = (side: LargeTradeSide | undefined) => {
 };
 
 const getTradeStrength = (btcAmount: number) =>
-  Math.min(4.6, Math.max(0.42, Math.log10(Math.max(3, btcAmount)) * 1.48));
+  Math.min(2.9, Math.max(0.62, Math.log10(Math.max(3, btcAmount)) / 1.05));
 
 const disposeRing = (group: THREE.Group, ring: ExpandingRing) => {
   group.remove(ring.mesh);
   ring.mesh.geometry.dispose();
   ring.mesh.material.dispose();
-};
-
-const disposeSplash = (group: THREE.Group, splash: Splash) => {
-  void group;
-  void splash;
 };
 
 const disposeFirework = (group: THREE.Group, firework: Firework) => {
@@ -97,9 +120,40 @@ export const createSceneEffects = (
   const group = new THREE.Group();
   group.name = "Hashlake event effects";
   const rings: ExpandingRing[] = [];
-  const splashes: Splash[] = [];
+  const splashBursts: SplashBurst[] = [];
   const fireworks: Firework[] = [];
   let qualityScale = 1;
+  const splashTexture = createSoftPointTexture();
+
+  for (let index = 0; index < SPLASH_POOL; index += 1) {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(SPLASH_POINTS * 3);
+    const velocities = new Float32Array(SPLASH_POINTS * 3);
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.PointsMaterial({
+      color: 0xdff7ff,
+      map: splashTexture,
+      opacity: 0,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      size: 1.2,
+      sizeAttenuation: true,
+    });
+    const points = new THREE.Points(geometry, material);
+    points.frustumCulled = false;
+    points.visible = false;
+    group.add(points);
+    splashBursts.push({
+      points,
+      positions,
+      velocities,
+      age: 0,
+      lifetime: 2.4,
+      active: false,
+      strength: 1,
+    });
+  }
 
   const splashGeometry = new THREE.BoxGeometry(1, 1, 1);
   const splashBlocks: SplashBlock[] = Array.from({ length: MAX_SPLASH_BLOCKS }, (_, index) => {
@@ -129,26 +183,32 @@ export const createSceneEffects = (
     color: number,
     strength: number,
     origin = getWaterPosition(getBoatPosition()),
-    lifetime = 0.78 + strength * 0.24,
-    opacity = 0.28,
+    lifetime = 1.15 + strength * 0.12,
+    opacity = 0.45,
+    speed = 1,
   ) => {
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(1, 0.035 + strength * 0.018, 8, 72),
+      new THREE.RingGeometry(0.92, 1, 72),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
         opacity,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
       }),
     );
-    ring.rotation.x = Math.PI / 2;
+    ring.rotation.x = -Math.PI / 2;
     ring.position.copy(origin);
+    ring.position.y = 0.18;
+    ring.scale.setScalar(Math.max(1.2, strength * 1.4));
     group.add(ring);
     rings.push({
       mesh: ring,
       age: 0,
       lifetime,
-      maxScale: 24 + strength * 38,
+      baseScale: Math.max(1.2, strength * 1.4),
+      speed,
       baseOpacity: opacity,
     });
     while (rings.length > MAX_ACTIVE_RINGS) {
@@ -163,7 +223,57 @@ export const createSceneEffects = (
     const origin = getWaterPosition(getBoatPosition());
     origin.x += (Math.random() - 0.5) * 8;
     origin.z += 8 + Math.random() * 8;
-    addRing(color, strength, origin, 0.58 + strength * 0.16, 0.075 + strength * 0.045);
+    addRing(color, strength, origin, 0.58 + strength * 0.16, 0.075 + strength * 0.045, 1.45);
+  };
+
+  const addSplashBurst = (origin: THREE.Vector3, strength: number, color: number) => {
+    const burst = splashBursts.find((candidate) => !candidate.active);
+    if (!burst) {
+      return;
+    }
+
+    const activePoints = Math.min(
+      SPLASH_POINTS,
+      Math.round((70 + strength * 38) * qualityScale),
+    );
+    burst.age = 0;
+    burst.lifetime = 2.05 + strength * 0.18;
+    burst.active = true;
+    burst.strength = strength;
+    burst.points.visible = true;
+    burst.points.material.color.setHex(color);
+    burst.points.material.size = 0.95 + strength * 0.42;
+    burst.points.material.opacity = 0.98;
+    burst.points.geometry.setDrawRange(0, activePoints);
+
+    for (let index = 0; index < SPLASH_POINTS; index += 1) {
+      const offset = index * 3;
+      const crown = index > activePoints * 0.38;
+      const angle = Math.random() * Math.PI * 2;
+      const spread = crown ? (5.4 + Math.random() * 7.2) * strength : (Math.random() - 0.5) * 3.4 * strength;
+      burst.positions[offset] = origin.x + (Math.random() - 0.5) * 1.2 * strength;
+      burst.positions[offset + 1] = 0.22;
+      burst.positions[offset + 2] = origin.z + (Math.random() - 0.5) * 1.2 * strength;
+
+      if (index >= activePoints) {
+        burst.velocities[offset] = 0;
+        burst.velocities[offset + 1] = 0;
+        burst.velocities[offset + 2] = 0;
+        continue;
+      }
+
+      if (crown) {
+        burst.velocities[offset] = Math.cos(angle) * spread;
+        burst.velocities[offset + 1] = (5.2 + Math.random() * 6.5) * strength;
+        burst.velocities[offset + 2] = Math.sin(angle) * spread;
+      } else {
+        burst.velocities[offset] = (Math.random() - 0.5) * 3.7 * strength;
+        burst.velocities[offset + 1] = (13.5 + Math.random() * 13.5) * strength;
+        burst.velocities[offset + 2] = (Math.random() - 0.5) * 3.7 * strength;
+      }
+    }
+
+    burst.points.geometry.attributes.position.needsUpdate = true;
   };
 
   const addLargeTradeSplash = (
@@ -180,10 +290,11 @@ export const createSceneEffects = (
         : side === "sell"
           ? Math.PI * 0.2
           : Math.random() * Math.PI * 2;
-    const placementDistance = 10 + Math.min(32, btcAmount * 0.18) + Math.random() * 10;
+    const placementDistance = 18 + Math.min(58, 12 + strength * 18) + Math.random() * 18;
     origin.x += Math.cos(placementAngle) * placementDistance + (Math.random() - 0.5) * 8;
-    origin.z += Math.sin(placementAngle) * placementDistance + (Math.random() - 0.5) * 8;
+    origin.z += Math.sin(placementAngle) * placementDistance - 14 + (Math.random() - 0.5) * 8;
     const color = getTradeColor(side);
+    addSplashBurst(origin, strength, color);
 
     for (let index = 0; index < count; index += 1) {
       const block = splashBlocks.find((candidate) => !candidate.active);
@@ -194,7 +305,7 @@ export const createSceneEffects = (
       const radius = Math.random() * (2.4 + strength * 1.9);
       block.active = true;
       block.age = 0;
-      block.lifetime = 1.0 + strength * 0.16 + Math.random() * 0.28;
+      block.lifetime = 1.15 + strength * 0.18 + Math.random() * 0.3;
       block.strength = strength;
       block.spin = (Math.random() - 0.5) * (0.55 + strength * 0.2);
       block.mesh.visible = true;
@@ -209,30 +320,20 @@ export const createSceneEffects = (
       block.mesh.material.color.set(index % 4 === 0 ? color : 0xe7fbff);
       block.mesh.material.opacity = 0.78;
       block.velocity.set(
-        Math.cos(angle) * (4.0 + strength * 2.1) * (0.4 + Math.random() * 0.8),
-        0.08 + Math.random() * 0.24 + strength * 0.035,
-        Math.sin(angle) * (4.0 + strength * 2.1) * (0.4 + Math.random() * 0.8),
+        Math.cos(angle) * (4.8 + strength * 2.8) * (0.4 + Math.random() * 0.8),
+        0.1 + Math.random() * 0.32 + strength * 0.08,
+        Math.sin(angle) * (4.8 + strength * 2.8) * (0.4 + Math.random() * 0.8),
       );
     }
 
-    splashes.push({
-      age: 0,
-      lifetime: 1.0 + strength * 0.18,
-      strength,
-    });
-    while (splashes.length > MAX_ACTIVE_SPLASHES) {
-      const oldest = splashes.shift();
-      if (oldest) {
-        disposeSplash(group, oldest);
-      }
-    }
-    addRing(color, strength, origin, 0.82 + strength * 0.14, 0.22);
+    addRing(color, strength * 2.2, origin, 1.05 + strength * 0.14, 0.5, 1);
+    addRing(0xdff6f8, strength * 1.1, origin, 0.92 + strength * 0.1, 0.34, 1.55);
     if (btcAmount >= 50) {
-      addRing(color, strength * 0.78, origin, 1.0 + strength * 0.1, 0.14);
+      addRing(color, strength * 1.45, origin, 1.2 + strength * 0.12, 0.2, 0.86);
     }
     if (btcAmount >= 300) {
-      addRing(0xdff7ff, strength * 0.55, origin, 0.72 + strength * 0.08, 0.11);
-      addBoatHop(1.45);
+      addRing(0xf4fdff, strength * 1.65, origin, 1.35 + strength * 0.1, 0.24, 0.76);
+      addBoatHop(1.55);
     }
   };
 
@@ -297,9 +398,10 @@ export const createSceneEffects = (
     }
 
     if (event.type === "newBlock") {
-      addRing(0x8df7ff, 1.05, getWaterPosition(getBoatPosition()), 0.42, 0.16);
-      addRing(0xd8fbff, 0.62, getWaterPosition(getBoatPosition()), 0.32, 0.12);
-      addBoatHop(1.25);
+      const origin = getWaterPosition(getBoatPosition());
+      addRing(0x7fd8c8, 5, origin, 0.88, 0.34, 0.82);
+      addRing(0xd8fbff, 2.6, origin, 0.58, 0.18, 1.35);
+      addBoatHop(1.32);
     }
 
     if (event.type === "rally") {
@@ -314,10 +416,10 @@ export const createSceneEffects = (
       const ring = rings[index];
       ring.age += delta;
       const progress = Math.min(1, ring.age / ring.lifetime);
-      const eased = 1 - (1 - progress) ** 3;
-      const scale = 1 + eased * ring.maxScale;
+      const t = ring.age * ring.speed;
+      const scale = ring.baseScale * (1 + t * 9);
       ring.mesh.scale.setScalar(scale);
-      ring.mesh.material.opacity = (1 - progress) ** 1.7 * ring.baseOpacity;
+      ring.mesh.material.opacity = Math.max(0, ring.baseOpacity * (1 - progress) ** 1.55);
 
       if (progress >= 1) {
         disposeRing(group, ring);
@@ -327,16 +429,35 @@ export const createSceneEffects = (
   };
 
   const updateSplashes = (delta: number) => {
-    for (let splashIndex = splashes.length - 1; splashIndex >= 0; splashIndex -= 1) {
-      const splash = splashes[splashIndex];
-      splash.age += delta;
-      const progress = Math.min(1, splash.age / splash.lifetime);
+    splashBursts.forEach((burst) => {
+      if (!burst.active) {
+        return;
+      }
+
+      burst.age += delta;
+      const progress = Math.min(1, burst.age / burst.lifetime);
+      for (let index = 0; index < burst.positions.length; index += 3) {
+        burst.velocities[index + 1] -= 24 * delta;
+        burst.positions[index] += burst.velocities[index] * delta;
+        burst.positions[index + 1] += burst.velocities[index + 1] * delta;
+        burst.positions[index + 2] += burst.velocities[index + 2] * delta;
+        if (burst.positions[index + 1] < 0.05) {
+          burst.positions[index + 1] = 0.05;
+          burst.velocities[index + 1] = 0;
+          burst.velocities[index] *= 0.9;
+          burst.velocities[index + 2] *= 0.9;
+        }
+      }
+      burst.points.geometry.attributes.position.needsUpdate = true;
+      burst.points.material.opacity = (1 - progress) ** 1.25 * 0.98;
+      burst.points.material.size = (0.95 + burst.strength * 0.42) * (0.8 + (1 - progress) * 0.2);
 
       if (progress >= 1) {
-        disposeSplash(group, splash);
-        splashes.splice(splashIndex, 1);
+        burst.active = false;
+        burst.points.visible = false;
+        burst.points.material.opacity = 0;
       }
-    }
+    });
 
     splashBlocks.forEach((block) => {
       if (!block.active) {
@@ -345,7 +466,7 @@ export const createSceneEffects = (
 
       block.age += delta;
       const progress = Math.min(1, block.age / block.lifetime);
-      block.velocity.y -= 1.55 * delta;
+      block.velocity.y -= 2.1 * delta;
       block.velocity.x *= Math.pow(0.88, delta);
       block.velocity.z *= Math.pow(0.88, delta);
       block.mesh.position.x += block.velocity.x * delta;
@@ -401,7 +522,7 @@ export const createSceneEffects = (
     },
     getStats: () => ({
       rings: rings.length,
-      splashes: splashes.length,
+      splashes: splashBursts.filter((burst) => burst.active).length,
       splashBlocks: splashBlocks.filter((block) => block.active).length,
       fireworks: fireworks.length,
       qualityScale,
@@ -419,13 +540,18 @@ export const createSceneEffects = (
     dispose: () => {
       unsubscribe();
       rings.forEach((ring) => disposeRing(group, ring));
-      splashes.forEach((splash) => disposeSplash(group, splash));
+      splashBursts.forEach((burst) => {
+        group.remove(burst.points);
+        burst.points.geometry.dispose();
+        burst.points.material.dispose();
+      });
       fireworks.forEach((firework) => disposeFirework(group, firework));
       splashBlocks.forEach((block) => {
         group.remove(block.mesh);
         block.mesh.material.dispose();
       });
       splashGeometry.dispose();
+      splashTexture?.dispose();
     },
   };
 };

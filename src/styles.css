@@ -914,28 +914,77 @@ body {
 .event-toasts {
   position: fixed;
   right: clamp(12px, 2vw, 24px);
-  bottom: clamp(12px, 2vw, 24px);
-  z-index: 26;
+  top: clamp(76px, 10vh, 118px);
+  z-index: 64;
   display: grid;
   gap: 8px;
-  width: min(320px, calc(100vw - 24px));
+  width: min(340px, calc(100vw - 24px));
   pointer-events: none;
 }
 
 .event-toast {
-  padding: 10px 12px;
-  border: 1px solid rgba(126, 217, 218, 0.28);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid rgba(164, 237, 236, 0.34);
   border-radius: 8px;
-  background: rgba(13, 33, 39, 0.76);
-  color: #f4f5eb;
+  background:
+    linear-gradient(135deg, rgba(14, 34, 41, 0.9), rgba(6, 14, 18, 0.76)),
+    rgba(13, 33, 39, 0.82);
+  color: #f7fbf3;
   font-size: 13px;
-  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
+  font-weight: 750;
+  line-height: 1.24;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
   opacity: 1;
   transform: translateY(0);
   transition:
     opacity 360ms ease,
     transform 360ms ease;
   backdrop-filter: blur(12px);
+}
+
+.event-toast__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #bff2ee;
+  box-shadow: 0 0 16px rgba(191, 242, 238, 0.72);
+}
+
+.event-toast--signal {
+  border-color: rgba(127, 216, 200, 0.52);
+}
+
+.event-toast--buy {
+  border-color: rgba(125, 246, 167, 0.5);
+}
+
+.event-toast--buy .event-toast__dot {
+  background: #7df6a7;
+  box-shadow: 0 0 16px rgba(125, 246, 167, 0.75);
+}
+
+.event-toast--sell {
+  border-color: rgba(255, 121, 121, 0.5);
+}
+
+.event-toast--sell .event-toast__dot {
+  background: #ff7979;
+  box-shadow: 0 0 16px rgba(255, 121, 121, 0.72);
+}
+
+.event-toast--stale {
+  border-color: rgba(203, 217, 209, 0.46);
+  color: #e7f0ec;
+}
+
+.event-toast--stale .event-toast__dot {
+  background: #cbd9d1;
+  box-shadow: 0 0 16px rgba(203, 217, 209, 0.62);
 }
 
 .event-toast--leaving {

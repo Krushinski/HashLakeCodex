@@ -385,6 +385,10 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="whale-300">300 BTC</button>
         <button type="button" data-debug-action="block">Block</button>
         <button type="button" data-debug-action="perf-stress">Perf Stress</button>
+        <button type="button" data-debug-action="toast-block">Toast Block</button>
+        <button type="button" data-debug-action="toast-buy">Toast Buy</button>
+        <button type="button" data-debug-action="toast-sell">Toast Sell</button>
+        <button type="button" data-debug-action="toast-stale">Toast Stale</button>
         <button type="button" data-debug-action="gust">Gust</button>
         <button type="button" data-debug-action="stale">Stale Fog</button>
         <button type="button" data-debug-action="resume">Resume Live</button>
@@ -1005,20 +1009,30 @@ export const createDebugPanel = (
   closeButton?.addEventListener("click", () => setVisible(false));
 
   const handleDebugAction = (action: string | undefined) => {
+    const emitManualTrade = (btcAmount: number, side: "buy" | "sell" | "unknown") => {
+      eventBus.emit({
+        type: "largeTrade",
+        btcAmount,
+        side,
+        source: "manual",
+        intensity: Math.max(0.25, Math.min(4, btcAmount / WHALE_LARGE_BTC)),
+      });
+    };
+
     if (action === "crash") {
       weatherStore.triggerCrash();
     } else if (action === "rally") {
       weatherStore.triggerRally();
     } else if (action === "whale") {
-      liveBitcoinStore.recordManualLargeTrade(14.7, "buy");
+      emitManualTrade(14.7, "unknown");
     } else if (action === "whale-3") {
-      liveBitcoinStore.recordManualLargeTrade(WHALE_MIN_BTC, "buy");
+      emitManualTrade(WHALE_MIN_BTC, "buy");
     } else if (action === "whale-10") {
-      liveBitcoinStore.recordManualLargeTrade(WHALE_MEDIUM_BTC, "sell");
+      emitManualTrade(WHALE_MEDIUM_BTC, "sell");
     } else if (action === "whale-50") {
-      liveBitcoinStore.recordManualLargeTrade(WHALE_LARGE_BTC, "buy");
+      emitManualTrade(WHALE_LARGE_BTC, "buy");
     } else if (action === "whale-300") {
-      liveBitcoinStore.recordManualLargeTrade(WHALE_HUGE_BTC, "sell");
+      emitManualTrade(WHALE_HUGE_BTC, "sell");
     } else if (action === "block") {
       const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
       const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;
@@ -1053,6 +1067,34 @@ export const createDebugPanel = (
         blockHeight: simulatedBlock,
         intensity: 0.85,
         message: `New block found - #${simulatedBlock}`,
+      });
+    } else if (action === "toast-block") {
+      const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
+      eventBus.emit({
+        type: "newBlock",
+        blockHeight: latestBlock === null ? 954506 : latestBlock + 1,
+        intensity: 0,
+      });
+    } else if (action === "toast-buy") {
+      eventBus.emit({
+        type: "largeTrade",
+        btcAmount: WHALE_MIN_BTC,
+        side: "buy",
+        source: "manual",
+        intensity: 0.25,
+      });
+    } else if (action === "toast-sell") {
+      eventBus.emit({
+        type: "largeTrade",
+        btcAmount: WHALE_MEDIUM_BTC,
+        side: "sell",
+        source: "manual",
+        intensity: 0.4,
+      });
+    } else if (action === "toast-stale") {
+      eventBus.emit({
+        type: "stale",
+        message: "Stale data - fog rolling in",
       });
     } else if (action === "gust") {
       weatherStore.triggerGust();
