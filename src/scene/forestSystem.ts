@@ -67,7 +67,7 @@ const installWindShader = (
 };
 
 const buildForestMassGeometry = (width: number, baseHeight: number, peakHeight: number) => {
-  const segments = 120;
+  const segments = 160;
   const vertices: number[] = [];
   const indices: number[] = [];
 
@@ -249,18 +249,32 @@ export const createForestSystem = (): ForestSystem => {
   const forestMassMaterial = new THREE.MeshBasicMaterial({
     color: 0x020c0b,
     transparent: true,
-    opacity: 0.62,
+    opacity: 0.66,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
+  const forestDepthMaterial = new THREE.MeshBasicMaterial({
+    color: 0x061816,
+    transparent: true,
+    opacity: 0.34,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const forestDepthMass = new THREE.Mesh(
+    buildForestMassGeometry(1780, 28, 42),
+    forestDepthMaterial,
+  );
+  forestDepthMass.name = "Distant layered treeline depth mass";
+  forestDepthMass.position.set(0, 0.2, -374);
+  forestDepthMass.frustumCulled = false;
   const forestMass = new THREE.Mesh(
-    buildForestMassGeometry(1680, 22, 34),
+    buildForestMassGeometry(1700, 24, 38),
     forestMassMaterial,
   );
   forestMass.name = "Continuous far treeline silhouette mass";
   forestMass.position.set(0, 0.4, -338);
   forestMass.frustumCulled = false;
-  group.add(forestMass);
+  group.add(forestDepthMass, forestMass);
   group.add(silhouettes);
 
   const scenicSilhouetteCount = 90;
@@ -311,6 +325,7 @@ export const createForestSystem = (): ForestSystem => {
       const useProceduralFarTrees = !scenicTreelineActive;
       silhouettes.visible = useProceduralFarTrees;
       forestMass.visible = useProceduralFarTrees;
+      forestDepthMass.visible = useProceduralFarTrees && activePreset !== "Performance";
       scenicSilhouettes.visible = useProceduralFarTrees && activePreset === "Scenic";
       windUniforms.time.value = elapsed;
       windUniforms.wind.value = 0.15 + weather.dials.wind * 1.35;
@@ -323,11 +338,18 @@ export const createForestSystem = (): ForestSystem => {
         weather.dials.skyDark * 0.1;
       forestMassMaterial.opacity =
         activePreset === "Performance"
-          ? 0.42 + weather.dials.skyDark * 0.08
+          ? 0.46 + weather.dials.skyDark * 0.08
           : activePreset === "Scenic"
-            ? 0.76 + weather.dials.skyDark * 0.08
-            : 0.62 + weather.dials.skyDark * 0.08;
+            ? 0.80 + weather.dials.skyDark * 0.08
+            : 0.68 + weather.dials.skyDark * 0.08;
       forestMassMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x010607 : 0x020c0b);
+      forestDepthMaterial.opacity =
+        activePreset === "Performance"
+          ? 0.18 + weather.dials.skyDark * 0.04
+          : activePreset === "Scenic"
+            ? 0.40 + weather.dials.skyDark * 0.05
+            : 0.30 + weather.dials.skyDark * 0.05;
+      forestDepthMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x071012 : 0x061816);
       reflectionMaterial.opacity =
         activePreset === "Performance"
           ? 0
@@ -351,12 +373,14 @@ export const createForestSystem = (): ForestSystem => {
     setQualityPreset: (preset) => {
       activePreset = preset;
       scenicSilhouettes.visible = !scenicTreelineActive && preset === "Scenic";
+      forestDepthMass.visible = !scenicTreelineActive && preset !== "Performance";
       reflectionGroup.visible = preset !== "Performance";
     },
     setScenicTreelineActive: (active) => {
       scenicTreelineActive = active;
       silhouettes.visible = !active;
       forestMass.visible = !active;
+      forestDepthMass.visible = !active;
       scenicSilhouettes.visible = !active && activePreset === "Scenic";
     },
   };

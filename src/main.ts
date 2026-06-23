@@ -43,7 +43,7 @@ const boot = () => {
   }
 
   try {
-    setFallback("Waiting for signal...");
+    setFallback("Waiting for signal.");
     const eventBus = createEventBus();
     const weatherStore = createWeatherStore(eventBus);
     const liveBitcoinStore = createLiveBitcoinStore(eventBus);

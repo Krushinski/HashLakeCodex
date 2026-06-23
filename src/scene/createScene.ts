@@ -626,6 +626,8 @@ export const createHashlakeScene = ({
   container.append(status);
   const driveHud = createDriveHud();
   container.append(driveHud);
+  const driveSpeedometer = createDriveSpeedometer();
+  container.append(driveSpeedometer);
 
   const startedAt = window.performance.now();
   const qualityState: QualityState = {
@@ -827,6 +829,7 @@ export const createHashlakeScene = ({
     postSystem.update(weather, elapsed);
     animateStatus(status, elapsed);
     animateDriveHud(driveHud, driveState, now);
+    animateDriveSpeedometer(driveSpeedometer, driveState);
     renderer.render(scene, camera);
 
     if (!hasRenderedFrame) {
@@ -1175,6 +1178,7 @@ export const createHashlakeScene = ({
       renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
       status.remove();
       driveHud.remove();
+      driveSpeedometer.remove();
       document.body.classList.remove("hashlake-drive-active");
       postSystem.dispose();
       sceneEffects.dispose();
@@ -1826,21 +1830,28 @@ const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xc4b27b,
+    color: 0x817553,
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x67634e,
+    color: 0x344d44,
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x213b2a,
+    color: 0x263f2b,
     roughness: 0.94,
   });
-  const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x5b9d95,
+  const shoreDropMaterial = new THREE.MeshBasicMaterial({
+    color: 0x071615,
     transparent: true,
-    opacity: 0.09,
+    opacity: 0.28,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const shallowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x75b7aa,
+    transparent: true,
+    opacity: 0.065,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -1861,15 +1872,22 @@ const createShoreline = () => {
     createStripGeometry(LAKE_MAP.outline, getExpandedOutline(13)),
     wetSandMaterial,
   );
-  wetSand.position.y = 0.035;
+  wetSand.position.y = 0.14;
   wetSand.receiveShadow = true;
   group.add(wetSand);
+
+  const shoreDrop = new THREE.Mesh(
+    createStripGeometry(getExpandedOutline(-9), getExpandedOutline(5)),
+    shoreDropMaterial,
+  );
+  shoreDrop.position.y = 0.07;
+  group.add(shoreDrop);
 
   const shoreline = new THREE.Mesh(
     createStripGeometry(getExpandedOutline(13), getExpandedOutline(LAKE_MAP.shorelineWidth)),
     sandMaterial,
   );
-  shoreline.position.y = 0.025;
+  shoreline.position.y = 0.22;
   shoreline.receiveShadow = true;
   group.add(shoreline);
 
@@ -1880,7 +1898,7 @@ const createShoreline = () => {
       roughness: 0.96,
     }),
   );
-  grassTransition.position.y = 0.006;
+  grassTransition.position.y = 0.31;
   grassTransition.receiveShadow = true;
   group.add(grassTransition);
 
@@ -1888,7 +1906,7 @@ const createShoreline = () => {
     createStripGeometry(getExpandedOutline(34), getExpandedOutline(62)),
     bankMaterial,
   );
-  raisedBank.position.y = 0;
+  raisedBank.position.y = 0.42;
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
@@ -1896,7 +1914,7 @@ const createShoreline = () => {
     createStripGeometry(getExpandedOutline(-26), LAKE_MAP.outline),
     shallowMaterial,
   );
-  shallow.position.y = 0.11;
+  shallow.position.y = 0.045;
   group.add(shallow);
 
   return group;
@@ -1924,17 +1942,17 @@ const createDestinationMarkers = () => {
   group.name = "Phase 12 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xc4b27b,
+    color: 0xada274,
     roughness: 0.92,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x7d7258,
+    color: 0x4c6259,
     roughness: 0.96,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x70b9ad,
+    color: 0x80c1b4,
     transparent: true,
-    opacity: 0.13,
+    opacity: 0.09,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -2004,7 +2022,7 @@ const createDestinationMarkers = () => {
   );
   const sandbarHalo = new THREE.Mesh(new THREE.ShapeGeometry(sandbarHaloShape, 8), sandShallowMaterial);
   sandbarHalo.name = "Sandbar shallows";
-  sandbarHalo.position.set(sandbarCenter.x, 0.13, sandbarCenter.z);
+  sandbarHalo.position.set(sandbarCenter.x, 0.055, sandbarCenter.z);
   sandbarHalo.rotation.x = -Math.PI / 2;
   sandbarHalo.rotation.z = LAKE_MAP.sandbar.rotation;
   group.add(sandbarHalo);
@@ -2021,7 +2039,7 @@ const createDestinationMarkers = () => {
   );
   const sandbarBank = new THREE.Mesh(new THREE.ShapeGeometry(sandbarBankShape, 8), wetSandMaterial);
   sandbarBank.name = "Sandbar wet edge";
-  sandbarBank.position.set(sandbarCenter.x, 0.065, sandbarCenter.z);
+  sandbarBank.position.set(sandbarCenter.x, 0.19, sandbarCenter.z);
   sandbarBank.rotation.x = -Math.PI / 2;
   sandbarBank.rotation.z = LAKE_MAP.sandbar.rotation;
   sandbarBank.receiveShadow = true;
@@ -2039,7 +2057,7 @@ const createDestinationMarkers = () => {
   );
   const sandbar = new THREE.Mesh(new THREE.ShapeGeometry(sandbarShape, 8), sandMaterial);
   sandbar.name = "Sandbar";
-  sandbar.position.set(sandbarCenter.x, 0.08, sandbarCenter.z);
+  sandbar.position.set(sandbarCenter.x, 0.28, sandbarCenter.z);
   sandbar.rotation.x = -Math.PI / 2;
   sandbar.rotation.z = LAKE_MAP.sandbar.rotation;
   sandbar.receiveShadow = true;
@@ -2090,7 +2108,7 @@ const createDestinationMarkers = () => {
   );
   const islandHalo = new THREE.Mesh(new THREE.ShapeGeometry(islandHaloShape, 8), sandShallowMaterial);
   islandHalo.name = "Island shallow transition";
-  islandHalo.position.set(islandCenter.x, 0.115, islandCenter.z);
+  islandHalo.position.set(islandCenter.x, 0.055, islandCenter.z);
   islandHalo.rotation.x = -Math.PI / 2;
   islandHalo.rotation.z = LAKE_MAP.island.rotation;
   island.add(islandHalo);
@@ -2105,7 +2123,7 @@ const createDestinationMarkers = () => {
     ).map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const islandBase = new THREE.Mesh(new THREE.ShapeGeometry(islandShape, 8), rockMaterial);
-  islandBase.position.set(islandCenter.x, 0.25, islandCenter.z);
+  islandBase.position.set(islandCenter.x, 0.36, islandCenter.z);
   islandBase.rotation.x = -Math.PI / 2;
   islandBase.rotation.z = LAKE_MAP.island.rotation;
   islandBase.receiveShadow = true;
@@ -2115,7 +2133,7 @@ const createDestinationMarkers = () => {
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(3.8 + (index % 3)), rockMaterial);
     rock.position.set(
       islandCenter.x + Math.cos(angle) * 12,
-      2.3,
+      2.46,
       islandCenter.z + Math.sin(angle) * 8,
     );
     rock.scale.y = 0.58 + (index % 4) * 0.14;
@@ -2139,7 +2157,7 @@ const createDestinationMarkers = () => {
     ),
     sandMaterial,
   );
-  islandBank.position.set(islandCenter.x, 0.14, islandCenter.z);
+  islandBank.position.set(islandCenter.x, 0.23, islandCenter.z);
   islandBank.rotation.x = -Math.PI / 2;
   islandBank.rotation.z = LAKE_MAP.island.rotation;
   islandBank.receiveShadow = true;
@@ -2189,10 +2207,10 @@ const createSunDisc = () => {
 const createClouds = () => {
   const group = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({
-    color: 0xf4f1df,
+    color: 0xd6ded0,
     roughness: 0.75,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.74,
   });
 
   for (let index = 0; index < 8; index += 1) {
@@ -2222,14 +2240,14 @@ const createHorizonHaze = () => {
   const group = new THREE.Group();
   group.name = "Atmospheric horizon haze";
   const bands = [
-    { y: 34, z: -548, height: 74, opacity: 0.12 },
-    { y: 76, z: -704, height: 116, opacity: 0.08 },
-    { y: 128, z: -864, height: 156, opacity: 0.055 },
+    { y: 30, z: -548, height: 64, opacity: 0.07 },
+    { y: 72, z: -704, height: 104, opacity: 0.052 },
+    { y: 126, z: -864, height: 142, opacity: 0.038 },
   ];
 
   bands.forEach((band, index) => {
     const material = new THREE.MeshBasicMaterial({
-      color: index === 0 ? 0x6e8f91 : 0x597a82,
+      color: index === 0 ? 0x41595a : 0x2f474d,
       transparent: true,
       opacity: band.opacity,
       depthWrite: false,
@@ -2237,6 +2255,7 @@ const createHorizonHaze = () => {
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1700, band.height), material);
     mesh.position.set(0, band.y, band.z);
+    mesh.userData.baseOpacity = band.opacity;
     mesh.name = "Horizon haze band";
     group.add(mesh);
   });
@@ -2687,7 +2706,7 @@ const applyWeatherToScene = ({
     cloud.scale.setScalar(1 + dark * 1.35);
     cloud.children.forEach((child) => {
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-        cloudColorScratch.setHex(dark > 0.48 ? palette.stormTint : 0xf5f1df);
+        cloudColorScratch.setHex(dark > 0.48 ? palette.stormTint : 0xd6ded0);
         child.material.color.copy(cloudColorScratch);
         child.material.opacity = 0.46 + dark * 0.24;
       }
@@ -2696,8 +2715,9 @@ const applyWeatherToScene = ({
 
   horizonHaze.children.forEach((band, index) => {
     if (band instanceof THREE.Mesh && band.material instanceof THREE.MeshBasicMaterial) {
-      band.material.color.setHex(fire > 0.25 ? palette.skyHorizon : palette.fogColor);
-      band.material.opacity = (0.1 + index * 0.045) + fog * 0.24 + dark * 0.08;
+      band.material.color.setHex(fire > 0.25 ? palette.skyHorizon : index === 0 ? 0x425d5e : 0x2d454b);
+      const baseOpacity = Number(band.userData.baseOpacity ?? 0.05);
+      band.material.opacity = baseOpacity + fog * 0.13 + dark * 0.04;
     }
   });
 
@@ -2770,6 +2790,22 @@ const createDriveHud = () => {
   return hud;
 };
 
+const createDriveSpeedometer = () => {
+  const meter = document.createElement("div");
+  meter.className = "drive-speedometer";
+  meter.setAttribute("aria-hidden", "true");
+  meter.innerHTML = `
+    <div class="drive-speedometer__dial">
+      <span class="drive-speedometer__tick drive-speedometer__tick--zero">0</span>
+      <span class="drive-speedometer__tick drive-speedometer__tick--max">100</span>
+      <span class="drive-speedometer__needle"></span>
+      <span class="drive-speedometer__hub"></span>
+    </div>
+    <div class="drive-speedometer__readout"><strong data-drive-speed-value>0</strong><span>speed</span></div>
+  `;
+  return meter;
+};
+
 const showDriveHud = (hud: HTMLDivElement, mode: "Frame" | "Drive") => {
   hud.dataset.mode = mode;
   document.body.classList.toggle("hashlake-drive-active", mode === "Drive");
@@ -2818,6 +2854,27 @@ const animateDriveHud = (
 
   const visibleUntil = Number(hud.dataset.visibleUntil ?? 0);
   hud.classList.toggle("drive-hud--visible", timestamp < visibleUntil);
+};
+
+const animateDriveSpeedometer = (
+  meter: HTMLDivElement,
+  driveState: DriveState,
+) => {
+  const visible = driveState.mode === "Drive";
+  meter.classList.toggle("drive-speedometer--visible", visible);
+  if (!visible) {
+    return;
+  }
+
+  const speed = Math.round(clamp(Math.abs(driveState.speed), 0, DRIVE_BOOST_MAX_SPEED));
+  const displaySpeed = Math.round((speed / DRIVE_BOOST_MAX_SPEED) * 100);
+  const speedRatio = clamp(displaySpeed / 100, 0, 1);
+  meter.style.setProperty("--speed-ratio", speedRatio.toFixed(3));
+  meter.style.setProperty("--needle-angle", `${(-116 + speedRatio * 232).toFixed(1)}deg`);
+  const value = meter.querySelector<HTMLElement>("[data-drive-speed-value]");
+  if (value && value.textContent !== String(displaySpeed)) {
+    value.textContent = String(displaySpeed);
+  }
 };
 
 const animateStatus = (status: HTMLDivElement, elapsed: number) => {

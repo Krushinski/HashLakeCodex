@@ -280,6 +280,129 @@ body {
   transform: translateY(0);
 }
 
+.drive-speedometer {
+  --speed-ratio: 0;
+  --needle-angle: -116deg;
+  position: fixed;
+  left: clamp(12px, 2vw, 24px);
+  bottom: clamp(96px, calc(2vw + 82px), 114px);
+  z-index: 16;
+  display: grid;
+  grid-template-columns: 64px auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 142px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid rgba(126, 217, 218, 0.42);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(13, 40, 45, 0.72), rgba(4, 14, 18, 0.72)),
+    rgba(4, 18, 22, 0.64);
+  color: #fff6df;
+  box-shadow:
+    0 16px 44px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 246, 223, 0.10),
+    inset 0 -12px 28px rgba(10, 104, 126, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.98);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  backdrop-filter: blur(14px);
+}
+
+.drive-speedometer--visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.drive-speedometer__dial {
+  position: relative;
+  width: 64px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 64px 64px 12px 12px;
+  background:
+    conic-gradient(
+      from 242deg at 50% 88%,
+      rgba(126, 217, 218, 0.22) 0deg,
+      rgba(126, 217, 218, 0.64) calc(var(--speed-ratio) * 232deg),
+      rgba(255, 246, 223, 0.10) 0deg,
+      rgba(255, 246, 223, 0.10) 232deg,
+      transparent 232deg
+    ),
+    radial-gradient(circle at 50% 86%, rgba(255, 246, 223, 0.20), rgba(126, 217, 218, 0.08) 35%, rgba(0, 0, 0, 0) 58%),
+    rgba(3, 18, 22, 0.86);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 246, 223, 0.10),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.36);
+}
+
+.drive-speedometer__needle {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 2px;
+  height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff6df, #7ed9da);
+  box-shadow: 0 0 12px rgba(126, 217, 218, 0.58);
+  transform: translateX(-50%) rotate(var(--needle-angle));
+  transform-origin: 50% 100%;
+}
+
+.drive-speedometer__hub {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #fff6df;
+  box-shadow: 0 0 12px rgba(126, 217, 218, 0.72);
+  transform: translateX(-50%);
+}
+
+.drive-speedometer__tick {
+  position: absolute;
+  bottom: 3px;
+  color: rgba(255, 246, 223, 0.58);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.drive-speedometer__tick--zero {
+  left: 6px;
+}
+
+.drive-speedometer__tick--max {
+  right: 4px;
+}
+
+.drive-speedometer__readout {
+  display: grid;
+  gap: 0;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  line-height: 1;
+}
+
+.drive-speedometer__readout strong {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff6df;
+  text-shadow: 0 0 14px rgba(126, 217, 218, 0.26);
+}
+
+.drive-speedometer__readout span {
+  color: rgba(126, 217, 218, 0.86);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .debug-panel-shell {
   position: fixed;
   inset: 0 auto auto 0;
@@ -1103,8 +1226,8 @@ body {
   overflow: hidden;
   background: #020405;
   transition:
-    opacity 600ms ease,
-    visibility 600ms ease;
+    opacity 420ms ease,
+    visibility 420ms ease;
 }
 
 .fallback-scene--hidden {
@@ -1118,9 +1241,9 @@ body {
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 54%, rgba(102, 218, 218, 0.16), transparent 23%),
-    radial-gradient(circle at 50% 44%, rgba(255, 214, 137, 0.08), transparent 12%),
-    linear-gradient(180deg, #000203 0%, #03080a 45%, #061216 46%, #000203 100%);
+    radial-gradient(circle at 50% 54%, rgba(102, 218, 218, 0.095), transparent 21%),
+    radial-gradient(circle at 50% 44%, rgba(255, 214, 137, 0.045), transparent 10%),
+    linear-gradient(180deg, #000102 0%, #020506 45%, #041013 46%, #000102 100%);
 }
 
 .fallback-scene__field::before {
@@ -1129,19 +1252,19 @@ body {
   background:
     repeating-linear-gradient(
       180deg,
-      rgba(120, 230, 230, 0.035) 0 1px,
+      rgba(120, 230, 230, 0.020) 0 1px,
       rgba(155, 232, 255, 0) 1px 8px
     );
   content: "";
-  opacity: 0.22;
+  opacity: 0.14;
 }
 
 .fallback-scene__field::after {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 50% 54%, rgba(130, 247, 242, 0.10), transparent 20%),
-    radial-gradient(ellipse at 50% 78%, rgba(0, 2, 3, 0), rgba(0, 2, 3, 0.84) 62%);
+    radial-gradient(ellipse at 50% 54%, rgba(130, 247, 242, 0.07), transparent 18%),
+    radial-gradient(ellipse at 50% 76%, rgba(0, 2, 3, 0), rgba(0, 2, 3, 0.90) 58%);
   content: "";
 }
 
@@ -1151,9 +1274,9 @@ body {
   left: 0;
   width: 100%;
   height: 22vh;
-  background: linear-gradient(180deg, transparent, rgba(126, 217, 218, 0.12), transparent);
-  opacity: 0.38;
-  animation: fallbackScanline 3.4s ease-in-out infinite;
+  background: linear-gradient(180deg, transparent, rgba(126, 217, 218, 0.07), transparent);
+  opacity: 0.20;
+  animation: fallbackScanline 4.8s ease-in-out infinite;
 }
 
 .fallback-scene__horizon {
@@ -1162,24 +1285,24 @@ body {
   bottom: 43%;
   left: 9vw;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(155, 232, 255, 0.86), transparent);
+  background: linear-gradient(90deg, transparent, rgba(155, 232, 255, 0.58), transparent);
   box-shadow:
-    0 0 18px rgba(126, 217, 218, 0.48),
-    0 28px 48px rgba(42, 150, 184, 0.16);
+    0 0 18px rgba(126, 217, 218, 0.34),
+    0 28px 48px rgba(42, 150, 184, 0.10);
 }
 
 .fallback-scene__signal {
   position: absolute;
   left: 50%;
-  top: calc(57% - 7px);
-  width: 14px;
+  top: calc(57% - 6px);
+  width: 12px;
   aspect-ratio: 1;
   border-radius: 50%;
   background: #89f3df;
   box-shadow:
-    0 0 16px rgba(137, 243, 223, 0.86),
-    0 0 58px rgba(137, 243, 223, 0.30);
-  animation: fallbackSignal 1.65s ease-in-out infinite;
+    0 0 14px rgba(137, 243, 223, 0.72),
+    0 0 46px rgba(137, 243, 223, 0.22);
+  animation: fallbackSignal 2.0s ease-in-out infinite;
 }
 
 .fallback-scene__waveform {
@@ -1188,18 +1311,18 @@ body {
   bottom: 34%;
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 42px;
+  gap: 6px;
+  height: 34px;
 }
 
 .fallback-scene__waveform span {
   display: block;
-  width: 4px;
-  height: 16px;
+  width: 3px;
+  height: 14px;
   border-radius: 999px;
-  background: rgba(137, 243, 223, 0.66);
-  box-shadow: 0 0 12px rgba(126, 217, 218, 0.34);
-  animation: fallbackWave 1.2s ease-in-out infinite;
+  background: rgba(137, 243, 223, 0.50);
+  box-shadow: 0 0 10px rgba(126, 217, 218, 0.24);
+  animation: fallbackWave 1.5s ease-in-out infinite;
 }
 
 .fallback-scene__waveform span:nth-child(2) {
@@ -1222,11 +1345,11 @@ body {
   background:
     repeating-linear-gradient(
       175deg,
-      rgba(255, 246, 223, 0.18) 0 2px,
-      rgba(255, 246, 223, 0) 2px 18px
+      rgba(255, 246, 223, 0.055) 0 1px,
+      rgba(255, 246, 223, 0) 1px 22px
     ),
-    radial-gradient(ellipse at 50% 0%, rgba(255, 211, 125, 0.25), transparent 44%),
-    linear-gradient(180deg, #2f8392, #103941);
+    radial-gradient(ellipse at 50% 0%, rgba(137, 243, 223, 0.13), transparent 42%),
+    linear-gradient(180deg, #0e3b45, #061b20);
   transform: skewY(-1deg);
 }
 
@@ -1235,22 +1358,22 @@ body {
   z-index: 1;
   display: grid;
   gap: 6px;
-  width: min(440px, calc(100vw - 32px));
-  padding: 16px 18px;
-  border: 1px solid rgba(255, 246, 223, 0.32);
+  width: min(420px, calc(100vw - 32px));
+  padding: 18px 20px;
+  border: 1px solid rgba(137, 243, 223, 0.24);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, rgba(8, 19, 22, 0.86), rgba(1, 4, 5, 0.86)),
-    rgba(2, 8, 10, 0.74);
+    linear-gradient(180deg, rgba(6, 16, 18, 0.94), rgba(0, 2, 3, 0.94)),
+    rgba(0, 3, 5, 0.88);
   color: #fff6df;
   box-shadow:
-    0 20px 58px rgba(0, 0, 0, 0.64),
-    inset 0 1px 0 rgba(255, 246, 223, 0.1);
-  backdrop-filter: blur(16px);
+    0 24px 70px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 246, 223, 0.08);
+  backdrop-filter: blur(18px);
 }
 
 .fallback-scene__message strong {
-  font-size: clamp(23px, 5vw, 36px);
+  font-size: clamp(22px, 5vw, 34px);
   letter-spacing: 0;
   line-height: 1.1;
 }
@@ -1265,7 +1388,7 @@ body {
 }
 
 .fallback-scene__message span {
-  color: rgba(230, 244, 241, 0.78);
+  color: rgba(230, 244, 241, 0.72);
   font-size: 14px;
 }
 
@@ -1305,7 +1428,7 @@ body {
   }
 
   50% {
-    height: 36px;
+    height: 28px;
     opacity: 1;
   }
 }
@@ -1322,6 +1445,27 @@ body {
     gap: 5px;
     max-width: calc(100vw - 24px);
     font-size: 10px;
+  }
+
+  .drive-speedometer {
+    bottom: 82px;
+    min-width: 126px;
+    grid-template-columns: 56px auto;
+    gap: 7px;
+    padding: 7px 9px 7px 7px;
+  }
+
+  .drive-speedometer__dial {
+    width: 56px;
+    height: 35px;
+  }
+
+  .drive-speedometer__needle {
+    height: 26px;
+  }
+
+  .drive-speedometer__readout strong {
+    font-size: 19px;
   }
 
   .debug-panel-shell {

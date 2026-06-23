@@ -169,7 +169,7 @@ const createTerrainMaterial = (
         float slope = clamp(normal.y, 0.0, 1.0);
         float roughNoise = bl_fbm(vWorldPos.xz * 0.012);
         float broadNoise = bl_fbm(vWorldPos.xz * 0.0028 + 7.0);
-        vec3 rock = mix(vec3(0.31, 0.33, 0.32), vec3(0.13, 0.16, 0.18), roughNoise)
+        vec3 rock = mix(vec3(0.34, 0.35, 0.33), vec3(0.12, 0.15, 0.17), roughNoise)
           * (0.74 + 0.26 * broadNoise);
         float forest = smoothstep(0.45, 0.16, vElev) * smoothstep(0.34, 0.62, slope) * uForest;
         vec3 forestColor = vec3(0.035, 0.080, 0.050)
@@ -177,7 +177,7 @@ const createTerrainMaterial = (
         vec3 albedo = mix(rock, forestColor, forest);
         float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
           * smoothstep(0.18, 0.46, slope);
-        albedo = mix(albedo, vec3(0.42, 0.48, 0.47), snow * 0.08);
+        albedo = mix(albedo, vec3(0.58, 0.62, 0.58), snow * 0.12);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.18 + uAmbient * (0.38 + 0.44 * slope));
@@ -190,7 +190,7 @@ const createTerrainMaterial = (
 
         float distanceToCamera = distance(vWorldPos, uCamPos);
         float haze = 1.0 - exp(-pow(distanceToCamera * uHazeDen, 1.45));
-        color = mix(color, uHorizon, clamp(haze, 0.0, 0.58));
+        color = mix(color, uHorizon, clamp(haze, 0.0, 0.46));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -283,16 +283,16 @@ export const createTerrainSystem = (): TerrainSystem => {
   far.frustumCulled = false;
   mid.frustumCulled = false;
   const curtainBackMaterial = new THREE.MeshBasicMaterial({
-    color: 0x2b4349,
+    color: 0x30484f,
     transparent: true,
-    opacity: 0.46,
+    opacity: 0.30,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const curtainFrontMaterial = new THREE.MeshBasicMaterial({
-    color: 0x0a1e20,
+    color: 0x102926,
     transparent: true,
-    opacity: 0.66,
+    opacity: 0.58,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -336,13 +336,13 @@ export const createTerrainSystem = (): TerrainSystem => {
       );
       shared.ambient.value.setHex(palette.ambientLight);
       shared.cameraPosition.value.copy(camera.position);
-      shared.hazeDensity.value = 0.00011 + weather.dials.fog * 0.00052 + weather.dials.skyDark * 0.00008;
+      shared.hazeDensity.value = 0.00008 + weather.dials.fog * 0.00040 + weather.dials.skyDark * 0.00006;
       shared.fire.value = weather.dials.fireWeather;
       shared.dark.value = weather.dials.skyDark;
-      curtainBackMaterial.color.setHex(weather.dials.skyDark > 0.35 ? 0x26383c : 0x2b4349);
-      curtainBackMaterial.opacity = 0.16 + weather.dials.fog * 0.10 + weather.dials.skyDark * 0.05;
-      curtainFrontMaterial.color.setHex(weather.dials.skyDark > 0.38 ? 0x26383c : 0x102d2c);
-      curtainFrontMaterial.opacity = 0.42 + weather.dials.skyDark * 0.10;
+      curtainBackMaterial.color.setHex(weather.dials.skyDark > 0.35 ? 0x26383c : 0x30484f);
+      curtainBackMaterial.opacity = 0.11 + weather.dials.fog * 0.08 + weather.dials.skyDark * 0.04;
+      curtainFrontMaterial.color.setHex(weather.dials.skyDark > 0.38 ? 0x203135 : 0x102926);
+      curtainFrontMaterial.opacity = 0.38 + weather.dials.skyDark * 0.08;
     },
     getStats: () => ({
       mountainVertices: scenicBackdropActive ? 0 : vertexCount,

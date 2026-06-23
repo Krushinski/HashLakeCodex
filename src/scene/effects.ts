@@ -11,6 +11,7 @@ type ExpandingRing = {
   baseScale: number;
   speed: number;
   baseOpacity: number;
+  baseColor: THREE.Color;
   activeSegments: number;
 };
 
@@ -223,6 +224,7 @@ export const createSceneEffects = (
       spin: (index % 5) * 0.2,
     };
   });
+  const ringGlimmerColor = new THREE.Color(0xf8ffff);
 
   const addRing = (
     color: number,
@@ -260,6 +262,7 @@ export const createSceneEffects = (
       baseScale: Math.max(1.35, strength * (visibilityTest ? 2.05 : 1.62)),
       speed,
       baseOpacity: opacity,
+      baseColor: new THREE.Color(color),
       activeSegments: 0,
     });
     while (rings.length > MAX_ACTIVE_RINGS) {
@@ -495,8 +498,11 @@ export const createSceneEffects = (
       const progress = Math.min(1, ring.age / ring.lifetime);
       const t = ring.age * ring.speed;
       const radius = ring.baseScale * (1 + t * 9);
-      const shimmer = 0.88 + Math.sin(ring.age * 18 + ring.baseScale * 0.31) * 0.12;
-      ring.mesh.material.opacity = Math.max(0, ring.baseOpacity * (1 - progress) ** 1.18 * shimmer);
+      const shimmer = 0.86 + Math.sin(ring.age * 20 + ring.baseScale * 0.31) * 0.14;
+      const fizzle = progress > 0.68 ? 0.86 + Math.sin(ring.age * 54 + ring.baseScale) * 0.14 : 1;
+      const glimmer = Math.max(0, Math.sin(ring.age * 25 + ring.baseScale * 0.19)) ** 2 * (1 - progress * 0.72);
+      ring.mesh.material.opacity = Math.max(0, ring.baseOpacity * (1 - progress) ** 1.08 * shimmer * fizzle);
+      ring.mesh.material.color.copy(ring.baseColor).lerp(ringGlimmerColor, glimmer * 0.38);
       let writeOffset = 0;
       let activeSegments = 0;
       const y = getWaterHeight(ring.origin.x, ring.origin.z, ring.age) + (visibilityTest ? 0.34 : 0.20);
@@ -515,7 +521,7 @@ export const createSceneEffects = (
 
         if (isWater(pointA) && isWater(pointB) && shoreA > 5.0 && shoreB > 5.0) {
           for (let pass = 0; pass < RING_THICKNESS_PASSES; pass += 1) {
-            const offsetRadius = (pass - 1.5) * 0.58;
+            const offsetRadius = (pass - 1.5) * 0.66;
             const passRadiusA = radius + offsetRadius;
             const passRadiusB = radius + offsetRadius;
             const ax = ring.origin.x + Math.cos(angleA) * passRadiusA;
