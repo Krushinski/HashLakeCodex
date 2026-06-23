@@ -85,14 +85,14 @@ export const LAKE_MAP = {
   landWidth: 330,
   island: {
     center: { x: 248, z: 46 },
-    radiusX: 54,
-    radiusZ: 31,
+    radiusX: 60,
+    radiusZ: 35,
     rotation: -0.28,
   },
   sandbar: {
     center: { x: -188, z: 158 },
-    radiusX: 104,
-    radiusZ: 26,
+    radiusX: 112,
+    radiusZ: 30,
     rotation: 0.14,
   },
   destinations: [
@@ -107,7 +107,7 @@ export const LAKE_MAP = {
       key: "sandbar",
       label: "Sandbar",
       center: { x: -188, z: 158 },
-      radius: 54,
+      radius: 62,
       kind: "shallows",
     },
     {
@@ -121,7 +121,7 @@ export const LAKE_MAP = {
       key: "island",
       label: "Island",
       center: { x: 248, z: 46 },
-      radius: 56,
+      radius: 64,
       kind: "island",
     },
     {
