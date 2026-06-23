@@ -22,6 +22,11 @@ type WaterQualityPreset = "Performance" | "Balanced" | "Scenic";
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
+const smoothstep = (edge0: number, edge1: number, value: number) => {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
 const inspirationDeepWater = new THREE.Color(0x0a6793);
 const inspirationShallowWater = new THREE.Color(0x2b9295);
 const inspirationHorizonWater = new THREE.Color(0x77c7d2);
@@ -42,6 +47,36 @@ const createOrganicWaterGeometry = () => {
   const shallowColor = new THREE.Color(0x2c9295);
   const sandbarColor = new THREE.Color(0x78936e);
   const coveColor = new THREE.Color(0x06304d);
+  const samplePoint = (point: { x: number; z: number }) => {
+    const shoreDistance = Math.max(0, distanceToShore(point));
+    const shoreDepth = clamp(shoreDistance / 152, 0, 1);
+    const shoreFactor = 1 - clamp(shoreDistance / 104, 0, 1);
+    const sandbarDx = (point.x - LAKE_MAP.sandbar.center.x) / (LAKE_MAP.sandbar.radiusX + 154);
+    const sandbarDz = (point.z - LAKE_MAP.sandbar.center.z) / (LAKE_MAP.sandbar.radiusZ + 102);
+    const nearSandbar = smoothstep(0, 1, clamp(1 - Math.hypot(sandbarDx, sandbarDz), 0, 1));
+    const islandDx = (point.x - LAKE_MAP.island.center.x) / (LAKE_MAP.island.radiusX + 78);
+    const islandDz = (point.z - LAKE_MAP.island.center.z) / (LAKE_MAP.island.radiusZ + 62);
+    const nearIsland = clamp(1 - Math.hypot(islandDx, islandDz), 0, 1);
+    const cove = LAKE_MAP.destinations.find((destination) => destination.key === "cove")?.center ?? {
+      x: 0,
+      z: 0,
+    };
+    const nearCove = clamp(1 - Math.hypot(point.x - cove.x, point.z - cove.z) / 190, 0, 1);
+    const tint = shallowColor
+      .clone()
+      .lerp(midColor, shoreDepth)
+      .lerp(deepColor, shoreDepth * 0.7);
+    tint.lerp(sandbarColor, nearSandbar * 0.34);
+    tint.lerp(shallowColor, nearIsland * 0.12);
+    tint.lerp(coveColor, nearCove * 0.25);
+
+    return {
+      depth: clamp(smoothstep(0, 1, shoreDepth) + nearCove * 0.05, 0.10, 1),
+      sand: nearSandbar,
+      shore: shoreFactor,
+      tint,
+    };
+  };
 
   for (let x = minX; x < maxX; x += step) {
     for (let z = minZ; z < maxZ; z += step) {
@@ -57,33 +92,18 @@ const createOrganicWaterGeometry = () => {
       const vertexIndex = positions.length / 3;
       positions.push(x, 0, z, x + step, 0, z, x + step, 0, z + step, x, 0, z + step);
 
-      const shoreDistance = Math.max(0, distanceToShore(center));
-      const shoreDepth = clamp(shoreDistance / 128, 0, 1);
-      const shoreFactor = 1 - clamp(shoreDistance / 86, 0, 1);
-      const sandbarDx = (center.x - LAKE_MAP.sandbar.center.x) / (LAKE_MAP.sandbar.radiusX + 128);
-      const sandbarDz = (center.z - LAKE_MAP.sandbar.center.z) / (LAKE_MAP.sandbar.radiusZ + 86);
-      const nearSandbar = clamp(1 - Math.hypot(sandbarDx, sandbarDz), 0, 1);
-      const islandDx = (center.x - LAKE_MAP.island.center.x) / (LAKE_MAP.island.radiusX + 78);
-      const islandDz = (center.z - LAKE_MAP.island.center.z) / (LAKE_MAP.island.radiusZ + 62);
-      const nearIsland = clamp(1 - Math.hypot(islandDx, islandDz), 0, 1);
-      const cove = LAKE_MAP.destinations.find((destination) => destination.key === "cove")?.center ?? {
-        x: 0,
-        z: 0,
-      };
-      const nearCove = clamp(1 - Math.hypot(center.x - cove.x, center.z - cove.z) / 190, 0, 1);
-      const tint = shallowColor
-        .clone()
-        .lerp(midColor, shoreDepth)
-        .lerp(deepColor, shoreDepth * 0.7);
-      tint.lerp(sandbarColor, nearSandbar * 0.34);
-      tint.lerp(shallowColor, nearIsland * 0.12);
-      tint.lerp(coveColor, nearCove * 0.25);
-
-      for (let vertex = 0; vertex < 4; vertex += 1) {
-        colors.push(tint.r, tint.g, tint.b);
-        depthFactors.push(clamp(shoreDepth + nearCove * 0.06, 0.12, 1));
-        sandFactors.push(nearSandbar);
-        shoreFactors.push(shoreFactor);
+      const tileVertices = [
+        { x, z },
+        { x: x + step, z },
+        { x: x + step, z: z + step },
+        { x, z: z + step },
+      ];
+      for (const vertex of tileVertices) {
+        const sample = samplePoint(vertex);
+        colors.push(sample.tint.r, sample.tint.g, sample.tint.b);
+        depthFactors.push(sample.depth);
+        sandFactors.push(sample.sand);
+        shoreFactors.push(sample.shore);
       }
 
       indices.push(vertexIndex, vertexIndex + 2, vertexIndex + 1);
@@ -210,60 +230,49 @@ export const createWater = (): WaterSurface => {
         float normalStrength = (0.17 + uChop * uChop * 0.88) * (0.36 + detailFade * 0.64);
         normal = normalize(mix(vec3(0.0, 1.0, 0.0), normal, normalStrength));
 
-        float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 2.15);
-        fresnel = clamp(mix(0.10, 1.0, fresnel) + uChop * 0.055, 0.0, 1.0);
-        float openWater = smoothstep(0.24, 0.94, vDepth);
+        float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 2.45);
+        fresnel = clamp(mix(0.09, 1.0, fresnel) + uChop * 0.045, 0.0, 1.0);
+        float depth = smoothstep(0.02, 1.0, vDepth);
+        float openWater = smoothstep(0.20, 0.96, depth);
         float shore = 1.0 - openWater;
-        float sandGlow = vSand * (1.0 - uDark * 0.34);
+        float sandGlow = smoothstep(0.04, 0.86, vSand) * (1.0 - uDark * 0.34);
 
         vec3 deep = mix(uDeepColor, uStormColor, uDark);
         vec3 shallow = mix(uShallowColor, vec3(0.54, 0.58, 0.42), sandGlow * 0.30);
         shallow = mix(shallow, vec3(0.30, 0.40, 0.38), uStale * 0.28);
-        vec3 base = mix(shallow, deep, smoothstep(0.05, 0.98, vDepth));
-        base = mix(base, vColor, 0.10 + shore * 0.13);
+        vec3 base = mix(shallow, deep, smoothstep(0.04, 1.0, depth));
+        base = mix(base, vColor, 0.055 + shore * 0.075);
         base = mix(base, vec3(0.32, 0.10, 0.035), uFire * 0.42);
 
-        float basinNoise = sin(vWorldPos.x * 0.006 + vWorldPos.z * 0.010) * 0.5 + 0.5;
-        float basin = smoothstep(0.42, 0.96, vDepth) * (0.42 + basinNoise * 0.58);
-        base = mix(base, base * vec3(0.70, 0.88, 0.98), basin * (1.0 - uDark * 0.34) * 0.22);
-        base += vec3(0.030, 0.090, 0.115) * (1.0 - uDark * 0.20) * openWater;
+        float bodyWaveA = sin(vWorldPos.x * 0.010 + vWorldPos.z * 0.006 + uTime * (0.050 + uWind * 0.045));
+        float bodyWaveB = sin(vWorldPos.x * -0.006 + vWorldPos.z * 0.013 - uTime * (0.042 + uWind * 0.035));
+        float bodyWave = bodyWaveA * 0.58 + bodyWaveB * 0.42;
+        float basin = smoothstep(0.32, 0.98, depth) * (0.92 + bodyWave * 0.08);
+        base = mix(base, base * vec3(0.72, 0.89, 0.98), basin * (1.0 - uDark * 0.30) * 0.13);
+        base += vec3(0.020, 0.070, 0.092) * (1.0 - uDark * 0.22) * openWater;
 
         float farBand = smoothstep(-650.0, -260.0, vWorldPos.z) * (1.0 - smoothstep(70.0, 310.0, vWorldPos.z));
-        farBand *= smoothstep(0.18, 0.86, vDepth);
-        float forestColumns = pow(1.0 - abs(fract(vWorldPos.x * 0.016 + sin(vWorldPos.z * 0.014 + uTime * 0.025) * 0.06) - 0.5) * 2.0, 2.2);
-        float skySwell = pow(sin(vWorldPos.x * 0.010 + vWorldPos.z * 0.006 + uTime * 0.045) * 0.5 + 0.5, 2.8);
+        farBand *= smoothstep(0.14, 0.86, depth);
+        float forestColumns = pow(1.0 - abs(fract(vWorldPos.x * 0.014 + sin(vWorldPos.z * 0.011 + uTime * 0.018) * 0.035) - 0.5) * 2.0, 2.6);
+        float skySwell = bodyWave * 0.5 + 0.5;
         vec3 skyMirror = mix(uHorizonColor, uSunColor * 0.60, 0.16);
         skyMirror = mix(skyMirror, vec3(0.035, 0.050, 0.060), uDark * 0.78);
         vec3 forestMirror = mix(vec3(0.010, 0.045, 0.038), vec3(0.028, 0.095, 0.080), forestColumns);
         vec3 reflectedMood = mix(skyMirror, forestMirror, 0.48 + farBand * 0.26);
-        reflectedMood += vec3(0.070, 0.150, 0.165) * skySwell * openWater * (1.0 - uDark * 0.34) * 0.32;
+        reflectedMood += vec3(0.040, 0.095, 0.110) * skySwell * openWater * (1.0 - uDark * 0.34) * 0.20;
 
-        vec3 color = mix(base, reflectedMood, (fresnel * 0.58 + farBand * 0.44) * uReflectionStrength);
+        vec3 color = mix(base, reflectedMood, (fresnel * 0.52 + farBand * 0.40) * uReflectionStrength);
 
         float nearCamera = smoothstep(720.0, 100.0, dist);
-        float rippleField = pow(
-          (sin(vWorldPos.x * 0.055 + sin(vWorldPos.z * 0.026) * 2.0 + uTime * 0.46) * 0.5 + 0.5) *
-            (sin(vWorldPos.z * 0.085 - uTime * 0.38) * 0.5 + 0.5),
-          2.35
-        );
-        float broadMotion = pow(
-          sin(vWorldPos.x * -0.009 + vWorldPos.z * 0.014 - uTime * 0.052) * 0.5 + 0.5,
-          2.0
-        );
-        float longSwell = sin(vWorldPos.x * 0.012 + vWorldPos.z * 0.018 + uTime * 0.065) * 0.5 + 0.5;
-        longSwell *= sin(vWorldPos.x * -0.006 + vWorldPos.z * 0.011 - uTime * 0.045) * 0.5 + 0.5;
-        float crossingSwell = sin(vWorldPos.x * 0.018 - vWorldPos.z * 0.012 + uTime * 0.072) * 0.5 + 0.5;
-        float reflectionCells = pow(longSwell * crossingSwell, 1.55);
-        float waveThreads = pow(sin(vWorldPos.x * 0.024 + vWorldPos.z * 0.034 + uTime * 0.13) * 0.5 + 0.5, 3.15);
-        float shortCrests = smoothstep(0.68, 0.94, sin(vWorldPos.x * 0.072 + vWorldPos.z * 0.038 + uTime * 0.72) * 0.5 + 0.5);
-        shortCrests *= smoothstep(0.58, 0.96, sin(vWorldPos.x * -0.040 + vWorldPos.z * 0.066 - uTime * 0.54) * 0.5 + 0.5);
-        color += vec3(0.095, 0.215, 0.255) * rippleField * openWater * (0.18 + nearCamera * 0.56) * (1.0 - uDark * 0.10) * 0.58;
-        color += vec3(0.130, 0.295, 0.345) * broadMotion * openWater * (0.24 + nearCamera * 0.32) * (1.0 - uDark * 0.16);
-        color += vec3(0.105, 0.245, 0.300) * reflectionCells * openWater * (1.0 - uDark * 0.18) * 0.32;
-        color += vec3(0.110, 0.275, 0.335) * longSwell * openWater * (1.0 - uDark * 0.18) * 0.26;
-        color += vec3(0.34, 0.56, 0.62) * waveThreads * openWater * (1.0 - uDark * 0.20) * 0.12;
-        color += vec3(0.42, 0.68, 0.76) * shortCrests * openWater * (0.16 + nearCamera * 0.54) * (1.0 - uDark * 0.16) * 0.10;
-        color += vec3(0.014, 0.052, 0.054) * shore * (1.0 - uDark * 0.5);
+        float midWave = sin(vWorldPos.x * 0.030 + vWorldPos.z * 0.021 + uTime * (0.17 + uWind * 0.12)) * 0.5 + 0.5;
+        midWave = mix(midWave, sin(vWorldPos.x * -0.023 + vWorldPos.z * 0.035 - uTime * 0.15) * 0.5 + 0.5, 0.35);
+        float fineRipple = sin(vWorldPos.x * 0.074 + vWorldPos.z * 0.048 + uTime * (0.54 + uChop * 0.38)) * 0.5 + 0.5;
+        fineRipple *= sin(vWorldPos.x * -0.046 + vWorldPos.z * 0.071 - uTime * 0.41) * 0.5 + 0.5;
+        float calmMotion = bodyWave * 0.5 + (midWave - 0.5) * 0.28;
+        color *= 0.985 + calmMotion * openWater * (1.0 - uDark * 0.24) * 0.060;
+        color += vec3(0.070, 0.165, 0.205) * (midWave - 0.42) * openWater * (0.26 + nearCamera * 0.30) * (1.0 - uDark * 0.18);
+        color += vec3(0.34, 0.52, 0.57) * pow(fineRipple, 3.3) * openWater * (0.10 + nearCamera * 0.36) * (0.10 + uChop * 0.16);
+        color += vec3(0.012, 0.040, 0.044) * shore * (1.0 - uDark * 0.5);
 
         float contactDistance = distance(vWorldPos.xz, uBoatPos);
         float boatContact = 1.0 - smoothstep(8.0, 30.0, contactDistance);
@@ -273,9 +282,9 @@ export const createWater = (): WaterSurface => {
 
         vec3 sunDir = normalize(vec3(-0.32, 0.74 - uDark * 0.26, -0.48));
         vec3 halfDir = normalize(viewDir + sunDir);
-        float spec = pow(max(dot(normal, halfDir), 0.0), mix(180.0, 54.0, uChop + uDark * 0.20));
-        float specMask = smoothstep(0.22, 1.0, skySwell) * (0.34 + openWater * 0.66);
-        color += uSunColor * spec * specMask * (1.0 - uDark * 0.38) * 4.4;
+        float spec = pow(max(dot(normal, halfDir), 0.0), mix(210.0, 68.0, uChop + uDark * 0.20));
+        float specMask = smoothstep(0.34, 1.0, skySwell) * (0.38 + openWater * 0.62);
+        color += uSunColor * spec * specMask * (1.0 - uDark * 0.42) * 3.4;
 
         float crest = smoothstep(0.60, 1.0, normal.x * normal.x + normal.z * normal.z + uChop * 0.10);
         color += vec3(0.62, 0.76, 0.82) * crest * (uDark * 0.14 + uChop * 0.08);

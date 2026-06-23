@@ -494,6 +494,8 @@ export const createSceneEffects = (
       let writeOffset = 0;
       let activeSegments = 0;
       const y = getWaterHeight(ring.origin.x, ring.origin.z, ring.age) + (visibilityTest ? 0.34 : 0.16);
+      const pointA: LakePoint = { x: 0, z: 0 };
+      const pointB: LakePoint = { x: 0, z: 0 };
 
       for (let sample = 0; sample < RING_SAMPLE_POINTS; sample += 1) {
         const angleA = (sample / RING_SAMPLE_POINTS) * Math.PI * 2;
@@ -502,12 +504,14 @@ export const createSceneEffects = (
         const az = ring.origin.z + Math.sin(angleA) * radius;
         const bx = ring.origin.x + Math.cos(angleB) * radius;
         const bz = ring.origin.z + Math.sin(angleB) * radius;
-        const pointA = { x: ax, z: az };
-        const pointB = { x: bx, z: bz };
+        pointA.x = ax;
+        pointA.z = az;
+        pointB.x = bx;
+        pointB.z = bz;
         const shoreA = distanceToShore(pointA);
         const shoreB = distanceToShore(pointB);
 
-        if (isWater(pointA) && isWater(pointB) && shoreA > 2.5 && shoreB > 2.5) {
+        if (isWater(pointA) && isWater(pointB) && shoreA > 4 && shoreB > 4) {
           ring.positions[writeOffset] = ax;
           ring.positions[writeOffset + 1] = y;
           ring.positions[writeOffset + 2] = az;

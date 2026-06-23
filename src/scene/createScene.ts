@@ -1362,9 +1362,9 @@ const createLakeFill = () => {
     LAKE_MAP.outline.map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const material = new THREE.MeshBasicMaterial({
-    color: 0x075f96,
+    color: 0x031422,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.18,
     depthWrite: true,
     side: THREE.DoubleSide,
   });
@@ -2602,8 +2602,8 @@ const applyWeatherToScene = ({
   sunDisc.material.color.setHex(palette.sunColor);
   sunDisc.visible = dark < 0.72 || fire > 0.38;
 
-  lakeFill.material.color.setHex(dark > 0.58 ? palette.waterDeep : 0x011a33);
-  lakeFill.material.opacity = Math.max(0.48, 0.66 - weather.stormDarkness * 0.12);
+  lakeFill.material.color.setHex(dark > 0.58 ? 0x03080d : 0x031422);
+  lakeFill.material.opacity = Math.max(0.12, 0.20 - weather.stormDarkness * 0.05);
   water.mesh.visible = true;
 
   clouds.children.forEach((cloud, index) => {
