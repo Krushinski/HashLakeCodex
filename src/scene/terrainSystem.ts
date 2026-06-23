@@ -13,6 +13,7 @@ export type TerrainSystem = {
   group: THREE.Group;
   update: (weather: WeatherSnapshot, camera: THREE.PerspectiveCamera) => void;
   getStats: () => TerrainStats;
+  setScenicBackdropActive: (active: boolean) => void;
 };
 
 const angleDiff = (a: number, b: number) => {
@@ -308,6 +309,7 @@ export const createTerrainSystem = (): TerrainSystem => {
   frontCurtain.name = "Near painterly mountain silhouette";
   frontCurtain.position.set(0, 8, -760);
   group.add(backCurtain, far, frontCurtain, mid);
+  let scenicBackdropActive = false;
 
   const vertexCount =
     far.geometry.attributes.position.count +
@@ -318,6 +320,10 @@ export const createTerrainSystem = (): TerrainSystem => {
   return {
     group,
     update: (weather, camera) => {
+      far.visible = !scenicBackdropActive;
+      mid.visible = !scenicBackdropActive;
+      backCurtain.visible = !scenicBackdropActive;
+      frontCurtain.visible = !scenicBackdropActive;
       const palette = getWeatherPalette(weather.stormIndex);
       shared.sunDir.value.set(-0.36, 0.72 - weather.dials.skyDark * 0.28, -0.44).normalize();
       shared.sunColor.value.setHex(palette.sunColor);
@@ -333,9 +339,12 @@ export const createTerrainSystem = (): TerrainSystem => {
       curtainFrontMaterial.opacity = 0.48 + weather.dials.skyDark * 0.12;
     },
     getStats: () => ({
-      mountainVertices: vertexCount,
+      mountainVertices: scenicBackdropActive ? 0 : vertexCount,
       reflectionEnabled: false,
       postEnabled: true,
     }),
+    setScenicBackdropActive: (active) => {
+      scenicBackdropActive = active;
+    },
   };
 };

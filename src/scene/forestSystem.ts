@@ -18,6 +18,7 @@ export type ForestSystem = {
   update: (elapsed: number, weather: WeatherSnapshot) => void;
   getStats: () => ForestStats;
   setQualityPreset: (preset: ForestQualityPreset) => void;
+  setScenicTreelineActive: (active: boolean) => void;
 };
 
 type ForestQualityPreset = "Performance" | "Balanced" | "Scenic";
@@ -218,6 +219,7 @@ export const createForestSystem = (): ForestSystem => {
   group.add(rocks);
 
   let activePreset: ForestQualityPreset = "Balanced";
+  let scenicTreelineActive = false;
   const silhouetteCount = 190;
   const silhouetteGeometry = new THREE.ConeGeometry(3.6, 18, 6, 1);
   const silhouetteMaterial = new THREE.MeshBasicMaterial({
@@ -306,6 +308,10 @@ export const createForestSystem = (): ForestSystem => {
     group,
     update: (elapsed, weather) => {
       const palette = getWeatherPalette(weather.stormIndex);
+      const useProceduralFarTrees = !scenicTreelineActive;
+      silhouettes.visible = useProceduralFarTrees;
+      forestMass.visible = useProceduralFarTrees;
+      scenicSilhouettes.visible = useProceduralFarTrees && activePreset === "Scenic";
       windUniforms.time.value = elapsed;
       windUniforms.wind.value = 0.15 + weather.dials.wind * 1.35;
       foliageMaterial.color.setHex(palette.shorelineGrass);
@@ -331,17 +337,27 @@ export const createForestSystem = (): ForestSystem => {
     },
     getStats: () => ({
       treeInstances:
-        treeCount + silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
+        treeCount + (silhouettes.visible ? silhouetteCount : 0) + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
       reedInstances: reedCount,
       rockInstances: rockCount,
-      silhouetteInstances: silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
-      forestBandInstances: silhouetteCount + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
-      forestBandMethod: scenicSilhouettes.visible ? "mass + instanced x2" : "mass + instanced",
+      silhouetteInstances: (silhouettes.visible ? silhouetteCount : 0) + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
+      forestBandInstances: (silhouettes.visible ? silhouetteCount : 0) + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
+      forestBandMethod: scenicTreelineActive
+        ? "Blender GLB treeline"
+        : scenicSilhouettes.visible
+          ? "mass + instanced x2"
+          : "mass + instanced",
     }),
     setQualityPreset: (preset) => {
       activePreset = preset;
-      scenicSilhouettes.visible = preset === "Scenic";
+      scenicSilhouettes.visible = !scenicTreelineActive && preset === "Scenic";
       reflectionGroup.visible = preset !== "Performance";
+    },
+    setScenicTreelineActive: (active) => {
+      scenicTreelineActive = active;
+      silhouettes.visible = !active;
+      forestMass.visible = !active;
+      scenicSilhouettes.visible = !active && activePreset === "Scenic";
     },
   };
 };

@@ -16,6 +16,7 @@ import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weath
 import { LAKE_MAP } from "../scene/lakeMap";
 import type { QualityPreset } from "../scene/createScene";
 import type { WaterDebugMode } from "../scene/waterSystem";
+import type { ScenicAssetStatuses } from "../scene/scenicAssets";
 
 type FeedRow = {
   name: FeedName;
@@ -95,6 +96,7 @@ export type SceneTelemetry = {
   reflectionEnabled: boolean;
   fxVisibilityTest: boolean;
   waterMode: WaterDebugMode;
+  scenicAssets: ScenicAssetStatuses;
 };
 
 const metricTiles: MetricTile[] = [
@@ -121,6 +123,9 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Fake reflect", value: "off", tone: "muted" },
   { group: "weather", label: "FX visibility", value: "off", tone: "muted" },
   { group: "weather", label: "Water mode", value: "Balanced", tone: "muted" },
+  { group: "weather", label: "Mountain asset", value: "fallback", tone: "muted" },
+  { group: "weather", label: "Treeline asset", value: "fallback", tone: "muted" },
+  { group: "weather", label: "Shoreline asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Debug UI", value: "hidden", tone: "muted" },
   { group: "weather", label: "DOM cadence", value: "hidden idle", tone: "muted" },
   { group: "bitcoin", label: "Price", value: "$62,989" },
@@ -216,6 +221,16 @@ const metricLabelsByFeed: Record<FeedName, string[]> = {
     "Splash source",
   ],
   websocket: ["WebSocket"],
+};
+
+const getAssetTone = (status: SceneTelemetry["scenicAssets"]["mountain"]): MetricTile["tone"] => {
+  if (status === "loaded") {
+    return "good";
+  }
+  if (status === "error") {
+    return "warn";
+  }
+  return "muted";
 };
 
 const formatAgo = (seconds: number) => {
@@ -1137,6 +1152,9 @@ export const createDebugPanel = (
           ? "good"
           : "muted",
     );
+    setMetric("Mountain asset", telemetry.scenicAssets.mountain, getAssetTone(telemetry.scenicAssets.mountain));
+    setMetric("Treeline asset", telemetry.scenicAssets.treeline, getAssetTone(telemetry.scenicAssets.treeline));
+    setMetric("Shoreline asset", telemetry.scenicAssets.shoreline, getAssetTone(telemetry.scenicAssets.shoreline));
     if (fxVisibilityElement) {
       fxVisibilityElement.textContent = telemetry.fxVisibilityTest ? "ON" : "OFF";
       fxVisibilityElement.classList.toggle("debug-tone-warn", telemetry.fxVisibilityTest);
