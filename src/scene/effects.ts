@@ -1,13 +1,17 @@
 import * as THREE from "three";
 import type { HashlakeEvent, HashlakeEventBus } from "../state/eventBus";
+import { distanceToShore, isWater, type LakePoint } from "./lakeMap";
 
 type ExpandingRing = {
-  mesh: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  mesh: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  positions: Float32Array;
+  origin: THREE.Vector3;
   age: number;
   lifetime: number;
   baseScale: number;
   speed: number;
   baseOpacity: number;
+  activeSegments: number;
 };
 
 type SplashBurst = {
@@ -42,6 +46,8 @@ const MAX_ACTIVE_FIREWORKS = 5;
 const MAX_SPLASH_BLOCKS = 280;
 const SPLASH_POOL = 5;
 const SPLASH_POINTS = 192;
+const RING_SAMPLE_POINTS = 112;
+const RING_MAX_SEGMENTS = RING_SAMPLE_POINTS;
 
 export type SceneEffectStats = {
   rings: number;
@@ -49,6 +55,7 @@ export type SceneEffectStats = {
   splashBlocks: number;
   fireworks: number;
   qualityScale: number;
+  activeRingSegments: number;
   lastSplashDistanceToBoat: number | null;
   lastBoatImpulseStrength: number;
   fxVisibilityTest: boolean;
@@ -66,6 +73,38 @@ export type SceneEffects = {
 
 const getWaterPosition = (source: THREE.Vector3) =>
   new THREE.Vector3(source.x, 0.18, source.z);
+
+const toLakePoint = (source: THREE.Vector3): LakePoint => ({
+  x: source.x,
+  z: source.z,
+});
+
+const getWaterHeight = (x: number, z: number, time = 0) =>
+  0.36 +
+  Math.sin(x * 0.014 + z * 0.006 + time * 0.34) * 0.045 +
+  Math.cos(x * -0.010 + z * 0.023 + time * 0.24) * 0.025;
+
+const findNearbyWaterPosition = (source: THREE.Vector3) => {
+  if (isWater(toLakePoint(source))) {
+    return source;
+  }
+
+  for (let radius = 8; radius <= 72; radius += 8) {
+    for (let index = 0; index < 16; index += 1) {
+      const angle = (index / 16) * Math.PI * 2;
+      const candidate = new THREE.Vector3(
+        source.x + Math.cos(angle) * radius,
+        source.y,
+        source.z + Math.sin(angle) * radius,
+      );
+      if (isWater(toLakePoint(candidate))) {
+        return candidate;
+      }
+    }
+  }
+
+  return getWaterPosition(new THREE.Vector3(0, 0, 0));
+};
 
 const createSoftPointTexture = () => {
   const canvas = document.createElement("canvas");
@@ -192,31 +231,35 @@ export const createSceneEffects = (
     opacity = 0.45,
     speed = 1,
   ) => {
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.82, visibilityTest ? 1.36 : 1.16, 96),
-      new THREE.MeshBasicMaterial({
+    const waterOrigin = findNearbyWaterPosition(origin);
+    const positions = new Float32Array(RING_MAX_SEGMENTS * 2 * 3);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setDrawRange(0, 0);
+    const ring = new THREE.LineSegments(
+      geometry,
+      new THREE.LineBasicMaterial({
         color,
         transparent: true,
         opacity,
         depthWrite: false,
         depthTest: false,
         blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
       }),
     );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.copy(origin);
-    ring.position.y = visibilityTest ? 0.74 : 0.48;
     ring.renderOrder = 41;
-    ring.scale.setScalar(Math.max(1.35, strength * (visibilityTest ? 2.05 : 1.62)));
+    ring.frustumCulled = false;
     group.add(ring);
     rings.push({
       mesh: ring,
+      positions,
+      origin: waterOrigin.clone(),
       age: 0,
       lifetime,
       baseScale: Math.max(1.35, strength * (visibilityTest ? 2.05 : 1.62)),
       speed,
       baseOpacity: opacity,
+      activeSegments: 0,
     });
     while (rings.length > MAX_ACTIVE_RINGS) {
       const oldest = rings.shift();
@@ -230,7 +273,7 @@ export const createSceneEffects = (
     const origin = getWaterPosition(getBoatPosition());
     origin.x += (Math.random() - 0.5) * 8;
     origin.z += 8 + Math.random() * 8;
-    addRing(color, strength, origin, 0.58 + strength * 0.16, 0.075 + strength * 0.045, 1.45);
+    addRing(color, strength, findNearbyWaterPosition(origin), 0.58 + strength * 0.16, 0.075 + strength * 0.045, 1.45);
   };
 
   const addSplashBurst = (origin: THREE.Vector3, strength: number, color: number) => {
@@ -259,8 +302,9 @@ export const createSceneEffects = (
       const offset = index * 3;
       const crown = index >= activePoints * 0.4;
       const angle = Math.random() * Math.PI * 2;
+      const surfaceY = getWaterHeight(origin.x, origin.z, burst.age);
       burst.positions[offset] = origin.x + (Math.random() - 0.5) * 1.05 * strength;
-      burst.positions[offset + 1] = 0.15;
+      burst.positions[offset + 1] = surfaceY + 0.08;
       burst.positions[offset + 2] = origin.z + (Math.random() - 0.5) * 1.2 * strength;
 
       if (index >= activePoints) {
@@ -312,7 +356,7 @@ export const createSceneEffects = (
       block.mesh.position.copy(origin);
       block.mesh.position.x += (Math.random() - 0.5) * strength * 1.6;
       block.mesh.position.z += (Math.random() - 0.5) * strength * 1.6;
-      block.mesh.position.y = visibilityTest ? 0.74 : 0.54;
+      block.mesh.position.y = getWaterHeight(block.mesh.position.x, block.mesh.position.z) + (visibilityTest ? 0.42 : 0.22);
       block.mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
       const scale =
         (visibilityTest ? 0.28 : 0.2) +
@@ -331,11 +375,11 @@ export const createSceneEffects = (
     const boat = getWaterPosition(getBoatPosition());
     const placementAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 0.42;
     const placementDistance = btcAmount >= 300 ? 48 + Math.random() * 32 : 58 + Math.random() * 42;
-    const origin = new THREE.Vector3(
+    const origin = findNearbyWaterPosition(new THREE.Vector3(
       boat.x + Math.cos(placementAngle) * placementDistance + (Math.random() - 0.5) * 12,
       0.42,
       boat.z + Math.sin(placementAngle) * placementDistance - 22 + (Math.random() - 0.5) * 12,
-    );
+    ));
     lastSplashDistanceToBoat = origin.distanceTo(boat);
     const proximity = Math.max(0, 1 - lastSplashDistanceToBoat / 92);
     lastBoatImpulseStrength =
@@ -427,7 +471,7 @@ export const createSceneEffects = (
     }
 
     if (event.type === "newBlock") {
-      const origin = getWaterPosition(getBoatPosition());
+      const origin = findNearbyWaterPosition(getWaterPosition(getBoatPosition()));
       addRing(0x7fd8c8, 5, origin, 1.08, 0.5, 0.8);
       addBoatHop(1.32);
     }
@@ -445,9 +489,39 @@ export const createSceneEffects = (
       ring.age += delta;
       const progress = Math.min(1, ring.age / ring.lifetime);
       const t = ring.age * ring.speed;
-      const scale = ring.baseScale * (1 + t * 9);
-      ring.mesh.scale.setScalar(scale);
+      const radius = ring.baseScale * (1 + t * 9);
       ring.mesh.material.opacity = Math.max(0, ring.baseOpacity * (1 - progress) ** 1.55);
+      let writeOffset = 0;
+      let activeSegments = 0;
+      const y = getWaterHeight(ring.origin.x, ring.origin.z, ring.age) + (visibilityTest ? 0.34 : 0.16);
+
+      for (let sample = 0; sample < RING_SAMPLE_POINTS; sample += 1) {
+        const angleA = (sample / RING_SAMPLE_POINTS) * Math.PI * 2;
+        const angleB = ((sample + 1) / RING_SAMPLE_POINTS) * Math.PI * 2;
+        const ax = ring.origin.x + Math.cos(angleA) * radius;
+        const az = ring.origin.z + Math.sin(angleA) * radius;
+        const bx = ring.origin.x + Math.cos(angleB) * radius;
+        const bz = ring.origin.z + Math.sin(angleB) * radius;
+        const pointA = { x: ax, z: az };
+        const pointB = { x: bx, z: bz };
+        const shoreA = distanceToShore(pointA);
+        const shoreB = distanceToShore(pointB);
+
+        if (isWater(pointA) && isWater(pointB) && shoreA > 2.5 && shoreB > 2.5) {
+          ring.positions[writeOffset] = ax;
+          ring.positions[writeOffset + 1] = y;
+          ring.positions[writeOffset + 2] = az;
+          ring.positions[writeOffset + 3] = bx;
+          ring.positions[writeOffset + 4] = y;
+          ring.positions[writeOffset + 5] = bz;
+          writeOffset += 6;
+          activeSegments += 1;
+        }
+      }
+
+      ring.activeSegments = activeSegments;
+      ring.mesh.geometry.setDrawRange(0, activeSegments * 2);
+      ring.mesh.geometry.attributes.position.needsUpdate = true;
 
       if (progress >= 1) {
         disposeRing(group, ring);
@@ -469,8 +543,9 @@ export const createSceneEffects = (
         burst.positions[index] += burst.velocities[index] * delta;
         burst.positions[index + 1] += burst.velocities[index + 1] * delta;
         burst.positions[index + 2] += burst.velocities[index + 2] * delta;
-        if (burst.positions[index + 1] < 0.05) {
-          burst.positions[index + 1] = 0.05;
+        const surfaceY = getWaterHeight(burst.positions[index], burst.positions[index + 2], burst.age);
+        if (burst.positions[index + 1] < surfaceY + 0.05) {
+          burst.positions[index + 1] = surfaceY + 0.05;
           burst.velocities[index + 1] = 0;
           burst.velocities[index] *= 0.9;
           burst.velocities[index + 2] *= 0.9;
@@ -499,7 +574,8 @@ export const createSceneEffects = (
       block.velocity.z *= Math.pow(0.84, delta);
       block.mesh.position.x += block.velocity.x * delta;
       block.mesh.position.z += block.velocity.z * delta;
-      block.mesh.position.y = Math.max(0.18, block.mesh.position.y + block.velocity.y * delta);
+      const surfaceY = getWaterHeight(block.mesh.position.x, block.mesh.position.z, block.age);
+      block.mesh.position.y = Math.max(surfaceY + 0.08, block.mesh.position.y + block.velocity.y * delta);
       block.mesh.rotation.y += delta * block.spin;
       block.mesh.rotation.z += delta * block.spin * 0.65;
       const settle = Math.max(0.1, 1 - progress * 0.72);
@@ -554,6 +630,7 @@ export const createSceneEffects = (
       splashBlocks: splashBlocks.filter((block) => block.active).length,
       fireworks: fireworks.length,
       qualityScale,
+      activeRingSegments: rings.reduce((total, ring) => total + ring.activeSegments, 0),
       lastSplashDistanceToBoat,
       lastBoatImpulseStrength,
       fxVisibilityTest: visibilityTest,
