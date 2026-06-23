@@ -229,16 +229,17 @@ const createHighlightPatches = () => {
       varying vec2 vUv;
 
       void main() {
-        vec2 p = (vUv - 0.5) * vec2(2.0, 3.4);
+        vec2 p = (vUv - 0.5) * vec2(1.76, 2.92);
         float d = length(p);
-        float body = 1.0 - smoothstep(0.18, 1.02, d);
-        float broken = sin(vUv.x * 27.0 + uTime * 0.24) * sin(vUv.y * 19.0 - uTime * 0.17);
-        float islands = smoothstep(0.05, 0.82, broken * 0.5 + 0.5);
-        float ribbing = pow(sin(vUv.x * 70.0 + vUv.y * 9.0 + uTime * 0.42) * 0.5 + 0.5, 5.4);
-        float alpha = body * (0.24 + islands * 0.32 + ribbing * 0.18) *
+        float body = 1.0 - smoothstep(0.20, 1.08, d);
+        float feather = 1.0 - smoothstep(0.68, 1.12, d);
+        float broad = sin(vUv.x * 10.5 + sin(vUv.y * 4.6 + uTime * 0.08) * 1.7 + uTime * 0.10) * 0.5 + 0.5;
+        float islands = smoothstep(0.18, 0.90, broad);
+        float ribbing = pow(sin(vUv.x * 42.0 + vUv.y * 5.0 + uTime * 0.22) * 0.5 + 0.5, 4.0);
+        float alpha = body * feather * (0.17 + islands * 0.27 + ribbing * 0.11) *
           uStrength *
           (1.0 - uDark * 0.24);
-        vec3 color = mix(vec3(0.42, 0.82, 0.90), uColor, 0.74 + islands * 0.18);
+        vec3 color = mix(vec3(0.32, 0.70, 0.78), uColor, 0.56 + islands * 0.22);
         gl_FragColor = vec4(color, alpha);
       }
     `,
@@ -282,13 +283,16 @@ const createReflectionBand = () => {
       varying vec2 vUv;
 
       void main() {
-        float verticalFade = smoothstep(0.02, 0.24, vUv.y) * (1.0 - smoothstep(0.74, 1.0, vUv.y));
-        float horizonCore = pow(1.0 - abs(vUv.y - 0.42) * 2.0, 2.6);
-        float longStreak = sin(vUv.x * 46.0 + sin(vUv.y * 13.0 + uTime * 0.17) * 2.2) * 0.5 + 0.5;
-        float brokenBands = pow(longStreak, 5.0) * 0.34 + horizonCore * 0.42;
-        vec3 forestInk = vec3(0.012, 0.055, 0.046);
-        vec3 mirror = mix(forestInk, uColor, 0.26 + brokenBands * 0.38);
-        float alpha = verticalFade * (0.46 + brokenBands * 0.42) * uStrength * (1.0 - uDark * 0.26);
+        float horizonFade = 1.0 - smoothstep(0.66, 1.0, vUv.y);
+        float cameraFade = smoothstep(0.02, 0.20, vUv.y);
+        float smear = pow(1.0 - vUv.y, 1.45) * horizonFade * cameraFade;
+        float verticalInk = pow(1.0 - abs(fract(vUv.x * 18.0 + sin(vUv.y * 7.0 + uTime * 0.05) * 0.05) - 0.5) * 2.0, 2.6);
+        float mountainWobble = sin(vUv.x * 8.0 + vUv.y * 5.2 + uTime * 0.07) * 0.5 + 0.5;
+        float brokenBands = pow(verticalInk, 1.8) * 0.34 + mountainWobble * 0.18;
+        vec3 forestInk = vec3(0.008, 0.044, 0.038);
+        vec3 mountainTint = mix(vec3(0.035, 0.090, 0.090), uColor, 0.28);
+        vec3 mirror = mix(forestInk, mountainTint, 0.32 + brokenBands * 0.48);
+        float alpha = smear * (0.44 + brokenBands * 0.42) * uStrength * (1.0 - uDark * 0.18);
         gl_FragColor = vec4(mirror, alpha);
       }
     `,
@@ -296,10 +300,10 @@ const createReflectionBand = () => {
     depthWrite: false,
     depthTest: true,
   });
-  const band = new THREE.Mesh(new THREE.PlaneGeometry(1540, 126, 1, 1), material);
+  const band = new THREE.Mesh(new THREE.PlaneGeometry(1600, 178, 1, 1), material);
   band.name = "Visible far treeline and sky reflection band";
   band.rotation.x = -Math.PI / 2;
-  band.position.set(0, 0.48, -250);
+  band.position.set(0, 0.49, -222);
   band.renderOrder = 11;
   return band;
 };
@@ -328,16 +332,18 @@ const createForegroundDetail = () => {
       varying vec2 vUv;
 
       void main() {
-        float frontFade = 0.34 + (1.0 - vUv.y) * 0.66;
-        float sideFade = smoothstep(0.0, 0.18, vUv.x) * (1.0 - smoothstep(0.82, 1.0, vUv.x));
-        float rippleA = sin(vUv.x * 95.0 + sin(vUv.y * 18.0) * 4.0 + uTime * 0.72) * 0.5 + 0.5;
-        float rippleB = sin(vUv.x * -54.0 + vUv.y * 62.0 - uTime * 0.55) * 0.5 + 0.5;
-        float cells = pow(rippleA * rippleB, 2.2);
-        float brightBreaks = pow(sin(vUv.x * 31.0 + uTime * 0.18) * 0.5 + 0.5, 5.0);
-        float alpha = frontFade * sideFade * (0.20 + cells * 0.30 + brightBreaks * 0.14) *
+        float frontFade = smoothstep(1.0, 0.02, vUv.y);
+        float sideFade = smoothstep(0.0, 0.12, vUv.x) * (1.0 - smoothstep(0.88, 1.0, vUv.x));
+        float broadSwell = sin(vUv.x * 8.0 + vUv.y * 3.2 + uTime * 0.10) * 0.5 + 0.5;
+        float rippleA = sin(vUv.x * 76.0 + sin(vUv.y * 14.0) * 3.2 + uTime * 0.50) * 0.5 + 0.5;
+        float rippleB = sin(vUv.x * -42.0 + vUv.y * 49.0 - uTime * 0.40) * 0.5 + 0.5;
+        float cells = pow(rippleA * rippleB, 2.55);
+        float brightBreaks = pow(sin(vUv.x * 24.0 + vUv.y * 4.0 + uTime * 0.12) * 0.5 + 0.5, 4.2);
+        float longSheen = pow(sin(vUv.x * 5.4 + vUv.y * 2.1 + uTime * 0.07) * 0.5 + 0.5, 2.4);
+        float alpha = frontFade * sideFade * (0.14 + broadSwell * 0.17 + cells * 0.28 + brightBreaks * 0.10 + longSheen * 0.12) *
           uStrength *
-          (1.0 - uDark * 0.24);
-        vec3 color = mix(vec3(0.28, 0.70, 0.78), uColor, 0.56 + cells * 0.34);
+          (1.0 - uDark * 0.20);
+        vec3 color = mix(vec3(0.24, 0.64, 0.73), uColor, 0.46 + cells * 0.30 + broadSwell * 0.16 + longSheen * 0.10);
         gl_FragColor = vec4(color, alpha);
       }
     `,
@@ -376,13 +382,13 @@ const createBoatContactPatch = () => {
       void main() {
         vec2 p = (vUv - 0.5) * vec2(2.0, 3.0);
         float d = length(p);
-        float shadow = 1.0 - smoothstep(0.12, 0.98, d);
-        float contactRing = smoothstep(0.42, 0.74, d) * (1.0 - smoothstep(0.74, 1.0, d));
-        float smallWake = pow(sin(vUv.x * 24.0 + uTime * 0.8) * 0.5 + 0.5, 3.2) * contactRing;
+        float shadow = 1.0 - smoothstep(0.10, 1.08, d);
+        float contactRing = smoothstep(0.38, 0.72, d) * (1.0 - smoothstep(0.72, 1.08, d));
+        float smallWake = pow(sin(vUv.x * 18.0 + vUv.y * 3.5 + uTime * 0.54) * 0.5 + 0.5, 2.8) * contactRing;
         vec3 shadowColor = vec3(0.004, 0.020, 0.026);
         vec3 glimmer = vec3(0.52, 0.88, 0.92);
-        float alpha = shadow * 0.22 * uStrength + smallWake * 0.12 * uStrength;
-        vec3 color = mix(shadowColor, glimmer, smallWake * 0.42);
+        float alpha = shadow * 0.16 * uStrength + smallWake * 0.08 * uStrength;
+        vec3 color = mix(shadowColor, glimmer, smallWake * 0.30);
         gl_FragColor = vec4(color, alpha);
       }
     `,
@@ -432,12 +438,14 @@ const createShallowFeather = (
       void main() {
         vec2 p = (vUv - 0.5) * 2.0;
         float d = length(p);
-        float softBody = 1.0 - smoothstep(0.14, 1.0, d);
-        float edgeFoam = smoothstep(0.38, 0.66, d) * (1.0 - smoothstep(0.76, 1.0, d));
-        float lace = pow(sin((vUv.x * 18.0 + vUv.y * 9.0) + uTime * 0.18) * 0.5 + 0.5, 3.2);
-        float alpha = (softBody * 0.12 + edgeFoam * (0.12 + lace * 0.09)) *
+        float wobble = sin(vUv.x * 8.0 + uTime * 0.10) * 0.05 + sin(vUv.y * 11.0 - uTime * 0.08) * 0.035;
+        float softBody = 1.0 - smoothstep(0.22 + wobble, 1.06 + wobble, d);
+        float edgeFoam = smoothstep(0.42 + wobble, 0.74 + wobble, d) *
+          (1.0 - smoothstep(0.78 + wobble, 1.10 + wobble, d));
+        float lace = pow(sin((vUv.x * 16.0 + vUv.y * 8.0) + uTime * 0.12) * 0.5 + 0.5, 3.0);
+        float alpha = (softBody * 0.10 + edgeFoam * (0.10 + lace * 0.07)) *
           uStrength *
-          (1.0 - uDark * 0.58);
+          (1.0 - uDark * 0.44);
         gl_FragColor = vec4(uColor, alpha);
       }
     `,
@@ -674,9 +682,9 @@ export const createWater = (): WaterSurface => {
         needleGlint *= pow(sin(vWorldPos.x * -0.019 + vWorldPos.z * 0.038 - uTime * 0.16) * 0.5 + 0.5, 2.4);
         float readableRipples = pow(sin(vWorldPos.z * 0.052 + sin(vWorldPos.x * 0.010) * 1.8 + uTime * 0.16) * 0.5 + 0.5, 4.2);
         readableRipples *= 0.50 + 0.50 * (sin(vWorldPos.x * 0.018 - uTime * 0.05) * 0.5 + 0.5);
-        color += vec3(0.135, 0.285, 0.330) * silk * openWater * (1.0 - uDark * 0.42);
-        color += vec3(0.145, 0.330, 0.375) * foregroundCells * openWater * nearCamera * (1.0 - uDark * 0.20) * 0.82;
-        color += vec3(0.50, 0.90, 0.98) * broadSky * openWater * (0.24 + nearCamera * 0.42) * (1.0 - uDark * 0.22);
+        color += vec3(0.135, 0.285, 0.330) * silk * openWater * (1.0 - uDark * 0.36);
+        color += vec3(0.140, 0.325, 0.375) * foregroundCells * openWater * nearCamera * (1.0 - uDark * 0.16) * 0.82;
+        color += vec3(0.48, 0.88, 0.96) * broadSky * openWater * (0.30 + nearCamera * 0.42) * (1.0 - uDark * 0.18);
         color += vec3(0.110, 0.255, 0.300) * readableRipples * openWater * (1.0 - uDark * 0.26) * 0.68;
         color += vec3(0.78, 0.98, 1.0) * needleGlint * openWater * (1.0 - uDark * 0.36) * 0.58;
         color += uHorizonColor * fresnel * openWater * (1.0 - uDark * 0.24) * 0.18;
@@ -752,7 +760,7 @@ const updateWaterCues = (
   const darkFade = 1 - weather.dials.skyDark * 0.28;
   const fireLift = weather.dials.fireWeather * 0.14;
   const windMotion = 1 + weather.dials.wind * 0.72 + Math.min(Math.abs(driveState.speed) / 120, 0.42);
-  const visibleOpacity = clamp((0.42 + fireLift) * strength * darkFade, 0.18, 0.58);
+  const visibleOpacity = clamp((0.34 + fireLift) * strength * darkFade, 0.13, 0.46);
 
   cues.glints.material.opacity = visibleOpacity;
   cues.glints.material.color
@@ -764,8 +772,8 @@ const updateWaterCues = (
     const shimmer = 0.56 + Math.sin(elapsed * config.speed * windMotion + config.phase) * 0.44;
     const driftX = Math.sin(elapsed * 0.10 * windMotion + config.phase) * config.drift;
     const driftZ = Math.cos(elapsed * 0.075 * windMotion + config.phase * 0.7) * config.drift * 0.42;
-    const length = config.length * (0.62 + shimmer * 0.52) * strength;
-    const width = config.width * (0.78 + shimmer * 0.34);
+    const length = config.length * (0.54 + shimmer * 0.44) * strength;
+    const width = config.width * (0.94 + shimmer * 0.38);
     glintMatrixObject.position.set(
       config.x + driftX,
       0.62 + shimmer * 0.055,
@@ -785,7 +793,7 @@ const updateWaterCues = (
   cues.highlightPatches.material.uniforms.uTime.value = elapsed;
   cues.highlightPatches.material.uniforms.uDark.value = weather.dials.skyDark;
   cues.highlightPatches.material.uniforms.uStrength.value =
-    clamp(1.26 * strength * darkFade + weather.dials.fireWeather * 0.1, 0.34, 1.46);
+    clamp(1.30 * strength * darkFade + weather.dials.fireWeather * 0.1, 0.38, 1.52);
   cues.highlightConfigs.forEach((config, index) => {
     const shimmer = 0.74 + Math.sin(elapsed * 0.31 * windMotion + config.phase) * 0.26;
     const driftX = Math.sin(elapsed * 0.055 * windMotion + config.phase) * config.drift;
@@ -797,8 +805,8 @@ const updateWaterCues = (
       config.angle + Math.sin(elapsed * 0.07 + config.phase) * 0.018,
     );
     highlightMatrixObject.scale.set(
-      config.scaleX * shimmer * strength,
-      config.scaleZ * (0.82 + shimmer * 0.22),
+      config.scaleX * (0.94 + shimmer * 0.30) * strength,
+      config.scaleZ * (1.02 + shimmer * 0.28),
       1,
     );
     highlightMatrixObject.updateMatrix();
@@ -809,7 +817,7 @@ const updateWaterCues = (
   cues.reflectionBand.material.uniforms.uTime.value = elapsed;
   cues.reflectionBand.material.uniforms.uDark.value = weather.dials.skyDark;
   cues.reflectionBand.material.uniforms.uStrength.value =
-    clamp(1.24 * strength * darkFade + weather.dials.fireWeather * 0.18, 0.34, 1.48);
+    clamp(1.44 * strength * darkFade + weather.dials.fireWeather * 0.18, 0.42, 1.68);
   cues.reflectionBand.material.uniforms.uColor.value
     .setHex(getWeatherPalette(weather.stormIndex).skyHorizon)
     .lerp(inspirationHorizonWater, Math.max(0.42, 0.82 - weather.dials.skyDark * 0.32));
@@ -817,7 +825,7 @@ const updateWaterCues = (
   cues.foregroundDetail.material.uniforms.uTime.value = elapsed;
   cues.foregroundDetail.material.uniforms.uDark.value = weather.dials.skyDark;
   cues.foregroundDetail.material.uniforms.uStrength.value =
-    clamp(1.42 * strength * darkFade, 0.42, 1.62);
+    clamp(1.64 * strength * darkFade, 0.52, 1.86);
   cues.foregroundDetail.position.x = cameraPosition.x * 0.74 + driveState.x * 0.26;
   cues.foregroundDetail.position.z = cameraPosition.z * 0.74 + driveState.z * 0.26;
   cues.foregroundDetail.rotation.z =
@@ -828,8 +836,8 @@ const updateWaterCues = (
   cues.boatContact.position.x = driveState.x;
   cues.boatContact.position.z = driveState.z + 2;
   cues.boatContact.scale.set(
-    34 + Math.min(Math.abs(driveState.speed) * 0.08, 8),
-    24 + Math.min(Math.abs(driveState.speed) * 0.045, 5),
+    38 + Math.min(Math.abs(driveState.speed) * 0.08, 8),
+    20 + Math.min(Math.abs(driveState.speed) * 0.045, 5),
     1,
   );
 
