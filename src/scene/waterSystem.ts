@@ -40,7 +40,7 @@ const createOrganicWaterGeometry = () => {
   const sandFactors: number[] = [];
   const shoreFactors: number[] = [];
   const indices: number[] = [];
-  const step = 12;
+  const step = 8;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
   const deepColor = new THREE.Color(0x05344d);
   const midColor = new THREE.Color(0x0a5964);
@@ -124,10 +124,12 @@ const createOrganicWaterGeometry = () => {
 export const createWater = (): WaterSurface => {
   const geometry = createOrganicWaterGeometry();
   const normalMap = createWaterNormalTexture(192, 17);
+  const detailNormalMap = createWaterNormalTexture(128, 41);
   let currentPreset: WaterQualityPreset = "Balanced";
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uNormalMap: { value: normalMap },
+      uDetailNormalMap: { value: detailNormalMap },
       uTime: { value: 0 },
       uChop: { value: 0 },
       uWind: { value: 0 },
@@ -167,22 +169,22 @@ export const createWater = (): WaterSurface => {
         vSand = sandFactor;
         vShore = shoreFactor;
         float waveSpeed = 0.34 + uWind * 1.2;
-        float waveHeight = (0.06 + uChop * 1.8) * (0.32 + vDepth * 0.68);
+        float waveHeight = (0.045 + uChop * 1.65) * (0.32 + vDepth * 0.68);
         float speedWake = clamp(abs(uBoatSpeed) / 90.0, 0.0, 1.0);
         float distanceToBoat = distance(position.xz, uBoatPos);
-        float localWake = max(0.0, 1.0 - distanceToBoat / 42.0) *
+        float localWake = smoothstep(46.0, 6.0, distanceToBoat) *
           speedWake *
-          sin(distanceToBoat * 0.62 - uTime * 11.0);
+          sin(distanceToBoat * 0.46 - uTime * 8.4);
         float longWave = sin(position.x * 0.014 + position.z * 0.006 + uTime * waveSpeed) * waveHeight;
         float crossWave = cos(position.x * -0.010 + position.z * 0.023 + uTime * waveSpeed * 0.72) *
           waveHeight *
           0.52;
         float micro = sin((position.x + position.z) * (0.040 + uChop * 0.030) +
           uTime * (0.68 + uChop * 1.45)) *
-          (0.014 + uChop * 0.16) *
+          (0.010 + uChop * 0.12) *
           (0.24 + vDepth * 0.76);
         vec3 displaced = position;
-        displaced.y += (longWave + crossWave + micro) * (1.0 - vShore * 0.46) + localWake * 0.55;
+        displaced.y += (longWave + crossWave + micro) * (1.0 - vShore * 0.58) + localWake * 0.34;
         vWake = localWake;
         vec4 worldPosition = modelMatrix * vec4(displaced, 1.0);
         vWorldPos = worldPosition.xyz;
@@ -191,6 +193,7 @@ export const createWater = (): WaterSurface => {
     `,
     fragmentShader: `
       uniform sampler2D uNormalMap;
+      uniform sampler2D uDetailNormalMap;
       uniform float uTime;
       uniform float uChop;
       uniform float uWind;
@@ -217,9 +220,10 @@ export const createWater = (): WaterSurface => {
         float t = uTime * (0.46 + uWind * 1.12 + uChop * 1.05);
         vec3 n1 = texture2D(uNormalMap, uv * 0.020 + vec2(t * 0.0062, t * 0.0036)).rgb;
         vec3 n2 = texture2D(uNormalMap, uv * 0.060 + vec2(-t * 0.0080, t * 0.0057)).rgb;
-        vec3 n3 = texture2D(uNormalMap, uv * 0.135 + vec2(t * 0.0040, -t * 0.0072)).rgb;
-        vec3 n = (n1 * 0.48 + n2 * 0.36 + n3 * 0.16) * 2.0 - 1.0;
-        return normalize(vec3(n.x, 2.20, n.z));
+        vec3 n3 = texture2D(uDetailNormalMap, uv * 0.150 + vec2(t * 0.0040, -t * 0.0072)).rgb;
+        vec3 n4 = texture2D(uDetailNormalMap, uv * 0.310 + vec2(-t * 0.0035, t * 0.0090)).rgb;
+        vec3 n = (n1 * 0.44 + n2 * 0.32 + n3 * 0.16 + n4 * 0.08) * 2.0 - 1.0;
+        return normalize(vec3(n.x, 2.08, n.z));
       }
 
       void main() {
@@ -248,21 +252,21 @@ export const createWater = (): WaterSurface => {
         float bodyWaveA = sin(vWorldPos.x * 0.010 + vWorldPos.z * 0.006 + uTime * (0.050 + uWind * 0.045));
         float bodyWaveB = sin(vWorldPos.x * -0.006 + vWorldPos.z * 0.013 - uTime * (0.042 + uWind * 0.035));
         float bodyWave = bodyWaveA * 0.58 + bodyWaveB * 0.42;
-        float basin = smoothstep(0.32, 0.98, depth) * (0.92 + bodyWave * 0.08);
-        base = mix(base, base * vec3(0.70, 0.88, 0.98), basin * (1.0 - uDark * 0.30) * 0.10);
+        float basin = smoothstep(0.32, 0.98, depth) * (0.94 + bodyWave * 0.06);
+        base = mix(base, base * vec3(0.72, 0.90, 0.98), basin * (1.0 - uDark * 0.30) * 0.075);
         base += vec3(0.014, 0.052, 0.068) * (1.0 - uDark * 0.24) * openWater;
 
         float farBand = smoothstep(-650.0, -260.0, vWorldPos.z) * (1.0 - smoothstep(70.0, 310.0, vWorldPos.z));
         farBand *= smoothstep(0.14, 0.86, depth);
-        float forestColumns = pow(1.0 - abs(fract(vWorldPos.x * 0.014 + sin(vWorldPos.z * 0.011 + uTime * 0.018) * 0.035) - 0.5) * 2.0, 2.6);
+        float forestColumns = pow(1.0 - abs(fract(vWorldPos.x * 0.010 + sin(vWorldPos.z * 0.008 + uTime * 0.012) * 0.026) - 0.5) * 2.0, 2.1);
         float skySwell = bodyWave * 0.5 + 0.5;
         vec3 skyMirror = mix(uHorizonColor, uSunColor * 0.68, 0.18);
         skyMirror = mix(skyMirror, vec3(0.030, 0.046, 0.055), uDark * 0.72);
         vec3 forestMirror = mix(vec3(0.008, 0.036, 0.032), vec3(0.026, 0.076, 0.062), forestColumns);
-        vec3 reflectedMood = mix(skyMirror, forestMirror, 0.40 + farBand * 0.34);
+        vec3 reflectedMood = mix(skyMirror, forestMirror, 0.38 + farBand * 0.28);
         reflectedMood += vec3(0.032, 0.075, 0.086) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.16;
 
-        float reflectionAmount = clamp((fresnel * 0.62 + farBand * 0.36) * uReflectionStrength, 0.0, 0.78);
+        float reflectionAmount = clamp((fresnel * 0.64 + farBand * 0.28) * uReflectionStrength, 0.0, 0.74);
         vec3 color = mix(base, reflectedMood, reflectionAmount);
 
         float nearCamera = smoothstep(720.0, 100.0, dist);
@@ -271,8 +275,8 @@ export const createWater = (): WaterSurface => {
         float fineRipple = sin(vWorldPos.x * 0.074 + vWorldPos.z * 0.048 + uTime * (0.54 + uChop * 0.38)) * 0.5 + 0.5;
         fineRipple *= sin(vWorldPos.x * -0.046 + vWorldPos.z * 0.071 - uTime * 0.41) * 0.5 + 0.5;
         float calmMotion = bodyWave * 0.5 + (midWave - 0.5) * 0.28;
-        color *= 0.988 + calmMotion * openWater * (1.0 - uDark * 0.24) * 0.052;
-        color += vec3(0.055, 0.135, 0.165) * (midWave - 0.45) * openWater * (0.22 + nearCamera * 0.24) * (1.0 - uDark * 0.18);
+        color *= 0.992 + calmMotion * openWater * (1.0 - uDark * 0.24) * 0.038;
+        color += vec3(0.055, 0.135, 0.165) * (midWave - 0.45) * openWater * (0.18 + nearCamera * 0.20) * (1.0 - uDark * 0.18);
         color += vec3(0.28, 0.44, 0.50) * pow(fineRipple, 3.5) * openWater * (0.08 + nearCamera * 0.28) * (0.08 + uChop * 0.14);
 
         float causticA = sin(vWorldPos.x * 0.055 + vWorldPos.z * 0.030 + uTime * 0.20);
@@ -288,8 +292,8 @@ export const createWater = (): WaterSurface => {
         float contactDistance = distance(vWorldPos.xz, uBoatPos);
         float boatContact = 1.0 - smoothstep(8.0, 30.0, contactDistance);
         float boatSheen = smoothstep(12.0, 36.0, contactDistance) * (1.0 - smoothstep(36.0, 58.0, contactDistance));
-        color = mix(color, color * vec3(0.58, 0.72, 0.76), boatContact * 0.10);
-        color += vec3(0.20, 0.45, 0.48) * boatSheen * (0.08 + abs(vWake) * 0.10);
+        color = mix(color, color * vec3(0.66, 0.78, 0.82), boatContact * 0.065);
+        color += vec3(0.20, 0.45, 0.48) * boatSheen * (0.06 + abs(vWake) * 0.08);
 
         vec3 sunDir = normalize(vec3(-0.32, 0.74 - uDark * 0.26, -0.48));
         vec3 halfDir = normalize(viewDir + sunDir);
