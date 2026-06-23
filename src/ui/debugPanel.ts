@@ -14,8 +14,6 @@ import {
 } from "../state/liveBitcoinStore";
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { LAKE_MAP } from "../scene/lakeMap";
-import type { QualityPreset } from "../scene/createScene";
-import type { WaterDebugMode } from "../scene/waterSystem";
 import type { ScenicAssetStatuses } from "../scene/scenicAssets";
 
 type FeedRow = {
@@ -78,8 +76,6 @@ export type SceneTelemetry = {
   savedTableau: boolean;
   fps: number;
   pixelRatio: number;
-  qualityMode: QualityPreset;
-  qualityPreset: QualityPreset;
   renderScale: number;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
@@ -94,8 +90,6 @@ export type SceneTelemetry = {
   mountainVertices: number;
   postEnabled: boolean;
   reflectionEnabled: boolean;
-  fxVisibilityTest: boolean;
-  waterMode: WaterDebugMode;
   scenicAssets: ScenicAssetStatuses;
 };
 
@@ -103,8 +97,6 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Data mode", value: "LIVE", tone: "good" },
   { group: "global", label: "Polling", value: "active", tone: "good" },
   { group: "global", label: "Staleness", value: "0%", tone: "good" },
-  { group: "global", label: "Quality", value: "crisp", tone: "good" },
-  { group: "global", label: "Preset", value: "Balanced", tone: "good" },
   { group: "global", label: "Pixel ratio", value: "1.00" },
   { group: "global", label: "Render scale", value: "1.00" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
@@ -121,8 +113,6 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Mount verts", value: "0" },
   { group: "weather", label: "Post", value: "on", tone: "good" },
   { group: "weather", label: "Fake reflect", value: "off", tone: "muted" },
-  { group: "weather", label: "FX visibility", value: "off", tone: "muted" },
-  { group: "weather", label: "Water mode", value: "Balanced", tone: "muted" },
   { group: "weather", label: "Mountain asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Treeline asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Shoreline asset", value: "fallback", tone: "muted" },
@@ -420,41 +410,6 @@ const renderTemplate = () => `
 
     ${createMetricSections()}
 
-    <div class="debug-section debug-quality">
-      <div class="debug-section__heading">
-        <span>Quality Preset</span>
-        <strong data-debug-quality-preset>Balanced</strong>
-      </div>
-      <div class="debug-quality__buttons" data-debug-quality-buttons>
-        <button type="button" data-debug-quality="Performance">Performance</button>
-        <button type="button" data-debug-quality="Balanced">Balanced</button>
-        <button type="button" data-debug-quality="Scenic">Scenic</button>
-      </div>
-    </div>
-
-    <div class="debug-section debug-quality">
-      <div class="debug-section__heading">
-        <span>FX Visibility Test</span>
-        <strong data-debug-fx-visibility>OFF</strong>
-      </div>
-      <div class="debug-quality__buttons debug-quality__buttons--two">
-        <button type="button" data-debug-fx-visibility-toggle="off">Off</button>
-        <button type="button" data-debug-fx-visibility-toggle="on">On</button>
-      </div>
-    </div>
-
-    <div class="debug-section debug-quality">
-      <div class="debug-section__heading">
-        <span>Water Mode</span>
-        <strong data-debug-water-mode>Balanced</strong>
-      </div>
-      <div class="debug-quality__buttons" data-debug-water-mode-buttons>
-        <button type="button" data-debug-water-mode="Balanced">Balanced</button>
-        <button type="button" data-debug-water-mode="Deep Reflective">Deep Reflective</button>
-        <button type="button" data-debug-water-mode="High Contrast Debug">High Contrast</button>
-      </div>
-    </div>
-
     <div class="debug-section">
       <div class="debug-section__heading">
         <span>Dials</span>
@@ -488,7 +443,6 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="whale-300">300 BTC</button>
         <button type="button" data-debug-action="whale-1000">1000 BTC</button>
         <button type="button" data-debug-action="whale-1750">1750 BTC</button>
-        <button type="button" data-debug-action="wake-burst">Wake Burst</button>
         <button type="button" data-debug-action="block">Block</button>
         <button type="button" data-debug-action="perf-stress">Perf Stress</button>
         <button type="button" data-debug-action="toast-block">Toast Block</button>
@@ -697,10 +651,6 @@ export const createDebugPanel = (
   eventBus: HashlakeEventBus,
   liveBitcoinStore: LiveBitcoinStore,
   getTelemetry: () => SceneTelemetry,
-  setQualityPreset: (preset: QualityPreset) => void,
-  setFxVisibilityTest: (enabled: boolean) => void,
-  setWaterMode: (mode: WaterDebugMode) => void,
-  triggerWakeVisibilityBurst: () => void,
 ): DebugPanel => {
   const wrapper = document.createElement("div");
   wrapper.className = "debug-panel-shell";
@@ -719,9 +669,6 @@ export const createDebugPanel = (
   const closeButton = wrapper.querySelector<HTMLButtonElement>(".debug-close");
   const minimapCanvas = wrapper.querySelector<HTMLCanvasElement>("[data-debug-minimap]");
   const nearestLocationElement = wrapper.querySelector<HTMLElement>("[data-debug-nearest]");
-  const qualityPresetElement = wrapper.querySelector<HTMLElement>("[data-debug-quality-preset]");
-  const fxVisibilityElement = wrapper.querySelector<HTMLElement>("[data-debug-fx-visibility]");
-  const waterModeElement = wrapper.querySelector<HTMLElement>("[data-debug-water-mode]");
 
   let timerId = 0;
   let telemetryTimerId = 0;
@@ -1090,30 +1037,6 @@ export const createDebugPanel = (
       worldLockMetric.classList.toggle("debug-tone-bad", !telemetry.worldRotationLocked);
     }
 
-    setMetric(
-      "Quality",
-      telemetry.qualityMode,
-      telemetry.qualityMode === "Scenic"
-        ? "good"
-        : telemetry.qualityMode === "Balanced"
-          ? "warn"
-          : "bad",
-    );
-    setMetric(
-      "Preset",
-      telemetry.qualityPreset,
-      telemetry.qualityPreset === "Scenic"
-        ? "good"
-        : telemetry.qualityPreset === "Balanced"
-          ? "warn"
-          : "bad",
-    );
-    if (qualityPresetElement) {
-      qualityPresetElement.textContent = telemetry.qualityPreset;
-    }
-    wrapper.querySelectorAll<HTMLButtonElement>("[data-debug-quality]").forEach((button) => {
-      button.classList.toggle("debug-quality__button--active", button.dataset.debugQuality === telemetry.qualityPreset);
-    });
     setMetric("Pixel ratio", telemetry.pixelRatio.toFixed(2));
     setMetric("Render scale", telemetry.renderScale.toFixed(2));
     setMetric("Wake blocks", String(telemetry.activeWakeBlocks));
@@ -1138,40 +1061,9 @@ export const createDebugPanel = (
       telemetry.reflectionEnabled ? "on" : "off",
       telemetry.reflectionEnabled ? "good" : "muted",
     );
-    setMetric(
-      "FX visibility",
-      telemetry.fxVisibilityTest ? "ON" : "off",
-      telemetry.fxVisibilityTest ? "warn" : "muted",
-    );
-    setMetric(
-      "Water mode",
-      telemetry.waterMode,
-      telemetry.waterMode === "High Contrast Debug"
-        ? "warn"
-        : telemetry.waterMode === "Deep Reflective"
-          ? "good"
-          : "muted",
-    );
     setMetric("Mountain asset", telemetry.scenicAssets.mountain, getAssetTone(telemetry.scenicAssets.mountain));
     setMetric("Treeline asset", telemetry.scenicAssets.treeline, getAssetTone(telemetry.scenicAssets.treeline));
     setMetric("Shoreline asset", telemetry.scenicAssets.shoreline, getAssetTone(telemetry.scenicAssets.shoreline));
-    if (fxVisibilityElement) {
-      fxVisibilityElement.textContent = telemetry.fxVisibilityTest ? "ON" : "OFF";
-      fxVisibilityElement.classList.toggle("debug-tone-warn", telemetry.fxVisibilityTest);
-      fxVisibilityElement.classList.toggle("debug-tone-muted", !telemetry.fxVisibilityTest);
-    }
-    wrapper.querySelectorAll<HTMLButtonElement>("[data-debug-fx-visibility-toggle]").forEach((button) => {
-      button.classList.toggle(
-        "debug-quality__button--active",
-        button.dataset.debugFxVisibilityToggle === (telemetry.fxVisibilityTest ? "on" : "off"),
-      );
-    });
-    if (waterModeElement) {
-      waterModeElement.textContent = telemetry.waterMode;
-    }
-    wrapper.querySelectorAll<HTMLButtonElement>("[data-debug-water-mode]").forEach((button) => {
-      button.classList.toggle("debug-quality__button--active", button.dataset.debugWaterMode === telemetry.waterMode);
-    });
     setMetric("Debug UI", "visible", "good");
     setMetric("DOM cadence", "250ms visible / hidden idle", "muted");
     setMetric("Boost", telemetry.boostActive ? "on" : "off", telemetry.boostActive ? "good" : "muted");
@@ -1234,8 +1126,6 @@ export const createDebugPanel = (
       emitManualWhale(1000);
     } else if (action === "whale-1750") {
       emitManualWhale(1750);
-    } else if (action === "wake-burst") {
-      triggerWakeVisibilityBurst();
     } else if (action === "block") {
       const latestBlock = liveBitcoinStore.getSnapshot().metrics.blockHeight;
       const simulatedBlock = latestBlock === null ? 902421 : latestBlock + 1;
@@ -1303,43 +1193,6 @@ export const createDebugPanel = (
   };
 
   const handleDebugClick = (event: MouseEvent) => {
-    const qualityButton = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
-      "[data-debug-quality]",
-    );
-    if (qualityButton && wrapper.contains(qualityButton)) {
-      const preset = qualityButton.dataset.debugQuality;
-      if (preset === "Performance" || preset === "Balanced" || preset === "Scenic") {
-        setQualityPreset(preset);
-        updateTelemetry();
-      }
-      return;
-    }
-
-    const fxVisibilityButton = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
-      "[data-debug-fx-visibility-toggle]",
-    );
-    if (fxVisibilityButton && wrapper.contains(fxVisibilityButton)) {
-      setFxVisibilityTest(fxVisibilityButton.dataset.debugFxVisibilityToggle === "on");
-      updateTelemetry();
-      return;
-    }
-
-    const waterButton = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
-      "[data-debug-water-mode]",
-    );
-    if (waterButton && wrapper.contains(waterButton)) {
-      const mode = waterButton.dataset.debugWaterMode;
-      if (
-        mode === "Balanced" ||
-        mode === "Deep Reflective" ||
-        mode === "High Contrast Debug"
-      ) {
-        setWaterMode(mode);
-        updateTelemetry();
-      }
-      return;
-    }
-
     const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
       "[data-debug-action]",
     );

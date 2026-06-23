@@ -19,14 +19,15 @@ export type WaterSurface = {
   basePositions: Float32Array;
   reflectionEnabled: boolean;
   setQualityPreset: (preset: WaterQualityPreset) => void;
-  setWaterMode: (mode: WaterDebugMode) => void;
 };
 
 type WaterQualityPreset = "Performance" | "Balanced" | "Scenic";
-export type WaterDebugMode = "Balanced" | "Deep Reflective" | "High Contrast Debug";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
+
+const defaultDeepWater = new THREE.Color(0x011d38);
+const defaultShallowWater = new THREE.Color(0x1d6974);
 
 const createOrganicWaterGeometry = () => {
   const geometry = new THREE.BufferGeometry();
@@ -37,11 +38,11 @@ const createOrganicWaterGeometry = () => {
   const indices: number[] = [];
   const step = 18;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
-  const deepColor = new THREE.Color(0x021f3a);
-  const midColor = new THREE.Color(0x055f90);
-  const shallowColor = new THREE.Color(0x2c8790);
-  const sandbarColor = new THREE.Color(0x75a894);
-  const coveColor = new THREE.Color(0x011a32);
+  const deepColor = new THREE.Color(0x01192f);
+  const midColor = new THREE.Color(0x06466d);
+  const shallowColor = new THREE.Color(0x1f6f7b);
+  const sandbarColor = new THREE.Color(0x477d78);
+  const coveColor = new THREE.Color(0x010f22);
 
   for (let x = minX; x < maxX; x += step) {
     for (let z = minZ; z < maxZ; z += step) {
@@ -72,8 +73,8 @@ const createOrganicWaterGeometry = () => {
         .clone()
         .lerp(midColor, shoreDepth)
         .lerp(deepColor, shoreDepth * 0.68);
-      tint.lerp(sandbarColor, nearSandbar * 0.56);
-      tint.lerp(shallowColor, nearIsland * 0.28);
+      tint.lerp(sandbarColor, nearSandbar * 0.34);
+      tint.lerp(shallowColor, nearIsland * 0.18);
       tint.lerp(coveColor, nearCove * 0.38);
       for (let vertex = 0; vertex < 4; vertex += 1) {
         colors.push(tint.r, tint.g, tint.b);
@@ -99,7 +100,6 @@ export const createWater = (): WaterSurface => {
   const normalA = createWaterNormalTexture(192, 11);
   const normalB = createWaterNormalTexture(192, 29);
   let currentPreset: WaterQualityPreset = "Balanced";
-  let currentWaterMode: WaterDebugMode = "Balanced";
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uNormalA: { value: normalA },
@@ -111,13 +111,12 @@ export const createWater = (): WaterSurface => {
       uFire: { value: 0 },
       uFlash: { value: 0 },
       uStale: { value: 0 },
-      uDeepColor: { value: new THREE.Color(0x022d55) },
-      uShallowColor: { value: new THREE.Color(0x2b8790) },
-      uStormColor: { value: new THREE.Color(0x061924) },
+      uDeepColor: { value: new THREE.Color(0x011f3d) },
+      uShallowColor: { value: new THREE.Color(0x1c6f78) },
+      uStormColor: { value: new THREE.Color(0x041018) },
       uSunColor: { value: new THREE.Color(SCENARIO_PALETTES.Serene.sunColor) },
       uCamPos: { value: new THREE.Vector3() },
-      uReflectionStrength: { value: 0.88 },
-      uWaterDebugMode: { value: 0 },
+      uReflectionStrength: { value: 1.26 },
     },
     vertexShader: `
       attribute float depthFactor;
@@ -152,7 +151,6 @@ export const createWater = (): WaterSurface => {
       uniform vec3 uSunColor;
       uniform vec3 uCamPos;
       uniform float uReflectionStrength;
-      uniform float uWaterDebugMode;
       varying vec3 vColor;
       varying vec3 vWorldPos;
       varying float vDepth;
@@ -176,49 +174,52 @@ export const createWater = (): WaterSurface => {
         float strength = (0.16 + uChop * uChop * 0.96) * (0.32 + detailFade * 0.68);
         normal = normalize(mix(vec3(0.0, 1.0, 0.0), normal, strength));
 
-        float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 4.0);
-        fresnel = clamp(mix(0.05, 0.9, fresnel) + uChop * 0.05, 0.0, 1.0);
-        float deepReflective = step(0.5, uWaterDebugMode) * (1.0 - step(1.5, uWaterDebugMode));
-        float highContrast = step(1.5, uWaterDebugMode);
-        vec3 deep = mix(uDeepColor * 0.34, uStormColor * 0.78, uDark);
-        vec3 shallow = mix(uShallowColor * 0.50, vec3(0.40, 0.52, 0.52), uStale * 0.42);
-        vec3 depthColor = mix(shallow, deep, vDepth);
-        depthColor = mix(depthColor, vec3(0.43, 0.40, 0.29), vSand * (1.0 - uDark) * 0.18);
-        depthColor = mix(depthColor, vColor * 0.48, 0.24);
+        float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.15);
+        fresnel = clamp(mix(0.08, 0.95, fresnel) + uChop * 0.04, 0.0, 1.0);
+        vec3 deep = mix(uDeepColor * 0.48, uStormColor * 0.86, uDark);
+        vec3 shallow = mix(uShallowColor * 0.58, vec3(0.28, 0.42, 0.44), uStale * 0.42);
+        vec3 depthColor = mix(shallow, deep, smoothstep(0.10, 1.0, vDepth));
+        depthColor = mix(depthColor, vec3(0.30, 0.34, 0.25), vSand * (1.0 - uDark) * 0.10);
+        depthColor = mix(depthColor, vColor * 0.56, 0.16);
         depthColor = mix(depthColor, vec3(0.30, 0.10, 0.035), uFire * 0.45);
 
-        vec3 reflectedSky = mix(vec3(0.15, 0.27, 0.33), uSunColor * 0.50, 0.08);
-        reflectedSky = mix(reflectedSky, vec3(0.045, 0.060, 0.076), uDark * 0.9);
-        float horizonMirror = smoothstep(-620.0, -270.0, vWorldPos.z) * (1.0 - smoothstep(40.0, 230.0, vWorldPos.z));
-        float treelineMirror = horizonMirror * (0.58 + 0.42 * smoothstep(0.18, 0.82, vDepth));
-        float streaks = sin(vWorldPos.x * 0.042 + sin(vWorldPos.z * 0.014 + uTime * 0.22) * 1.8) * 0.5 + 0.5;
-        streaks *= sin(vWorldPos.x * 0.011 - uTime * 0.09) * 0.18 + 0.82;
-        vec3 reflectedTree = mix(vec3(0.006, 0.020, 0.023), vec3(0.030, 0.060, 0.060), streaks);
-        vec3 mountainReflection = mix(vec3(0.030, 0.064, 0.084), vec3(0.11, 0.145, 0.15), streaks);
-        float horizontalShimmer = sin(vWorldPos.x * 0.018 + uTime * 0.16) * 0.5 + 0.5;
-        vec3 color = mix(depthColor, reflectedSky, fresnel * (0.30 + (1.0 - uDark) * 0.18));
-        color = mix(color, mountainReflection, horizonMirror * (0.28 + deepReflective * 0.14) * uReflectionStrength);
-        color = mix(color, reflectedTree, treelineMirror * (0.72 + fresnel * 0.42 + deepReflective * 0.18) * uReflectionStrength);
-        color += vec3(0.012, 0.026, 0.030) * horizontalShimmer * horizonMirror * uReflectionStrength;
-        color *= 0.53 + vDepth * 0.14 - deepReflective * 0.06;
-        color = mix(color, color * vec3(0.78, 0.92, 1.12) + vec3(0.0, 0.015, 0.035), deepReflective * 0.52);
+        vec3 reflectedSky = mix(vec3(0.20, 0.34, 0.40), uSunColor * 0.42, 0.08);
+        reflectedSky = mix(reflectedSky, vec3(0.035, 0.050, 0.066), uDark * 0.92);
+        float horizonMirror = smoothstep(-675.0, -315.0, vWorldPos.z) * (1.0 - smoothstep(20.0, 250.0, vWorldPos.z));
+        horizonMirror *= smoothstep(0.20, 0.92, vDepth);
+        float treelineMirror = horizonMirror * (0.66 + 0.34 * smoothstep(0.28, 0.88, vDepth));
+        float streaks = sin(vWorldPos.x * 0.026 + sin(vWorldPos.z * 0.010 + uTime * 0.12) * 1.15) * 0.5 + 0.5;
+        streaks *= sin(vWorldPos.x * 0.007 - uTime * 0.055) * 0.12 + 0.88;
+        vec3 reflectedTree = mix(vec3(0.002, 0.016, 0.018), vec3(0.020, 0.052, 0.052), streaks);
+        vec3 mountainReflection = mix(vec3(0.040, 0.070, 0.086), vec3(0.13, 0.16, 0.16), streaks);
+        float horizontalShimmer = sin(vWorldPos.x * 0.012 + uTime * 0.085) * 0.5 + 0.5;
+        vec3 color = mix(depthColor, reflectedSky, fresnel * (0.42 + (1.0 - uDark) * 0.14));
+        color = mix(color, mountainReflection, horizonMirror * 0.46 * uReflectionStrength);
+        color = mix(color, reflectedTree, treelineMirror * (0.72 + fresnel * 0.28) * uReflectionStrength);
+        color += vec3(0.020, 0.042, 0.050) * horizontalShimmer * horizonMirror * uReflectionStrength;
+        float openWater = smoothstep(0.30, 0.96, vDepth) * (1.0 - vSand * 0.72);
+        float silk = sin(vWorldPos.x * 0.018 + sin(vWorldPos.z * 0.012 + uTime * 0.05) * 1.4 + uTime * 0.07) * 0.5 + 0.5;
+        silk = pow(silk, 3.0);
+        float broadSheen = sin(vWorldPos.z * 0.016 - uTime * 0.035) * 0.5 + 0.5;
+        float farGloss = smoothstep(-520.0, -160.0, vWorldPos.z) * (1.0 - smoothstep(120.0, 300.0, vWorldPos.z));
+        color += vec3(0.030, 0.078, 0.095) * openWater * (0.24 + silk * 0.74 + broadSheen * 0.16) * (1.0 - uDark * 0.72);
+        color += vec3(0.020, 0.055, 0.070) * farGloss * (0.42 + horizontalShimmer * 0.34) * (1.0 - uDark * 0.75);
+        color = mix(color, color + vec3(0.0, 0.032, 0.042), fresnel * openWater * (1.0 - uDark * 0.65));
+        color *= 0.50 + vDepth * 0.22;
+        color += vec3(0.005, 0.018, 0.030) * smoothstep(0.45, 1.0, vDepth);
 
         vec3 sunDir = normalize(vec3(-0.36, 0.72 - uDark * 0.28, -0.44));
         vec3 halfDir = normalize(viewDir + sunDir);
-        float spec = pow(max(dot(normal, halfDir), 0.0), mix(420.0, 82.0, uChop + uDark * 0.35));
-        color += uSunColor * spec * (1.0 - uDark * 0.78) * 2.8;
+        float spec = pow(max(dot(normal, halfDir), 0.0), mix(520.0, 96.0, uChop + uDark * 0.35));
+        color += uSunColor * spec * (1.0 - uDark * 0.78) * 3.4;
 
         float crest = smoothstep(0.55, 0.95, normal.x * normal.x + normal.z * normal.z + uChop * 0.08);
         color += vec3(0.66, 0.75, 0.80) * crest * uDark * 0.22;
         color += vec3(0.75, 0.82, 1.0) * uFlash * 0.24;
         color = mix(color, vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), uStale * 0.16);
-        vec3 highContrastColor = mix(vec3(0.005, 0.018, 0.11), vec3(0.0, 0.96, 1.0), pow(1.0 - vDepth, 1.35));
-        highContrastColor = mix(highContrastColor, vec3(1.0, 0.78, 0.08), vSand * 0.92);
-        highContrastColor += vec3(0.0, 0.42, 0.78) * horizonMirror * (0.55 + horizontalShimmer * 0.45);
-        highContrastColor += vec3(0.0, 0.22, 0.42) * abs(sin(vWorldPos.x * 0.055 + uTime * 0.9)) * 0.28;
-        color = mix(color, highContrastColor, highContrast);
+        color = mix(color, color * vec3(0.62, 0.68, 0.72), uDark * 0.26);
 
-        gl_FragColor = vec4(color, 0.94);
+        gl_FragColor = vec4(color, 0.96);
       }
     `,
     vertexColors: true,
@@ -238,16 +239,9 @@ export const createWater = (): WaterSurface => {
     setQualityPreset: (preset) => {
       currentPreset = preset;
       surface.reflectionEnabled = preset !== "Performance";
-      surface.setWaterMode(currentWaterMode);
-    },
-    setWaterMode: (mode) => {
-      currentWaterMode = mode;
-      material.uniforms.uWaterDebugMode.value =
-        mode === "High Contrast Debug" ? 2 : mode === "Deep Reflective" ? 1 : 0;
       const presetStrength =
-        currentPreset === "Scenic" ? 1.28 : currentPreset === "Performance" ? 0.46 : 0.98;
-      material.uniforms.uReflectionStrength.value =
-        mode === "High Contrast Debug" ? 1.55 : mode === "Deep Reflective" ? 1.42 : presetStrength;
+        currentPreset === "Scenic" ? 1.38 : currentPreset === "Performance" ? 0.92 : 1.26;
+      material.uniforms.uReflectionStrength.value = presetStrength;
     },
   };
   return surface;
@@ -298,8 +292,12 @@ export const animateWater = (
       ? weather.dials.lightning * 0.36
       : 0;
   water.mesh.material.uniforms.uStale.value = weather.staleData ? 1 : 0;
-  water.mesh.material.uniforms.uDeepColor.value.setHex(palette.waterDeep);
-  water.mesh.material.uniforms.uShallowColor.value.setHex(palette.waterShallow);
+  water.mesh.material.uniforms.uDeepColor.value
+    .setHex(palette.waterDeep)
+    .lerp(defaultDeepWater, Math.max(0.18, 0.72 - weather.dials.skyDark * 0.4));
+  water.mesh.material.uniforms.uShallowColor.value
+    .setHex(palette.waterShallow)
+    .lerp(defaultShallowWater, Math.max(0.12, 0.54 - weather.dials.skyDark * 0.36));
   water.mesh.material.uniforms.uStormColor.value.setHex(palette.waterDeep);
   water.mesh.material.uniforms.uSunColor.value.setHex(palette.sunColor);
   camera.getWorldPosition(water.mesh.material.uniforms.uCamPos.value);

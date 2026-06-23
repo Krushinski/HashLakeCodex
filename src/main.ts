@@ -75,10 +75,6 @@ const boot = () => {
       eventBus,
       liveBitcoinStore,
       scene.getTelemetry,
-      scene.setQualityPreset,
-      scene.setFxVisibilityTest,
-      scene.setWaterMode,
-      scene.triggerWakeVisibilityBurst,
     );
     const legendPanel = createLegendPanel(appElement);
     createBitcoinPill(appElement, liveBitcoinStore);

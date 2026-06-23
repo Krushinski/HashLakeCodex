@@ -18,18 +18,6 @@ const ASSET_PATHS: Record<ScenicAssetKey, string> = {
   shoreline: "assets/models/hl-shoreline-kit-v1.glb",
 };
 
-const cloneScene = (source: THREE.Group) => {
-  const clone = source.clone(true);
-  clone.traverse((child) => {
-    child.frustumCulled = false;
-    if (child instanceof THREE.Mesh) {
-      child.castShadow = false;
-      child.receiveShadow = false;
-    }
-  });
-  return clone;
-};
-
 const scenicMaterials = {
   mountainFar: new THREE.MeshBasicMaterial({ color: 0x8fa2a1, toneMapped: false }),
   mountainMid: new THREE.MeshBasicMaterial({ color: 0x3d5554, toneMapped: false }),
@@ -83,8 +71,8 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
     loaded.treeline?.traverse((child) => {
       child.visible = useAssets;
     });
-    loaded.shoreline?.children.forEach((child, index) => {
-      child.visible = useAssets && (scenic || index < 2);
+    loaded.shoreline?.traverse((child) => {
+      child.visible = false;
     });
     if (loaded.mountain) {
       loaded.mountain.scale.set(scenic ? 1.08 : 1.02, scenic ? 1.56 : 1.34, 1);
@@ -112,25 +100,6 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
           gltf.scene.position.set(0, 0, 0);
           loaded.treeline = gltf.scene;
           group.add(gltf.scene);
-        } else {
-          const shorelineGroup = new THREE.Group();
-          shorelineGroup.name = "Loaded Blender shoreline accent placements v1";
-          const placements = [
-            { x: -270, z: -72, rotation: -0.24, scale: 1.65 },
-            { x: 196, z: 126, rotation: 0.54, scale: 1.32 },
-            { x: -432, z: 228, rotation: -0.9, scale: 1.46 },
-            { x: 362, z: -128, rotation: 0.18, scale: 1.18 },
-            { x: -52, z: 244, rotation: 1.02, scale: 1.08 },
-          ];
-          placements.forEach((placement) => {
-            const clone = cloneScene(gltf.scene);
-            clone.position.set(placement.x, 0.18, placement.z);
-            clone.rotation.y = placement.rotation;
-            clone.scale.setScalar(placement.scale);
-            shorelineGroup.add(clone);
-          });
-          loaded.shoreline = shorelineGroup;
-          group.add(shorelineGroup);
         }
         applyVisibility();
       },
@@ -142,7 +111,7 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
     );
   };
 
-  (Object.keys(ASSET_PATHS) as ScenicAssetKey[]).forEach(loadAsset);
+  (["treeline"] as ScenicAssetKey[]).forEach(loadAsset);
 
   return {
     group,
