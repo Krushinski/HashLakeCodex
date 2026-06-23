@@ -628,6 +628,10 @@ body {
   gap: 5px;
 }
 
+.debug-quality__buttons--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .debug-quality__buttons button,
 .debug-manual__buttons button {
   min-height: 26px;
@@ -963,7 +967,7 @@ body {
 
 .event-toasts {
   position: fixed;
-  top: clamp(70px, 9vh, 104px);
+  top: clamp(122px, 17vh, 158px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 64;

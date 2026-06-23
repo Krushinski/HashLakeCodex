@@ -51,6 +51,7 @@ export type SceneEffectStats = {
   qualityScale: number;
   lastSplashDistanceToBoat: number | null;
   lastBoatImpulseStrength: number;
+  fxVisibilityTest: boolean;
 };
 
 export type SceneEffects = {
@@ -58,6 +59,7 @@ export type SceneEffects = {
   update: (delta: number) => void;
   getStats: () => SceneEffectStats;
   setQualityScale: (scale: number) => void;
+  setVisibilityTest: (enabled: boolean) => void;
   stressTest: () => void;
   dispose: () => void;
 };
@@ -119,6 +121,7 @@ export const createSceneEffects = (
   const splashBursts: SplashBurst[] = [];
   const fireworks: Firework[] = [];
   let qualityScale = 1;
+  let visibilityTest = false;
   let lastSplashDistanceToBoat: number | null = null;
   let lastBoatImpulseStrength = 0;
   const splashTexture = createSoftPointTexture();
@@ -134,12 +137,14 @@ export const createSceneEffects = (
       opacity: 0,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       blending: THREE.AdditiveBlending,
       size: 1.2,
       sizeAttenuation: true,
     });
     const points = new THREE.Points(geometry, material);
     points.frustumCulled = false;
+    points.renderOrder = 42;
     points.visible = false;
     group.add(points);
     splashBursts.push({
@@ -162,9 +167,11 @@ export const createSceneEffects = (
         transparent: true,
         opacity: 0,
         depthWrite: false,
+        depthTest: false,
       }),
     );
     mesh.visible = false;
+    mesh.renderOrder = 43;
     group.add(mesh);
     return {
       mesh,
@@ -186,26 +193,28 @@ export const createSceneEffects = (
     speed = 1,
   ) => {
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.92, 1, 72),
+      new THREE.RingGeometry(0.82, visibilityTest ? 1.36 : 1.16, 96),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
         opacity,
         depthWrite: false,
+        depthTest: false,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
       }),
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.copy(origin);
-    ring.position.y = 0.18;
-    ring.scale.setScalar(Math.max(1.2, strength * 1.4));
+    ring.position.y = visibilityTest ? 0.74 : 0.48;
+    ring.renderOrder = 41;
+    ring.scale.setScalar(Math.max(1.35, strength * (visibilityTest ? 2.05 : 1.62)));
     group.add(ring);
     rings.push({
       mesh: ring,
       age: 0,
       lifetime,
-      baseScale: Math.max(1.2, strength * 1.4),
+      baseScale: Math.max(1.35, strength * (visibilityTest ? 2.05 : 1.62)),
       speed,
       baseOpacity: opacity,
     });
@@ -230,15 +239,20 @@ export const createSceneEffects = (
       return;
     }
 
-    const activePoints = Math.min(SPLASH_POINTS, Math.round(SPLASH_POINTS * qualityScale));
+    const visibilityBoost = visibilityTest ? 1.7 : 1;
+    const activePoints = Math.min(
+      SPLASH_POINTS,
+      Math.round(SPLASH_POINTS * qualityScale * visibilityBoost),
+    );
     burst.age = 0;
-    burst.lifetime = 1.78 + strength * 0.28;
+    burst.lifetime = 1.95 + strength * 0.3 + (visibilityTest ? 0.35 : 0);
     burst.active = true;
     burst.strength = strength;
     burst.points.visible = true;
     burst.points.material.color.setHex(color);
-    burst.points.material.size = 0.9 + strength * 0.48;
-    burst.points.material.opacity = 0.98;
+    burst.points.material.size = (visibilityTest ? 1.45 : 1.08) + strength * (visibilityTest ? 0.78 : 0.56);
+    burst.points.material.opacity = visibilityTest ? 1 : 0.98;
+    burst.points.renderOrder = 44;
     burst.points.geometry.setDrawRange(0, activePoints);
 
     for (let index = 0; index < SPLASH_POINTS; index += 1) {
@@ -257,13 +271,13 @@ export const createSceneEffects = (
       }
 
       if (crown) {
-        const spread = (4.8 + Math.random() * 8) * strength;
+        const spread = (4.8 + Math.random() * (visibilityTest ? 10 : 8)) * strength;
         burst.velocities[offset] = Math.cos(angle) * spread;
-        burst.velocities[offset + 1] = (4.5 + Math.random() * 6.5) * strength;
+        burst.velocities[offset + 1] = (5.2 + Math.random() * (visibilityTest ? 8.5 : 6.5)) * strength;
         burst.velocities[offset + 2] = Math.sin(angle) * spread;
       } else {
         burst.velocities[offset] = (Math.random() - 0.5) * 3.5 * strength;
-        burst.velocities[offset + 1] = (13 + Math.random() * 15) * strength;
+        burst.velocities[offset + 1] = (14 + Math.random() * (visibilityTest ? 19 : 15)) * strength;
         burst.velocities[offset + 2] = (Math.random() - 0.5) * 3.5 * strength;
       }
     }
@@ -273,7 +287,7 @@ export const createSceneEffects = (
 
   const addSplashBlocks = (origin: THREE.Vector3, strength: number, color: number) => {
     const blockCount = Math.min(
-      Math.round((12 + strength * 18) * qualityScale),
+      Math.round((16 + strength * (visibilityTest ? 34 : 24)) * qualityScale * (visibilityTest ? 1.25 : 1)),
       splashBlocks.length,
     );
     for (let index = 0; index < blockCount; index += 1) {
@@ -283,8 +297,8 @@ export const createSceneEffects = (
       }
 
       const angle = Math.random() * Math.PI * 2;
-      const radius = (0.85 + Math.random() * 4.8) * strength;
-      const upward = 2.5 + Math.random() * 6.6 * strength;
+      const radius = (0.85 + Math.random() * (visibilityTest ? 6.4 : 5.2)) * strength;
+      const upward = 3.1 + Math.random() * (visibilityTest ? 8.6 : 6.9) * strength;
       block.active = true;
       block.age = 0;
       block.lifetime = 0.78 + Math.random() * 0.6 + strength * 0.16;
@@ -298,26 +312,29 @@ export const createSceneEffects = (
       block.mesh.position.copy(origin);
       block.mesh.position.x += (Math.random() - 0.5) * strength * 1.6;
       block.mesh.position.z += (Math.random() - 0.5) * strength * 1.6;
-      block.mesh.position.y = 0.28;
+      block.mesh.position.y = visibilityTest ? 0.74 : 0.54;
       block.mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      const scale = 0.16 + Math.random() * 0.3 + strength * 0.13;
-      block.mesh.scale.set(scale * (0.7 + Math.random() * 0.9), scale * 0.5, scale);
+      const scale =
+        (visibilityTest ? 0.28 : 0.2) +
+        Math.random() * (visibilityTest ? 0.46 : 0.34) +
+        strength * (visibilityTest ? 0.22 : 0.16);
+      block.mesh.scale.set(scale * (0.86 + Math.random() * 1.0), scale * 0.55, scale);
       block.mesh.material.color.setHex(color);
-      block.mesh.material.opacity = 0.82;
+      block.mesh.material.opacity = visibilityTest ? 1 : 0.92;
       block.mesh.visible = true;
     }
   };
 
   const addWhaleSplash = (btcAmount: number) => {
     // Whale splashes are local on-chain events and never drive global weather color.
-    const strength = getWhaleSplashScale(btcAmount);
+    const strength = getWhaleSplashScale(btcAmount) * (visibilityTest ? 1.22 : 1);
     const boat = getWaterPosition(getBoatPosition());
-    const placementAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 0.86;
-    const placementDistance = btcAmount >= 300 ? 20 + Math.random() * 34 : 24 + Math.random() * 48;
+    const placementAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 0.42;
+    const placementDistance = btcAmount >= 300 ? 48 + Math.random() * 32 : 58 + Math.random() * 42;
     const origin = new THREE.Vector3(
-      boat.x + Math.cos(placementAngle) * placementDistance + (Math.random() - 0.5) * 18,
-      0.18,
-      boat.z + Math.sin(placementAngle) * placementDistance - 8 + (Math.random() - 0.5) * 16,
+      boat.x + Math.cos(placementAngle) * placementDistance + (Math.random() - 0.5) * 12,
+      0.42,
+      boat.z + Math.sin(placementAngle) * placementDistance - 22 + (Math.random() - 0.5) * 12,
     );
     lastSplashDistanceToBoat = origin.distanceTo(boat);
     const proximity = Math.max(0, 1 - lastSplashDistanceToBoat / 92);
@@ -333,16 +350,16 @@ export const createSceneEffects = (
     addSplashBurst(origin, strength, color);
     addSplashBlocks(origin, strength, color);
 
-    addRing(color, strength * 2.45, origin, 1.72 + strength * 0.13, 0.38, 1.34);
-    addRing(0xdff6f8, strength * 1.26, origin, 1.08 + strength * 0.08, 0.34, 1.92);
+    addRing(color, strength * 2.6, origin, 1.72 + strength * 0.13, visibilityTest ? 0.74 : 0.54, 1.34);
+    addRing(0xdff6f8, strength * 1.38, origin, 1.08 + strength * 0.08, visibilityTest ? 0.66 : 0.48, 1.92);
     if (btcAmount >= 50) {
-      addRing(0x7deaff, strength * 0.92, origin, 0.86 + strength * 0.08, 0.22, 2.28);
+      addRing(0x7deaff, strength * 1.02, origin, 0.86 + strength * 0.08, visibilityTest ? 0.44 : 0.3, 2.28);
     }
     if (btcAmount >= 300) {
-      addRing(0xffffff, strength * 3.1, origin, 1.95, 0.26, 1.48);
+      addRing(0xffffff, strength * 3.35, origin, 1.95, visibilityTest ? 0.42 : 0.32, 1.48);
     }
     if (btcAmount >= 1000) {
-      addRing(0x9ff8ff, strength * 3.8, origin, 2.08, 0.2, 1.62);
+      addRing(0x9ff8ff, strength * 4.15, origin, 2.08, visibilityTest ? 0.36 : 0.26, 1.62);
     }
     if (lastBoatImpulseStrength > 0.08) {
       addBoatHop(lastBoatImpulseStrength);
@@ -539,9 +556,13 @@ export const createSceneEffects = (
       qualityScale,
       lastSplashDistanceToBoat,
       lastBoatImpulseStrength,
+      fxVisibilityTest: visibilityTest,
     }),
     setQualityScale: (scale) => {
       qualityScale = Math.max(0.45, Math.min(1, scale));
+    },
+    setVisibilityTest: (enabled) => {
+      visibilityTest = enabled;
     },
     stressTest: () => {
       addWhaleSplash(3);

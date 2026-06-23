@@ -12,7 +12,12 @@ import {
 } from "./lakeMap";
 import { createPostSystem } from "./postSystem";
 import { createTerrainSystem } from "./terrainSystem";
-import { type WaterSurface, animateWater, createWater } from "./waterSystem";
+import {
+  type WaterDebugMode,
+  type WaterSurface,
+  animateWater,
+  createWater,
+} from "./waterSystem";
 
 type HashlakeSceneOptions = {
   container: HTMLElement;
@@ -28,6 +33,9 @@ type HashlakeScene = {
   getTelemetry: () => SceneTelemetry;
   toggleDriveMode: () => void;
   setQualityPreset: (preset: QualityPreset) => void;
+  setFxVisibilityTest: (enabled: boolean) => void;
+  setWaterMode: (mode: WaterDebugMode) => void;
+  triggerWakeVisibilityBurst: () => void;
 };
 
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
@@ -59,14 +67,14 @@ const DRIVE_BANK_SCALE = 0.14;
 const DRIVE_CAMERA_DAMPING = 0.42;
 const FRAME_CAMERA_DAMPING = 0.08;
 const WAKE_BLOCK_SIZE_MIN = 0.46;
-const WAKE_BLOCK_SIZE_MAX = 1.28;
-const WAKE_VERTICAL_VELOCITY = 0.12;
-const WAKE_BACKWARD_VELOCITY = 5.4;
-const WAKE_OUTWARD_SPREAD = 3.25;
-const WAKE_LIFETIME_SECONDS = 0.82;
-const WAKE_EMISSION_RATE = 50;
-const WAKE_BOOST_MULTIPLIER = 1.58;
-const WAKE_SURFACE_Y_OFFSET = 0.2;
+const WAKE_BLOCK_SIZE_MAX = 1.58;
+const WAKE_VERTICAL_VELOCITY = 0.18;
+const WAKE_BACKWARD_VELOCITY = 6.8;
+const WAKE_OUTWARD_SPREAD = 4.8;
+const WAKE_LIFETIME_SECONDS = 0.72;
+const WAKE_EMISSION_RATE = 66;
+const WAKE_BOOST_MULTIPLIER = 1.72;
+const WAKE_SURFACE_Y_OFFSET = 0.52;
 const WAKE_FADE_SPEED = 1.26;
 const WAKE_MAX_ACTIVE_BLOCKS = 224;
 const QUALITY_TARGET_FPS = 54;
@@ -155,6 +163,8 @@ type SceneTelemetry = {
   mountainVertices: number;
   postEnabled: boolean;
   reflectionEnabled: boolean;
+  fxVisibilityTest: boolean;
+  waterMode: WaterDebugMode;
 };
 
 type CameraPreset = {
@@ -218,6 +228,7 @@ type DriveState = {
   mobileThrottle: boolean;
   mobileAnchor: boolean;
   mobileSteer: number;
+  wakeVisibilityBurstUntil: number;
 };
 
 type QualityState = {
@@ -235,6 +246,8 @@ type QualityState = {
   stableHighSamples: number;
   warmupUntil: number;
   minPixelRatio: number;
+  fxVisibilityTest: boolean;
+  waterMode: WaterDebugMode;
 };
 
 type DriveInput = {
@@ -582,6 +595,7 @@ export const createHashlakeScene = ({
     mobileThrottle: false,
     mobileAnchor: false,
     mobileSteer: 0,
+    wakeVisibilityBurstUntil: 0,
   };
   boat.position.x = driveState.x;
   boat.position.z = driveState.z;
@@ -634,6 +648,8 @@ export const createHashlakeScene = ({
     stableHighSamples: 0,
     warmupUntil: startedAt + QUALITY_WARMUP_MS,
     minPixelRatio,
+    fxVisibilityTest: false,
+    waterMode: "Balanced",
   };
   let animationId = 0;
   let hasRenderedFrame = false;
@@ -683,9 +699,11 @@ export const createHashlakeScene = ({
       renderer.setPixelRatio(qualityState.pixelRatio);
     }
     sceneEffects.setQualityScale(qualityState.effectScale);
+    sceneEffects.setVisibilityTest(qualityState.fxVisibilityTest);
     postSystem.setEnabled(qualityState.postEnabled);
     forestSystem.setQualityPreset(preset);
     water.setQualityPreset(preset);
+    water.setWaterMode(qualityState.waterMode);
   };
 
   const governQuality = (delta: number, now: number) => {
@@ -773,7 +791,15 @@ export const createHashlakeScene = ({
       lastForestUpdateAt = elapsed;
     }
     animateBoat(boat, elapsed, weather, driveState);
-    animateWakeEffect(wakeEffect, driveState, elapsed, delta, qualityState.wakeScale);
+    animateWakeEffect(
+      wakeEffect,
+      driveState,
+      elapsed,
+      delta,
+      qualityState.wakeScale,
+      qualityState.fxVisibilityTest,
+      now < driveState.wakeVisibilityBurstUntil,
+    );
     animateWeatherEffects(weatherEffects, elapsed, weather);
     sceneEffects.update(delta);
     applyWeatherToScene({
@@ -788,6 +814,7 @@ export const createHashlakeScene = ({
       sunDisc,
       clouds,
       weather,
+      waterMode: qualityState.waterMode,
       elapsed,
       driveState,
       cameraTarget,
@@ -1211,11 +1238,25 @@ export const createHashlakeScene = ({
           mountainVertices: terrainStats.mountainVertices,
           postEnabled: postSystem.enabled && terrainStats.postEnabled,
           reflectionEnabled: water.reflectionEnabled || terrainStats.reflectionEnabled,
+          fxVisibilityTest: qualityState.fxVisibilityTest,
+          waterMode: qualityState.waterMode,
         };
       })(),
     }),
     toggleDriveMode,
     setQualityPreset: (preset) => applyQualityPreset(preset, true),
+    setFxVisibilityTest: (enabled) => {
+      qualityState.fxVisibilityTest = enabled;
+      sceneEffects.setVisibilityTest(enabled);
+    },
+    setWaterMode: (mode) => {
+      qualityState.waterMode = mode;
+      water.setWaterMode(mode);
+    },
+    triggerWakeVisibilityBurst: () => {
+      driveState.wakeVisibilityBurstUntil = window.performance.now() + 1400;
+      driveState.wakePower = Math.max(driveState.wakePower, 1.24);
+    },
   };
 };
 
@@ -2184,8 +2225,10 @@ const createWakeEffect = (): WakeEffect => {
         transparent: true,
         opacity: 0,
         depthWrite: false,
+        depthTest: false,
       }),
     );
+    mesh.renderOrder = 40;
     group.add(mesh);
     segments.push({
       mesh,
@@ -2210,10 +2253,14 @@ const emitWakeSegment = (
   wake: WakeEffect,
   driveState: DriveState,
   side: number,
+  visibilityTest: boolean,
+  forceBurst: boolean,
 ) => {
-  const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
-  const wakePower = clamp(driveState.wakePower, 0, 1.34);
-  const reverseChurn = driveState.speed < -1;
+  const effectiveSpeed = forceBurst ? Math.max(38, Math.abs(driveState.speed)) : driveState.speed;
+  const speedRatio = clamp(Math.abs(effectiveSpeed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
+  const wakePower = clamp(forceBurst ? Math.max(1.18, driveState.wakePower) : driveState.wakePower, 0, 1.34);
+  const reverseChurn = !forceBurst && driveState.speed < -1;
+  const visibilityScale = visibilityTest ? 1.75 : 1;
   const forward = getBoatForward(driveState.yaw);
   const lateral = new THREE.Vector3(-forward.z, 0, forward.x);
   const segment = wake.segments[wake.cursor];
@@ -2224,8 +2271,8 @@ const emitWakeSegment = (
       : 1;
   const spread =
     side === 0
-      ? (Math.random() - 0.5) * WAKE_OUTWARD_SPREAD * (reverseChurn ? 0.18 : 0.28)
-      : 0.78 + speedRatio * WAKE_OUTWARD_SPREAD * (reverseChurn ? 0.32 : 0.82) + wakePower * 0.9;
+      ? (Math.random() - 0.5) * WAKE_OUTWARD_SPREAD * (reverseChurn ? 0.28 : 0.4)
+      : 0.95 + speedRatio * WAKE_OUTWARD_SPREAD * (reverseChurn ? 0.42 : 0.96) + wakePower * 1.15;
   const rearDistance =
     side === 0
       ? 6.28 + Math.random() * 0.88
@@ -2233,7 +2280,7 @@ const emitWakeSegment = (
   segment.mesh.position
     .set(
       driveState.x,
-      WAKE_SURFACE_Y_OFFSET + Math.random() * WAKE_VERTICAL_VELOCITY,
+      WAKE_SURFACE_Y_OFFSET + Math.random() * WAKE_VERTICAL_VELOCITY + (visibilityTest ? 0.26 : 0),
       driveState.z,
     )
     .addScaledVector(forward, -rearDistance)
@@ -2246,7 +2293,7 @@ const emitWakeSegment = (
   segment.mesh.scale.set(1, 1, 1);
   segment.age = 0;
   segment.lifetime =
-    WAKE_LIFETIME_SECONDS + speedRatio * 0.18 + wakePower * 0.1;
+    WAKE_LIFETIME_SECONDS + speedRatio * 0.2 + wakePower * 0.12 + (visibilityTest ? 0.12 : 0);
   segment.active = true;
   segment.side = side;
   segment.speedRatio = speedRatio;
@@ -2254,12 +2301,16 @@ const emitWakeSegment = (
     clamp(
       WAKE_BLOCK_SIZE_MIN +
         Math.random() * (WAKE_BLOCK_SIZE_MAX - WAKE_BLOCK_SIZE_MIN) +
-        wakePower * 0.2,
+        wakePower * 0.32,
       WAKE_BLOCK_SIZE_MIN,
-      WAKE_BLOCK_SIZE_MAX * boostIntensity,
+      WAKE_BLOCK_SIZE_MAX * boostIntensity * visibilityScale,
     );
-  segment.heightScale = 0.075 + Math.random() * 0.085 + wakePower * 0.028;
-  segment.lengthScale = (reverseChurn ? 0.9 : 1.18) + speedRatio * 1.05 + Math.random() * 0.5;
+  segment.heightScale =
+    (visibilityTest ? 0.13 : 0.09) + Math.random() * 0.11 + wakePower * (visibilityTest ? 0.065 : 0.04);
+  segment.lengthScale =
+    (reverseChurn ? 1.0 : 1.38) +
+    speedRatio * (visibilityTest ? 1.65 : 1.32) +
+    Math.random() * 0.7;
   segment.driftX =
     forward.x * -(WAKE_BACKWARD_VELOCITY + speedRatio * 2.4) * boostIntensity * (reverseChurn ? 0.36 : 1) +
     lateral.x * side * (0.68 + speedRatio * 1.42);
@@ -2267,8 +2318,12 @@ const emitWakeSegment = (
     forward.z * -(WAKE_BACKWARD_VELOCITY + speedRatio * 2.4) * boostIntensity * (reverseChurn ? 0.36 : 1) +
     lateral.z * side * (0.68 + speedRatio * 1.42);
   segment.spin = (Math.random() - 0.5) * (0.58 + wakePower * 0.26);
-  segment.mesh.material.color.set(speedRatio > 0.45 || wakePower > 0.55 ? 0xffffff : 0xf0fbff);
-  segment.mesh.material.opacity = clamp(0.58 + speedRatio * 0.18 + wakePower * 0.1, 0.56, 0.9);
+  segment.mesh.material.color.set(speedRatio > 0.35 || wakePower > 0.42 || visibilityTest ? 0xffffff : 0xf0fbff);
+  segment.mesh.material.opacity = clamp(
+    (visibilityTest ? 0.82 : 0.68) + speedRatio * 0.2 + wakePower * 0.13,
+    visibilityTest ? 0.78 : 0.64,
+    1,
+  );
 };
 
 const animateWakeEffect = (
@@ -2277,28 +2332,36 @@ const animateWakeEffect = (
   elapsed: number,
   delta: number,
   wakeQualityScale: number,
+  visibilityTest: boolean,
+  forceBurst: boolean,
 ) => {
-  const speedRatio = clamp(Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
-  const wakePower = clamp(driveState.wakePower, 0, 1.34);
+  const effectiveSpeed = forceBurst ? Math.max(38, Math.abs(driveState.speed)) : driveState.speed;
+  const speedRatio = clamp(Math.abs(effectiveSpeed) / DRIVE_BOOST_MAX_SPEED, 0, 1);
+  const wakePower = clamp(forceBurst ? Math.max(1.18, driveState.wakePower) : driveState.wakePower, 0, 1.34);
   const emitCadence = clamp(
-    1 / ((WAKE_EMISSION_RATE + wakePower * 24 + speedRatio * 14) * wakeQualityScale),
-    0.014,
-    0.068,
+    1 / ((WAKE_EMISSION_RATE + wakePower * 34 + speedRatio * 22) * wakeQualityScale * (visibilityTest ? 1.85 : 1)),
+    visibilityTest ? 0.007 : 0.012,
+    0.056,
   );
   if (
-    driveState.mode === "Drive" &&
-    (wakePower > 0.1 || speedRatio > 0.08) &&
+    (driveState.mode === "Drive" || forceBurst) &&
+    (forceBurst || wakePower > 0.1 || speedRatio > 0.08) &&
     elapsed - wake.lastEmitAt > emitCadence
   ) {
-    emitWakeSegment(wake, driveState, -1);
-    emitWakeSegment(wake, driveState, 1);
-    emitWakeSegment(wake, driveState, 0);
-    emitWakeSegment(wake, driveState, 0);
+    emitWakeSegment(wake, driveState, -1, visibilityTest, forceBurst);
+    emitWakeSegment(wake, driveState, 1, visibilityTest, forceBurst);
+    emitWakeSegment(wake, driveState, 0, visibilityTest, forceBurst);
+    emitWakeSegment(wake, driveState, 0, visibilityTest, forceBurst);
+    emitWakeSegment(wake, driveState, 0, visibilityTest, forceBurst);
     if (wakePower > 0.22) {
-      emitWakeSegment(wake, driveState, 0);
+      emitWakeSegment(wake, driveState, 0, visibilityTest, forceBurst);
     }
     if (driveState.throttleInput > 0.7 || speedRatio > 0.52) {
-      emitWakeSegment(wake, driveState, Math.random() > 0.5 ? 1 : -1);
+      emitWakeSegment(wake, driveState, Math.random() > 0.5 ? 1 : -1, visibilityTest, forceBurst);
+    }
+    if (visibilityTest || forceBurst) {
+      emitWakeSegment(wake, driveState, -1, visibilityTest, forceBurst);
+      emitWakeSegment(wake, driveState, 1, visibilityTest, forceBurst);
     }
     wake.lastEmitAt = elapsed;
   }
@@ -2317,6 +2380,7 @@ const animateWakeEffect = (
     segment.mesh.position.z += segment.driftZ * delta;
     segment.mesh.position.y =
       WAKE_SURFACE_Y_OFFSET +
+      (visibilityTest ? 0.18 : 0) +
       Math.sin(segment.age * 14 + segment.side * 1.7) * WAKE_VERTICAL_VELOCITY;
     segment.mesh.rotation.x += segment.spin * 0.04 * delta;
     segment.mesh.rotation.z += segment.spin * 0.48 * delta;
@@ -2444,6 +2508,7 @@ type WeatherSceneTargets = {
   sunDisc: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   clouds: THREE.Group;
   weather: WeatherSnapshot;
+  waterMode: WaterDebugMode;
   elapsed: number;
   driveState: DriveState;
   cameraTarget: THREE.Vector3;
@@ -2500,6 +2565,7 @@ const applyWeatherToScene = ({
   sunDisc,
   clouds,
   weather,
+  waterMode,
   elapsed,
   driveState,
   cameraTarget,
@@ -2551,6 +2617,13 @@ const applyWeatherToScene = ({
 
   lakeFill.material.color.setHex(palette.waterDeep);
   lakeFill.material.opacity = Math.max(0.5, 0.86 - weather.stormDarkness * 0.22);
+  if (waterMode === "Deep Reflective") {
+    lakeFill.material.color.setHex(0x023c78);
+    lakeFill.material.opacity = 0.74;
+  } else if (waterMode === "High Contrast Debug") {
+    lakeFill.material.color.setHex(0x000724);
+    lakeFill.material.opacity = 0.96;
+  }
   water.mesh.visible = true;
 
   clouds.children.forEach((cloud, index) => {
@@ -2627,7 +2700,7 @@ const createStatusPill = () => {
   status.className = "status-pill";
   status.innerHTML = `
     <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 24</span>
+    <span>Hashlake Phase 25</span>
   `;
   return status;
 };
