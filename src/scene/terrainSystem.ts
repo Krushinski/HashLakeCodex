@@ -177,7 +177,7 @@ const createTerrainMaterial = (
         vec3 albedo = mix(rock, forestColor, forest);
         float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
           * smoothstep(0.18, 0.46, slope);
-        albedo = mix(albedo, vec3(0.78, 0.83, 0.82), snow * 0.7);
+        albedo = mix(albedo, vec3(0.42, 0.48, 0.47), snow * 0.08);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.18 + uAmbient * (0.38 + 0.44 * slope));
@@ -190,7 +190,7 @@ const createTerrainMaterial = (
 
         float distanceToCamera = distance(vWorldPos, uCamPos);
         float haze = 1.0 - exp(-pow(distanceToCamera * uHazeDen, 1.45));
-        color = mix(color, uHorizon, clamp(haze, 0.0, 0.965));
+        color = mix(color, uHorizon, clamp(haze, 0.0, 0.58));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -264,7 +264,7 @@ export const createTerrainSystem = (): TerrainSystem => {
       ridgeFrequency: 2.4,
       hero: true,
     }),
-    createTerrainMaterial(shared, 0.56, 0.9),
+    createTerrainMaterial(shared, 1.12, 0.9),
   );
   const mid = new THREE.Mesh(
     buildRidgeRing({
@@ -327,16 +327,22 @@ export const createTerrainSystem = (): TerrainSystem => {
       const palette = getWeatherPalette(weather.stormIndex);
       shared.sunDir.value.set(-0.36, 0.72 - weather.dials.skyDark * 0.28, -0.44).normalize();
       shared.sunColor.value.setHex(palette.sunColor);
-      shared.horizon.value.setHex(weather.dials.fireWeather > 0.25 ? palette.skyHorizon : palette.fogColor);
+      shared.horizon.value.setHex(
+        weather.dials.fireWeather > 0.25
+          ? palette.skyHorizon
+          : weather.dials.skyDark > 0.35
+            ? 0x25343a
+            : 0x40595d,
+      );
       shared.ambient.value.setHex(palette.ambientLight);
       shared.cameraPosition.value.copy(camera.position);
-      shared.hazeDensity.value = 0.00018 + weather.dials.fog * 0.0008 + weather.dials.skyDark * 0.00012;
+      shared.hazeDensity.value = 0.00011 + weather.dials.fog * 0.00052 + weather.dials.skyDark * 0.00008;
       shared.fire.value = weather.dials.fireWeather;
       shared.dark.value = weather.dials.skyDark;
-      curtainBackMaterial.color.setHex(palette.fogColor);
-      curtainBackMaterial.opacity = 0.30 + weather.dials.fog * 0.14 + weather.dials.skyDark * 0.08;
-      curtainFrontMaterial.color.setHex(weather.dials.skyDark > 0.38 ? palette.stormTint : 0x102d2c);
-      curtainFrontMaterial.opacity = 0.48 + weather.dials.skyDark * 0.12;
+      curtainBackMaterial.color.setHex(weather.dials.skyDark > 0.35 ? 0x26383c : 0x2b4349);
+      curtainBackMaterial.opacity = 0.16 + weather.dials.fog * 0.10 + weather.dials.skyDark * 0.05;
+      curtainFrontMaterial.color.setHex(weather.dials.skyDark > 0.38 ? 0x26383c : 0x102d2c);
+      curtainFrontMaterial.opacity = 0.42 + weather.dials.skyDark * 0.10;
     },
     getStats: () => ({
       mountainVertices: scenicBackdropActive ? 0 : vertexCount,

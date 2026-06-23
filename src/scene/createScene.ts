@@ -1175,6 +1175,7 @@ export const createHashlakeScene = ({
       renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
       status.remove();
       driveHud.remove();
+      document.body.classList.remove("hashlake-drive-active");
       postSystem.dispose();
       sceneEffects.dispose();
       renderer.dispose();
@@ -1336,7 +1337,7 @@ const createSkyDome = (): SkyDome => {
         float coverage = mix(0.66, 0.19, dark) - stale * 0.05;
         float cloudMask = smoothstep(coverage, coverage + 0.24, cloudNoise) * smoothstep(0.0, 0.12, direction.y);
         float cloudShade = fbm(cloudUv * 2.3 + 41.0);
-        vec3 cloudLit = vec3(1.05, 1.01, 0.96) * (0.92 + toSun * 0.12);
+        vec3 cloudLit = vec3(0.78, 0.83, 0.82) * (0.90 + toSun * 0.08);
         vec3 cloudDark = mix(vec3(0.50, 0.56, 0.65), vec3(0.12, 0.13, 0.15), dark);
         vec3 cloudColor = mix(cloudLit, cloudDark, clamp(cloudShade + dark * 0.55, 0.0, 1.0));
         color = mix(color, cloudColor, cloudMask);
@@ -1361,6 +1362,29 @@ const createLakeFill = () => {
   const shape = new THREE.Shape(
     LAKE_MAP.outline.map((point) => new THREE.Vector2(point.x, point.z)),
   );
+  const islandHole = new THREE.Path();
+  islandHole.absellipse(
+    LAKE_MAP.island.center.x,
+    LAKE_MAP.island.center.z,
+    LAKE_MAP.island.radiusX + 6,
+    LAKE_MAP.island.radiusZ + 4,
+    0,
+    Math.PI * 2,
+    true,
+    LAKE_MAP.island.rotation,
+  );
+  const sandbarHole = new THREE.Path();
+  sandbarHole.absellipse(
+    LAKE_MAP.sandbar.center.x,
+    LAKE_MAP.sandbar.center.z,
+    LAKE_MAP.sandbar.radiusX + 8,
+    LAKE_MAP.sandbar.radiusZ + 3,
+    0,
+    Math.PI * 2,
+    true,
+    LAKE_MAP.sandbar.rotation,
+  );
+  shape.holes.push(islandHole, sandbarHole);
   const material = new THREE.MeshBasicMaterial({
     color: 0x020911,
     transparent: true,
@@ -1897,10 +1921,14 @@ const createDestinationMarkers = () => {
     color: 0xc4b27b,
     roughness: 0.92,
   });
+  const wetSandMaterial = new THREE.MeshStandardMaterial({
+    color: 0x7d7258,
+    roughness: 0.96,
+  });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x4e8c86,
+    color: 0x5aa59b,
     transparent: true,
-    opacity: 0.14,
+    opacity: 0.26,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -1973,6 +2001,22 @@ const createDestinationMarkers = () => {
   sandbarHalo.rotation.z = LAKE_MAP.sandbar.rotation;
   group.add(sandbarHalo);
 
+  const sandbarBankShape = new THREE.Shape(
+    createEllipseOutline(
+      { x: 0, z: 0 },
+      LAKE_MAP.sandbar.radiusX + 8,
+      LAKE_MAP.sandbar.radiusZ + 3,
+      0,
+    ).map((point) => new THREE.Vector2(point.x, point.z)),
+  );
+  const sandbarBank = new THREE.Mesh(new THREE.ShapeGeometry(sandbarBankShape, 8), wetSandMaterial);
+  sandbarBank.name = "Sandbar wet edge";
+  sandbarBank.position.set(sandbarCenter.x, 0.065, sandbarCenter.z);
+  sandbarBank.rotation.x = -Math.PI / 2;
+  sandbarBank.rotation.z = LAKE_MAP.sandbar.rotation;
+  sandbarBank.receiveShadow = true;
+  group.add(sandbarBank);
+
   const sandbarShape = new THREE.Shape(
     createEllipseOutline(
       { x: 0, z: 0 },
@@ -2022,6 +2066,20 @@ const createDestinationMarkers = () => {
 
   const island = new THREE.Group();
   island.name = "Rocky island";
+  const islandHaloShape = new THREE.Shape(
+    createEllipseOutline(
+      { x: 0, z: 0 },
+      LAKE_MAP.island.radiusX + 30,
+      LAKE_MAP.island.radiusZ + 18,
+      0,
+    ).map((point) => new THREE.Vector2(point.x, point.z)),
+  );
+  const islandHalo = new THREE.Mesh(new THREE.ShapeGeometry(islandHaloShape, 8), sandShallowMaterial);
+  islandHalo.name = "Island shallow transition";
+  islandHalo.position.set(islandCenter.x, 0.115, islandCenter.z);
+  islandHalo.rotation.x = -Math.PI / 2;
+  islandHalo.rotation.z = LAKE_MAP.island.rotation;
+  island.add(islandHalo);
   const islandShape = new THREE.Shape(
     createEllipseOutline(
       { x: 0, z: 0 },
@@ -2613,7 +2671,7 @@ const applyWeatherToScene = ({
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
         cloudColorScratch.setHex(dark > 0.48 ? palette.stormTint : 0xf5f1df);
         child.material.color.copy(cloudColorScratch);
-        child.material.opacity = 0.62 + dark * 0.28;
+        child.material.opacity = 0.46 + dark * 0.24;
       }
     });
   });
@@ -2696,11 +2754,12 @@ const createDriveHud = () => {
 
 const showDriveHud = (hud: HTMLDivElement, mode: "Frame" | "Drive") => {
   hud.dataset.mode = mode;
+  document.body.classList.toggle("hashlake-drive-active", mode === "Drive");
   hud.dataset.visibleUntil =
     mode === "Frame" ? String(window.performance.now() + 2200) : "always";
   hud.textContent =
     mode === "Drive"
-      ? "DRIVE MODE - Up throttle / Left-right steer / Hold-drag upward on mobile"
+      ? "DRIVE - Speed 0 - Camera locked"
       : "FRAME MODE - Living art view";
   hud.classList.add("drive-hud--visible");
 };
@@ -2716,12 +2775,15 @@ const animateDriveHud = (
   }
 
   if (driveState.mode === "Drive") {
-    hud.textContent = `DRIVE MODE - Hard-lock chase / Hold-drag upward to steer / Speed ${Math.abs(
+    document.body.classList.add("hashlake-drive-active");
+    hud.textContent = `DRIVE - Speed ${Math.abs(
       driveState.speed,
-    ).toFixed(0)}`;
+    ).toFixed(0)} - Camera locked`;
     hud.classList.add("drive-hud--visible");
     return;
   }
+
+  document.body.classList.remove("hashlake-drive-active");
 
   if (timestamp < driveState.scenicCameraLabelUntil) {
     const scenicPreset = getScenicCameraPresetForState(driveState);

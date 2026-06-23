@@ -264,8 +264,20 @@ body {
 }
 
 .drive-hud[data-mode="Drive"] {
+  top: auto;
+  bottom: clamp(58px, calc(2vw + 44px), 76px);
+  left: clamp(12px, 2vw, 24px);
+  max-width: min(310px, calc(100vw - 24px));
+  min-height: 30px;
+  padding: 7px 10px;
   border-color: rgba(126, 217, 218, 0.58);
+  font-size: 11px;
+  transform: translateY(6px);
   box-shadow: 0 0 28px rgba(126, 217, 218, 0.18);
+}
+
+.drive-hud--visible[data-mode="Drive"] {
+  transform: translateY(0);
 }
 
 .debug-panel-shell {
@@ -1039,6 +1051,25 @@ body {
 .event-toast--leaving {
   opacity: 0;
   transform: translateY(-8px) scale(0.98);
+}
+
+.hashlake-drive-active .event-toasts {
+  top: auto;
+  right: clamp(12px, 2vw, 24px);
+  bottom: clamp(16px, 2vw, 26px);
+  left: auto;
+  width: min(410px, calc(100vw - 24px));
+  transform: none;
+  justify-items: end;
+}
+
+.hashlake-drive-active .event-toast {
+  justify-self: end;
+  text-align: left;
+}
+
+.hashlake-drive-active .event-toast--leaving {
+  transform: translateY(8px) scale(0.98);
 }
 
 .mobile-mode-controls {

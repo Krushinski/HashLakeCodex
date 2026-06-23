@@ -24,6 +24,16 @@ type NearestShoreResult = {
   distance: number;
 };
 
+const ISLAND_EDGE_PADDING = {
+  x: 6,
+  z: 4,
+} as const;
+
+const SANDBAR_EDGE_PADDING = {
+  x: 8,
+  z: 3,
+} as const;
+
 export const LAKE_MAP = {
   outline: [
     { x: -690, z: -50 },
@@ -141,6 +151,24 @@ const rotateIntoEllipse = (
   };
 };
 
+const getEllipseClearance = (
+  point: LakePoint,
+  center: LakePoint,
+  radiusX: number,
+  radiusZ: number,
+  rotation: number,
+) => {
+  const rotated = rotateIntoEllipse(point, center, rotation);
+  const normalized = Math.hypot(rotated.x / radiusX, rotated.z / radiusZ);
+  const angle = Math.atan2(rotated.z / radiusZ, rotated.x / radiusX);
+  const boundary = {
+    x: Math.cos(angle) * radiusX,
+    z: Math.sin(angle) * radiusZ,
+  };
+  const distance = Math.hypot(rotated.x - boundary.x, rotated.z - boundary.z);
+  return normalized <= 1 ? -distance : distance;
+};
+
 const pointInPolygon = (point: LakePoint, polygon: readonly LakePoint[]) => {
   let inside = false;
   for (let index = 0, last = polygon.length - 1; index < polygon.length; last = index, index += 1) {
@@ -243,8 +271,8 @@ export const isInSandbar = (point: LakePoint) =>
   isInEllipse(
     point,
     LAKE_MAP.sandbar.center,
-    LAKE_MAP.sandbar.radiusX,
-    LAKE_MAP.sandbar.radiusZ,
+    LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x,
+    LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z,
     LAKE_MAP.sandbar.rotation,
   );
 
@@ -252,8 +280,8 @@ export const isInIsland = (point: LakePoint) =>
   isInEllipse(
     point,
     LAKE_MAP.island.center,
-    LAKE_MAP.island.radiusX,
-    LAKE_MAP.island.radiusZ,
+    LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x,
+    LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z,
     LAKE_MAP.island.rotation,
   );
 
@@ -266,8 +294,20 @@ export const distanceToShore = (point: LakePoint) => {
   const shore = getNearestShorePoint(point);
   const signedDistance = pointInPolygon(point, LAKE_MAP.outline) ? shore.distance : -shore.distance;
   const obstacleDistance = Math.min(
-    getDistance(point, LAKE_MAP.island.center) - LAKE_MAP.island.radiusX,
-    getDistance(point, LAKE_MAP.sandbar.center) - LAKE_MAP.sandbar.radiusX,
+    getEllipseClearance(
+      point,
+      LAKE_MAP.island.center,
+      LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x,
+      LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z,
+      LAKE_MAP.island.rotation,
+    ),
+    getEllipseClearance(
+      point,
+      LAKE_MAP.sandbar.center,
+      LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x,
+      LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z,
+      LAKE_MAP.sandbar.rotation,
+    ),
   );
   return Math.min(signedDistance, obstacleDistance);
 };
@@ -306,10 +346,10 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
   const afterIsland = pushOutOfEllipse(
     next,
     LAKE_MAP.island.center,
-    LAKE_MAP.island.radiusX,
-    LAKE_MAP.island.radiusZ,
+    LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x,
+    LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z,
     LAKE_MAP.island.rotation,
-    7,
+    3,
   );
   if (afterIsland !== next) {
     next = afterIsland;
@@ -319,10 +359,10 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
   const afterSandbar = pushOutOfEllipse(
     next,
     LAKE_MAP.sandbar.center,
-    LAKE_MAP.sandbar.radiusX,
-    LAKE_MAP.sandbar.radiusZ,
+    LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x,
+    LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z,
     LAKE_MAP.sandbar.rotation,
-    6,
+    3,
   );
   if (afterSandbar !== next) {
     next = afterSandbar;
