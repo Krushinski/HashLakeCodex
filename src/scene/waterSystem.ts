@@ -18,6 +18,9 @@ export type WaterSurface = {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   basePositions: Float32Array;
   reflectionEnabled: boolean;
+  reflectionBand: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  shimmerLayer: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  shallowLayer: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   setQualityPreset: (preset: WaterQualityPreset) => void;
 };
 
@@ -28,6 +31,216 @@ const clamp = (value: number, min: number, max: number) =>
 
 const defaultDeepWater = new THREE.Color(0x011d38);
 const defaultShallowWater = new THREE.Color(0x1d6974);
+
+const cloneWaterGeometryAtHeight = (
+  source: THREE.BufferGeometry,
+  height: number,
+) => {
+  const geometry = source.clone();
+  const position = geometry.attributes.position;
+  const values = position.array as Float32Array;
+  for (let index = 0; index < values.length; index += 3) {
+    values[index + 1] = height;
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+const createShimmerLayer = (geometry: THREE.BufferGeometry) => {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDark: { value: 0 },
+      uChop: { value: 0 },
+      uStale: { value: 0 },
+      uOpacity: { value: 0.16 },
+      uColorDeep: { value: new THREE.Color(0x0a5c83) },
+      uColorHigh: { value: new THREE.Color(0x8fe8ff) },
+    },
+    vertexShader: `
+      attribute float depthFactor;
+      attribute float sandFactor;
+      varying vec3 vWorldPos;
+      varying float vDepth;
+      varying float vSand;
+
+      void main() {
+        vDepth = depthFactor;
+        vSand = sandFactor;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uDark;
+      uniform float uChop;
+      uniform float uStale;
+      uniform float uOpacity;
+      uniform vec3 uColorDeep;
+      uniform vec3 uColorHigh;
+      varying vec3 vWorldPos;
+      varying float vDepth;
+      varying float vSand;
+
+      void main() {
+        float openWater = smoothstep(0.34, 0.96, vDepth) * (1.0 - vSand * 0.84);
+        float longGlint = sin(vWorldPos.x * 0.016 + sin(vWorldPos.z * 0.008 + uTime * 0.11) * 1.6 + uTime * 0.18) * 0.5 + 0.5;
+        float crossGlint = sin((vWorldPos.x + vWorldPos.z * 0.34) * 0.028 - uTime * (0.18 + uChop * 0.28)) * 0.5 + 0.5;
+        float band = smoothstep(0.52, 0.98, longGlint) * (0.36 + crossGlint * 0.64);
+        float farMirror = smoothstep(-560.0, -230.0, vWorldPos.z) * (1.0 - smoothstep(86.0, 286.0, vWorldPos.z));
+        float foregroundFalloff = 0.56 + 0.44 * smoothstep(-160.0, 250.0, vWorldPos.z);
+        float alpha = (band * openWater * 0.42 + farMirror * (0.24 + band * 0.56)) * uOpacity;
+        alpha *= foregroundFalloff * (1.0 - uDark * 0.52) * (1.0 - uStale * 0.18);
+        vec3 color = mix(uColorDeep, uColorHigh, band * 0.54 + farMirror * 0.22);
+        color = mix(color, vec3(0.075, 0.105, 0.118), uDark * 0.62);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+  });
+  const mesh = new THREE.Mesh(cloneWaterGeometryAtHeight(geometry, 0.19), material);
+  mesh.name = "Native lake shimmer layer";
+  mesh.renderOrder = 8;
+  return mesh;
+};
+
+const createReflectionBand = () => {
+  const geometry = new THREE.PlaneGeometry(1580, 340, 28, 10);
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDark: { value: 0 },
+      uFire: { value: 0 },
+      uStale: { value: 0 },
+      uOpacity: { value: 0.42 },
+      uReflectionStrength: { value: 1 },
+      uSkyColor: { value: new THREE.Color(0x24495d) },
+      uTreeColor: { value: new THREE.Color(0x061d1d) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+
+      void main() {
+        vUv = uv;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uDark;
+      uniform float uFire;
+      uniform float uStale;
+      uniform float uOpacity;
+      uniform float uReflectionStrength;
+      uniform vec3 uSkyColor;
+      uniform vec3 uTreeColor;
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+      }
+
+      void main() {
+        float yFade = smoothstep(0.02, 0.28, vUv.y) * (1.0 - smoothstep(0.82, 1.0, vUv.y));
+        float centerFade = 1.0 - smoothstep(0.84, 1.0, abs(vUv.x - 0.5) * 2.0);
+        float streak = sin(vWorldPos.x * 0.022 + sin(vWorldPos.z * 0.019 + uTime * 0.15) * 2.1) * 0.5 + 0.5;
+        streak *= 0.72 + hash(floor(vUv.x * 52.0)) * 0.28;
+        float treeStripe = smoothstep(0.30, 0.78, sin(vWorldPos.x * 0.047 + uTime * 0.035) * 0.5 + 0.5);
+        vec3 coolMirror = mix(uSkyColor, uTreeColor, 0.55 + treeStripe * 0.34);
+        vec3 stormMirror = mix(vec3(0.010, 0.018, 0.024), vec3(0.055, 0.020, 0.014), uFire * 0.74);
+        vec3 color = mix(coolMirror, stormMirror, uDark * 0.84);
+        color += vec3(0.028, 0.068, 0.078) * streak * (1.0 - uDark * 0.7);
+        color = mix(color, vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), uStale * 0.16);
+        float alpha = yFade * centerFade * (0.38 + streak * 0.36) * uOpacity * uReflectionStrength;
+        alpha *= 1.0 - uStale * 0.18;
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "Native horizon reflection band";
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(0, 0.225, -118);
+  mesh.renderOrder = 7;
+  return mesh;
+};
+
+const createShallowLayer = () => {
+  const geometry = new THREE.PlaneGeometry(
+    LAKE_MAP.sandbar.radiusX * 3.08,
+    LAKE_MAP.sandbar.radiusZ * 4.2,
+    24,
+    10,
+  );
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDark: { value: 0 },
+      uStale: { value: 0 },
+      uOpacity: { value: 0.5 },
+      uShallowColor: { value: new THREE.Color(0x3ca5a4) },
+      uSandColor: { value: new THREE.Color(0x7d8d72) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+
+      void main() {
+        vUv = uv;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uDark;
+      uniform float uStale;
+      uniform float uOpacity;
+      uniform vec3 uShallowColor;
+      uniform vec3 uSandColor;
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+
+      void main() {
+        vec2 centered = (vUv - 0.5) * vec2(1.0, 2.2);
+        float radius = length(centered);
+        float softEdge = 1.0 - smoothstep(0.26, 0.64, radius);
+        float outerTint = 1.0 - smoothstep(0.50, 0.86, radius);
+        float ripples = sin(vWorldPos.x * 0.055 + vWorldPos.z * 0.036 + uTime * 0.32) * 0.5 + 0.5;
+        vec3 color = mix(uShallowColor, uSandColor, 0.36 + outerTint * 0.28);
+        color += vec3(0.02, 0.06, 0.05) * ripples * (1.0 - uDark);
+        color = mix(color, vec3(0.07, 0.09, 0.08), uDark * 0.58);
+        color = mix(color, vec3(0.19, 0.22, 0.20), uStale * 0.16);
+        float alpha = softEdge * (0.22 + ripples * 0.12) * uOpacity * (1.0 - uDark * 0.25);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "Native sandbar shallows blend";
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.rotation.z = LAKE_MAP.sandbar.rotation;
+  mesh.position.set(LAKE_MAP.sandbar.center.x, 0.245, LAKE_MAP.sandbar.center.z);
+  mesh.renderOrder = 9;
+  return mesh;
+};
 
 const createOrganicWaterGeometry = () => {
   const geometry = new THREE.BufferGeometry();
@@ -176,7 +389,7 @@ export const createWater = (): WaterSurface => {
 
         float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.15);
         fresnel = clamp(mix(0.08, 0.95, fresnel) + uChop * 0.04, 0.0, 1.0);
-        vec3 deep = mix(uDeepColor * 0.48, uStormColor * 0.86, uDark);
+        vec3 deep = mix(uDeepColor * 0.58, uStormColor * 0.86, uDark);
         vec3 shallow = mix(uShallowColor * 0.58, vec3(0.28, 0.42, 0.44), uStale * 0.42);
         vec3 depthColor = mix(shallow, deep, smoothstep(0.10, 1.0, vDepth));
         depthColor = mix(depthColor, vec3(0.30, 0.34, 0.25), vSand * (1.0 - uDark) * 0.10);
@@ -202,11 +415,11 @@ export const createWater = (): WaterSurface => {
         silk = pow(silk, 3.0);
         float broadSheen = sin(vWorldPos.z * 0.016 - uTime * 0.035) * 0.5 + 0.5;
         float farGloss = smoothstep(-520.0, -160.0, vWorldPos.z) * (1.0 - smoothstep(120.0, 300.0, vWorldPos.z));
-        color += vec3(0.030, 0.078, 0.095) * openWater * (0.24 + silk * 0.74 + broadSheen * 0.16) * (1.0 - uDark * 0.72);
-        color += vec3(0.020, 0.055, 0.070) * farGloss * (0.42 + horizontalShimmer * 0.34) * (1.0 - uDark * 0.75);
+        color += vec3(0.038, 0.098, 0.128) * openWater * (0.24 + silk * 0.74 + broadSheen * 0.16) * (1.0 - uDark * 0.72);
+        color += vec3(0.028, 0.078, 0.104) * farGloss * (0.42 + horizontalShimmer * 0.34) * (1.0 - uDark * 0.75);
         color = mix(color, color + vec3(0.0, 0.032, 0.042), fresnel * openWater * (1.0 - uDark * 0.65));
-        color *= 0.50 + vDepth * 0.22;
-        color += vec3(0.005, 0.018, 0.030) * smoothstep(0.45, 1.0, vDepth);
+        color *= 0.56 + vDepth * 0.28;
+        color += vec3(0.006, 0.026, 0.044) * smoothstep(0.45, 1.0, vDepth);
 
         vec3 sunDir = normalize(vec3(-0.36, 0.72 - uDark * 0.28, -0.44));
         vec3 halfDir = normalize(viewDir + sunDir);
@@ -219,7 +432,7 @@ export const createWater = (): WaterSurface => {
         color = mix(color, vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), uStale * 0.16);
         color = mix(color, color * vec3(0.62, 0.68, 0.72), uDark * 0.26);
 
-        gl_FragColor = vec4(color, 0.96);
+        gl_FragColor = vec4(color, 0.985);
       }
     `,
     vertexColors: true,
@@ -231,17 +444,33 @@ export const createWater = (): WaterSurface => {
   mesh.name = "HashLake3-adapted procedural water";
   mesh.receiveShadow = true;
   mesh.position.y = 0;
+  mesh.renderOrder = 5;
+  const reflectionBand = createReflectionBand();
+  const shimmerLayer = createShimmerLayer(geometry);
+  const shallowLayer = createShallowLayer();
+  mesh.add(reflectionBand, shimmerLayer, shallowLayer);
   const position = geometry.attributes.position;
   const surface: WaterSurface = {
     mesh,
     basePositions: new Float32Array(position.array),
     reflectionEnabled: true,
+    reflectionBand,
+    shimmerLayer,
+    shallowLayer,
     setQualityPreset: (preset) => {
       currentPreset = preset;
       surface.reflectionEnabled = preset !== "Performance";
       const presetStrength =
-        currentPreset === "Scenic" ? 1.38 : currentPreset === "Performance" ? 0.92 : 1.26;
+        currentPreset === "Scenic" ? 1.52 : currentPreset === "Performance" ? 0.82 : 1.26;
       material.uniforms.uReflectionStrength.value = presetStrength;
+      reflectionBand.material.uniforms.uReflectionStrength.value =
+        currentPreset === "Scenic" ? 1.26 : currentPreset === "Performance" ? 0.72 : 1;
+      reflectionBand.material.uniforms.uOpacity.value =
+        currentPreset === "Scenic" ? 0.52 : currentPreset === "Performance" ? 0.28 : 0.42;
+      shimmerLayer.material.uniforms.uOpacity.value =
+        currentPreset === "Scenic" ? 0.2 : currentPreset === "Performance" ? 0.1 : 0.16;
+      shallowLayer.material.uniforms.uOpacity.value =
+        currentPreset === "Scenic" ? 0.58 : currentPreset === "Performance" ? 0.36 : 0.5;
     },
   };
   return surface;
@@ -301,4 +530,31 @@ export const animateWater = (
   water.mesh.material.uniforms.uStormColor.value.setHex(palette.waterDeep);
   water.mesh.material.uniforms.uSunColor.value.setHex(palette.sunColor);
   camera.getWorldPosition(water.mesh.material.uniforms.uCamPos.value);
+
+  water.reflectionBand.visible = water.reflectionEnabled;
+  water.reflectionBand.material.uniforms.uTime.value = elapsed;
+  water.reflectionBand.material.uniforms.uDark.value = weather.dials.skyDark;
+  water.reflectionBand.material.uniforms.uFire.value = weather.dials.fireWeather;
+  water.reflectionBand.material.uniforms.uStale.value = weather.staleData ? 1 : 0;
+  water.reflectionBand.material.uniforms.uSkyColor.value
+    .setHex(palette.skyHorizon)
+    .lerp(defaultDeepWater, 0.28 + weather.dials.skyDark * 0.28);
+
+  water.shimmerLayer.material.uniforms.uTime.value = elapsed;
+  water.shimmerLayer.material.uniforms.uDark.value = weather.dials.skyDark;
+  water.shimmerLayer.material.uniforms.uChop.value = weather.dials.chop;
+  water.shimmerLayer.material.uniforms.uStale.value = weather.staleData ? 1 : 0;
+  water.shimmerLayer.material.uniforms.uColorDeep.value
+    .setHex(palette.waterDeep)
+    .lerp(defaultDeepWater, 0.38);
+  water.shimmerLayer.material.uniforms.uColorHigh.value
+    .setHex(palette.waterShallow)
+    .lerp(new THREE.Color(0x9aeaff), 0.46 - weather.dials.skyDark * 0.18);
+
+  water.shallowLayer.material.uniforms.uTime.value = elapsed;
+  water.shallowLayer.material.uniforms.uDark.value = weather.dials.skyDark;
+  water.shallowLayer.material.uniforms.uStale.value = weather.staleData ? 1 : 0;
+  water.shallowLayer.material.uniforms.uShallowColor.value
+    .setHex(palette.waterShallow)
+    .lerp(defaultShallowWater, 0.26);
 };

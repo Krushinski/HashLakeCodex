@@ -2602,7 +2602,7 @@ const applyWeatherToScene = ({
   sunDisc.visible = dark < 0.72 || fire > 0.38;
 
   lakeFill.material.color.setHex(dark > 0.58 ? palette.waterDeep : 0x011a33);
-  lakeFill.material.opacity = Math.max(0.64, 0.82 - weather.stormDarkness * 0.16);
+  lakeFill.material.opacity = Math.max(0.48, 0.66 - weather.stormDarkness * 0.12);
   water.mesh.visible = true;
 
   clouds.children.forEach((cloud, index) => {
