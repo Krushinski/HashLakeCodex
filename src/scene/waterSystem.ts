@@ -252,8 +252,8 @@ export const createWater = (): WaterSurface => {
         float bodyWaveA = sin(vWorldPos.x * 0.007 + vWorldPos.z * 0.004 + uTime * (0.034 + uWind * 0.032));
         float bodyWaveB = sin(vWorldPos.x * -0.004 + vWorldPos.z * 0.009 - uTime * (0.030 + uWind * 0.026));
         float bodyWave = bodyWaveA * 0.52 + bodyWaveB * 0.48;
-        float basin = smoothstep(0.32, 0.98, depth) * (0.965 + bodyWave * 0.035);
-        base = mix(base, base * vec3(0.72, 0.90, 0.98), basin * (1.0 - uDark * 0.30) * 0.075);
+        float basin = smoothstep(0.32, 0.98, depth) * (0.975 + bodyWave * 0.025);
+        base = mix(base, base * vec3(0.72, 0.90, 0.98), basin * (1.0 - uDark * 0.30) * 0.062);
         base += vec3(0.014, 0.052, 0.068) * (1.0 - uDark * 0.24) * openWater;
 
         float farBand = smoothstep(-710.0, -210.0, vWorldPos.z) * (1.0 - smoothstep(120.0, 380.0, vWorldPos.z));
@@ -264,7 +264,7 @@ export const createWater = (): WaterSurface => {
         skyMirror = mix(skyMirror, vec3(0.030, 0.046, 0.055), uDark * 0.72);
         vec3 forestMirror = mix(vec3(0.008, 0.036, 0.032), vec3(0.026, 0.076, 0.062), forestColumns);
         vec3 reflectedMood = mix(skyMirror, forestMirror, 0.32 + farBand * 0.22);
-        reflectedMood += vec3(0.052, 0.108, 0.120) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.20;
+        reflectedMood += vec3(0.052, 0.108, 0.120) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.24;
 
         float reflectionAmount = clamp((fresnel * 0.82 + farBand * 0.20 + openWater * 0.10) * uReflectionStrength, 0.0, 0.82);
         vec3 color = mix(base, reflectedMood, reflectionAmount);
@@ -276,7 +276,7 @@ export const createWater = (): WaterSurface => {
         fineRipple *= sin(vWorldPos.x * -0.046 + vWorldPos.z * 0.071 - uTime * 0.41) * 0.5 + 0.5;
         float calmMotion = bodyWave * 0.5 + (midWave - 0.5) * 0.28;
         color *= 0.996 + calmMotion * openWater * (1.0 - uDark * 0.24) * 0.022;
-        color += vec3(0.055, 0.135, 0.165) * (midWave - 0.45) * openWater * (0.12 + nearCamera * 0.13) * (1.0 - uDark * 0.18);
+        color += vec3(0.055, 0.135, 0.165) * (midWave - 0.47) * openWater * (0.09 + nearCamera * 0.10) * (1.0 - uDark * 0.18);
         color += vec3(0.28, 0.44, 0.50) * pow(fineRipple, 3.5) * openWater * (0.08 + nearCamera * 0.28) * (0.08 + uChop * 0.14);
 
         float causticA = sin(vWorldPos.x * 0.055 + vWorldPos.z * 0.030 + uTime * 0.20);

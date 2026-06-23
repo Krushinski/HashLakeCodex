@@ -43,7 +43,7 @@ const boot = () => {
   }
 
   try {
-    setFallback("Launching the realtime lake renderer...");
+    setFallback("Waiting for signal...");
     const eventBus = createEventBus();
     const weatherStore = createWeatherStore(eventBus);
     const liveBitcoinStore = createLiveBitcoinStore(eventBus);

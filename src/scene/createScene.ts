@@ -1797,17 +1797,23 @@ const createStripGeometry = (
   return geometry;
 };
 
-const createEllipseOutline = (
+const createOrganicEllipseOutline = (
   center: { x: number; z: number },
   radiusX: number,
   radiusZ: number,
   rotation: number,
-  count = 48,
+  seed: number,
+  wobble = 0.04,
+  count = 64,
 ) =>
   Array.from({ length: count }, (_, index) => {
     const angle = (index / count) * Math.PI * 2;
-    const localX = Math.cos(angle) * radiusX;
-    const localZ = Math.sin(angle) * radiusZ;
+    const ripple =
+      1 +
+      Math.sin(angle * 3 + seed) * wobble +
+      Math.sin(angle * 7 + seed * 0.43) * wobble * 0.42;
+    const localX = Math.cos(angle) * radiusX * ripple;
+    const localZ = Math.sin(angle) * radiusZ * (1 + (ripple - 1) * 0.72);
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
     return {
@@ -1832,9 +1838,9 @@ const createShoreline = () => {
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x3f827d,
+    color: 0x5b9d95,
     transparent: true,
-    opacity: 0.13,
+    opacity: 0.09,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -1926,9 +1932,9 @@ const createDestinationMarkers = () => {
     roughness: 0.96,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x5aa59b,
+    color: 0x70b9ad,
     transparent: true,
-    opacity: 0.26,
+    opacity: 0.13,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -1987,11 +1993,13 @@ const createDestinationMarkers = () => {
   group.add(dock);
 
   const sandbarHaloShape = new THREE.Shape(
-    createEllipseOutline(
+    createOrganicEllipseOutline(
       { x: 0, z: 0 },
       LAKE_MAP.sandbar.radiusX + 28,
       LAKE_MAP.sandbar.radiusZ + 14,
       0,
+      11,
+      0.035,
     ).map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const sandbarHalo = new THREE.Mesh(new THREE.ShapeGeometry(sandbarHaloShape, 8), sandShallowMaterial);
@@ -2002,11 +2010,13 @@ const createDestinationMarkers = () => {
   group.add(sandbarHalo);
 
   const sandbarBankShape = new THREE.Shape(
-    createEllipseOutline(
+    createOrganicEllipseOutline(
       { x: 0, z: 0 },
       LAKE_MAP.sandbar.radiusX + 8,
       LAKE_MAP.sandbar.radiusZ + 3,
       0,
+      23,
+      0.03,
     ).map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const sandbarBank = new THREE.Mesh(new THREE.ShapeGeometry(sandbarBankShape, 8), wetSandMaterial);
@@ -2018,11 +2028,13 @@ const createDestinationMarkers = () => {
   group.add(sandbarBank);
 
   const sandbarShape = new THREE.Shape(
-    createEllipseOutline(
+    createOrganicEllipseOutline(
       { x: 0, z: 0 },
       LAKE_MAP.sandbar.radiusX,
       LAKE_MAP.sandbar.radiusZ,
       0,
+      31,
+      0.025,
     ).map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const sandbar = new THREE.Mesh(new THREE.ShapeGeometry(sandbarShape, 8), sandMaterial);
@@ -2067,11 +2079,13 @@ const createDestinationMarkers = () => {
   const island = new THREE.Group();
   island.name = "Rocky island";
   const islandHaloShape = new THREE.Shape(
-    createEllipseOutline(
+    createOrganicEllipseOutline(
       { x: 0, z: 0 },
       LAKE_MAP.island.radiusX + 30,
       LAKE_MAP.island.radiusZ + 18,
       0,
+      43,
+      0.05,
     ).map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const islandHalo = new THREE.Mesh(new THREE.ShapeGeometry(islandHaloShape, 8), sandShallowMaterial);
@@ -2081,11 +2095,13 @@ const createDestinationMarkers = () => {
   islandHalo.rotation.z = LAKE_MAP.island.rotation;
   island.add(islandHalo);
   const islandShape = new THREE.Shape(
-    createEllipseOutline(
+    createOrganicEllipseOutline(
       { x: 0, z: 0 },
       LAKE_MAP.island.radiusX,
       LAKE_MAP.island.radiusZ,
       0,
+      59,
+      0.035,
     ).map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const islandBase = new THREE.Mesh(new THREE.ShapeGeometry(islandShape, 8), rockMaterial);
@@ -2110,11 +2126,13 @@ const createDestinationMarkers = () => {
   const islandBank = new THREE.Mesh(
     new THREE.ShapeGeometry(
       new THREE.Shape(
-        createEllipseOutline(
+        createOrganicEllipseOutline(
           { x: 0, z: 0 },
           LAKE_MAP.island.radiusX + 6,
           LAKE_MAP.island.radiusZ + 4,
           0,
+          67,
+          0.032,
         ).map((point) => new THREE.Vector2(point.x, point.z)),
       ),
       8,
@@ -2204,14 +2222,14 @@ const createHorizonHaze = () => {
   const group = new THREE.Group();
   group.name = "Atmospheric horizon haze";
   const bands = [
-    { y: 32, z: -540, height: 70, opacity: 0.22 },
-    { y: 70, z: -690, height: 108, opacity: 0.16 },
-    { y: 120, z: -840, height: 150, opacity: 0.1 },
+    { y: 34, z: -548, height: 74, opacity: 0.12 },
+    { y: 76, z: -704, height: 116, opacity: 0.08 },
+    { y: 128, z: -864, height: 156, opacity: 0.055 },
   ];
 
   bands.forEach((band, index) => {
     const material = new THREE.MeshBasicMaterial({
-      color: index === 0 ? 0xc9e4e9 : 0x9fc2cc,
+      color: index === 0 ? 0x6e8f91 : 0x597a82,
       transparent: true,
       opacity: band.opacity,
       depthWrite: false,
