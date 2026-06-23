@@ -398,11 +398,11 @@ export const createSceneEffects = (
     addSplashBurst(origin, strength, color);
     addSplashBlocks(origin, strength, color);
 
-    addRing(color, strength * 2.6, origin, 1.72 + strength * 0.13, visibilityTest ? 0.88 : 0.80, 1.34);
-    addRing(0xf4feff, strength * 2.42, origin, 1.42 + strength * 0.1, visibilityTest ? 0.52 : 0.42, 1.42);
-    addRing(0xdff6f8, strength * 1.38, origin, 1.08 + strength * 0.08, visibilityTest ? 0.74 : 0.58, 1.92);
+    addRing(color, strength * 2.76, origin, 1.78 + strength * 0.14, visibilityTest ? 0.94 : 0.86, 1.38);
+    addRing(0xf4feff, strength * 2.50, origin, 1.46 + strength * 0.1, visibilityTest ? 0.56 : 0.46, 1.46);
+    addRing(0xdff6f8, strength * 1.44, origin, 1.10 + strength * 0.08, visibilityTest ? 0.76 : 0.62, 1.96);
     if (btcAmount >= 50) {
-      addRing(0x9ff8ff, strength * 1.16, origin, 0.94 + strength * 0.08, visibilityTest ? 0.52 : 0.38, 2.32);
+      addRing(0x9ff8ff, strength * 1.20, origin, 0.98 + strength * 0.08, visibilityTest ? 0.56 : 0.42, 2.36);
       addSplashBlocks(origin, strength * 0.58, 0xf4feff);
     }
     if (btcAmount >= 300) {
@@ -498,11 +498,12 @@ export const createSceneEffects = (
       const progress = Math.min(1, ring.age / ring.lifetime);
       const t = ring.age * ring.speed;
       const radius = ring.baseScale * (1 + t * 9);
-      const shimmer = 0.86 + Math.sin(ring.age * 20 + ring.baseScale * 0.31) * 0.14;
-      const fizzle = progress > 0.68 ? 0.86 + Math.sin(ring.age * 54 + ring.baseScale) * 0.14 : 1;
-      const glimmer = Math.max(0, Math.sin(ring.age * 25 + ring.baseScale * 0.19)) ** 2 * (1 - progress * 0.72);
-      ring.mesh.material.opacity = Math.max(0, ring.baseOpacity * (1 - progress) ** 1.08 * shimmer * fizzle);
-      ring.mesh.material.color.copy(ring.baseColor).lerp(ringGlimmerColor, glimmer * 0.38);
+      const shimmer = 0.88 + Math.sin(ring.age * 22 + ring.baseScale * 0.31) * 0.12;
+      const fizzle = progress > 0.66 ? 0.80 + Math.sin(ring.age * 64 + ring.baseScale) * 0.20 : 1;
+      const frontGlow = Math.exp(-Math.pow(progress - 0.22, 2) / 0.012);
+      const glimmer = Math.max(0, Math.sin(ring.age * 31 + ring.baseScale * 0.19)) ** 2 * (1 - progress * 0.62);
+      ring.mesh.material.opacity = Math.max(0, ring.baseOpacity * (1 - progress) ** 0.96 * shimmer * fizzle * (1 + frontGlow * 0.18));
+      ring.mesh.material.color.copy(ring.baseColor).lerp(ringGlimmerColor, Math.min(1, glimmer * 0.46 + frontGlow * 0.18));
       let writeOffset = 0;
       let activeSegments = 0;
       const y = getWaterHeight(ring.origin.x, ring.origin.z, ring.age) + (visibilityTest ? 0.34 : 0.20);
@@ -521,7 +522,7 @@ export const createSceneEffects = (
 
         if (isWater(pointA) && isWater(pointB) && shoreA > 5.0 && shoreB > 5.0) {
           for (let pass = 0; pass < RING_THICKNESS_PASSES; pass += 1) {
-            const offsetRadius = (pass - 1.5) * 0.82;
+            const offsetRadius = (pass - 1.5) * 0.92;
             const passRadiusA = radius + offsetRadius;
             const passRadiusB = radius + offsetRadius;
             const ax = ring.origin.x + Math.cos(angleA) * passRadiusA;

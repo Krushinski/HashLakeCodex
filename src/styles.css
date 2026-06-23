@@ -287,8 +287,8 @@ body {
   left: clamp(12px, 2vw, 24px);
   bottom: clamp(92px, calc(2vw + 78px), 112px);
   z-index: 16;
-  width: 176px;
-  height: 106px;
+  width: 190px;
+  height: 116px;
   color: #fff6df;
   opacity: 0;
   pointer-events: none;
@@ -305,24 +305,24 @@ body {
 
 .drive-speedometer__dial {
   position: relative;
-  width: 160px;
-  height: 88px;
+  width: 174px;
+  height: 96px;
   overflow: hidden;
   border-radius: 160px 160px 24px 24px;
   background:
     conic-gradient(
       from 244deg at 50% 91%,
-      rgba(106, 235, 221, 0.20) 0deg,
-      rgba(126, 217, 218, 0.82) calc(var(--speed-ratio) * 232deg),
-      rgba(255, 246, 223, 0.10) 0deg,
-      rgba(255, 246, 223, 0.12) 232deg,
+      rgba(239, 253, 249, 0.34) 0deg,
+      rgba(174, 255, 241, 0.96) calc(var(--speed-ratio) * 232deg),
+      rgba(255, 246, 223, 0.20) 0deg,
+      rgba(255, 246, 223, 0.22) 232deg,
       transparent 232deg
     ),
-    radial-gradient(ellipse at 50% 92%, rgba(255, 246, 223, 0.22), rgba(126, 217, 218, 0.12) 34%, rgba(0, 0, 0, 0) 62%),
-    linear-gradient(180deg, rgba(6, 30, 35, 0.72), rgba(0, 6, 9, 0.30));
+    radial-gradient(ellipse at 50% 90%, rgba(255, 255, 246, 0.28), rgba(126, 217, 218, 0.16) 34%, rgba(0, 0, 0, 0) 62%),
+    linear-gradient(180deg, rgba(11, 38, 43, 0.76), rgba(0, 7, 10, 0.36));
   box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.28),
-    inset 0 0 0 1px rgba(126, 217, 218, 0.18),
+    inset 0 0 0 1px rgba(239, 253, 249, 0.34),
     inset 0 -22px 34px rgba(0, 0, 0, 0.30);
   backdrop-filter: blur(10px);
 }
@@ -332,10 +332,12 @@ body {
   left: 50%;
   bottom: 11px;
   width: 3px;
-  height: 68px;
+  height: 74px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #fff6df, #7ed9da);
-  box-shadow: 0 0 16px rgba(126, 217, 218, 0.66);
+  background: linear-gradient(180deg, #ffffff, #aefdf1);
+  box-shadow:
+    0 0 16px rgba(174, 253, 241, 0.86),
+    0 0 3px rgba(0, 0, 0, 0.82);
   transform: translateX(-50%) rotate(var(--needle-angle));
   transform-origin: 50% 100%;
 }
@@ -357,9 +359,9 @@ body {
 .drive-speedometer__tick {
   position: absolute;
   bottom: 10px;
-  color: rgba(255, 246, 223, 0.58);
+  color: rgba(255, 255, 246, 0.92);
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 850;
 }
 
@@ -384,10 +386,12 @@ body {
 }
 
 .drive-speedometer__readout strong {
-  font-size: 27px;
+  font-size: 31px;
   font-weight: 900;
   color: #fff6df;
-  text-shadow: 0 0 14px rgba(126, 217, 218, 0.26);
+  text-shadow:
+    0 0 12px rgba(126, 217, 218, 0.54),
+    0 2px 3px rgba(0, 0, 0, 0.74);
 }
 
 .drive-speedometer__readout span {
@@ -1106,18 +1110,20 @@ body {
 
 .event-toasts {
   position: fixed;
-  top: clamp(122px, 17vh, 158px);
-  left: 50%;
-  transform: translateX(-50%);
+  top: clamp(24px, 4vw, 32px);
+  right: clamp(12px, 2vw, 24px);
+  left: auto;
+  transform: none;
   z-index: 64;
   display: grid;
   gap: 8px;
-  width: min(520px, calc(100vw - 24px));
+  width: min(410px, calc(100vw - 48px));
+  justify-items: end;
   pointer-events: none;
 }
 
 .event-toast {
-  justify-self: center;
+  justify-self: end;
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -1133,7 +1139,7 @@ body {
   font-size: 13px;
   font-weight: 750;
   line-height: 1.24;
-  text-align: center;
+  text-align: left;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
   opacity: 0.95;
   transform: translateY(0) scale(1);
@@ -1219,7 +1225,7 @@ body {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #020405;
+  background: #000102;
   transition:
     opacity 420ms ease,
     visibility 420ms ease;
@@ -1236,9 +1242,8 @@ body {
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 42%, rgba(255, 218, 153, 0.060), transparent 12%),
-    radial-gradient(circle at 50% 54%, rgba(102, 218, 218, 0.12), transparent 24%),
-    linear-gradient(180deg, #000102 0%, #020507 39%, #041116 47%, #000102 100%);
+    radial-gradient(circle at 50% 54%, rgba(98, 225, 207, 0.070), transparent 24%),
+    linear-gradient(180deg, #000102 0%, #010405 41%, #031014 48%, #000102 100%);
 }
 
 .fallback-scene__field::before {
@@ -1247,11 +1252,11 @@ body {
   background:
     repeating-linear-gradient(
       180deg,
-      rgba(120, 230, 230, 0.020) 0 1px,
+    rgba(120, 230, 230, 0.012) 0 1px,
       rgba(155, 232, 255, 0) 1px 8px
     );
   content: "";
-  opacity: 0.14;
+  opacity: 0.10;
 }
 
 .fallback-scene__field::after {
@@ -1268,10 +1273,10 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 22vh;
-  background: linear-gradient(180deg, transparent, rgba(126, 217, 218, 0.07), transparent);
-  opacity: 0.20;
-  animation: fallbackScanline 4.8s ease-in-out infinite;
+  height: 18vh;
+  background: linear-gradient(180deg, transparent, rgba(126, 217, 218, 0.045), transparent);
+  opacity: 0.16;
+  animation: fallbackScanline 5.8s ease-in-out infinite;
 }
 
 .fallback-scene__horizon {
@@ -1294,11 +1299,11 @@ body {
   width: 12px;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: #89f3df;
+  background: #9df2d2;
   box-shadow:
-    0 0 14px rgba(137, 243, 223, 0.72),
-    0 0 46px rgba(137, 243, 223, 0.22);
-  animation: fallbackSignal 2.0s ease-in-out infinite;
+    0 0 12px rgba(157, 242, 210, 0.68),
+    0 0 42px rgba(157, 242, 210, 0.18);
+  animation: fallbackSignal 2.4s ease-in-out infinite;
 }
 
 .fallback-scene__waveform {
@@ -1351,7 +1356,7 @@ body {
     ),
     radial-gradient(ellipse at 50% 0%, rgba(137, 243, 223, 0.17), transparent 42%),
     linear-gradient(180deg, #0e4250, #04181e 64%, #010608);
-  opacity: 0.86;
+  opacity: 0.78;
   transform: skewY(-1deg);
 }
 
@@ -1360,16 +1365,16 @@ body {
   z-index: 1;
   display: grid;
   gap: 6px;
-  width: min(420px, calc(100vw - 32px));
-  padding: 18px 20px;
+  width: min(390px, calc(100vw - 32px));
+  padding: 16px 18px;
   border: 1px solid rgba(137, 243, 223, 0.24);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, rgba(6, 16, 18, 0.94), rgba(0, 2, 3, 0.94)),
-    rgba(0, 3, 5, 0.88);
+    linear-gradient(180deg, rgba(4, 13, 15, 0.92), rgba(0, 2, 3, 0.92)),
+    rgba(0, 3, 5, 0.86);
   color: #fff6df;
   box-shadow:
-    0 24px 70px rgba(0, 0, 0, 0.72),
+    0 24px 70px rgba(0, 0, 0, 0.74),
     inset 0 1px 0 rgba(255, 246, 223, 0.08);
   backdrop-filter: blur(18px);
 }
@@ -1483,7 +1488,7 @@ body {
   }
 
   .drive-speedometer__readout strong {
-    font-size: 23px;
+    font-size: 26px;
   }
 
   .debug-panel-shell {

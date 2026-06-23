@@ -247,16 +247,16 @@ export const createForestSystem = (): ForestSystem => {
   }
   silhouettes.instanceMatrix.needsUpdate = true;
   const forestMassMaterial = new THREE.MeshBasicMaterial({
-    color: 0x020c0b,
+    color: 0x031411,
     transparent: true,
-    opacity: 0.66,
+    opacity: 0.72,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const forestDepthMaterial = new THREE.MeshBasicMaterial({
-    color: 0x061816,
+    color: 0x08221d,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.40,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -338,18 +338,18 @@ export const createForestSystem = (): ForestSystem => {
         weather.dials.skyDark * 0.1;
       forestMassMaterial.opacity =
         activePreset === "Performance"
-          ? 0.46 + weather.dials.skyDark * 0.08
+          ? 0.50 + weather.dials.skyDark * 0.08
           : activePreset === "Scenic"
-            ? 0.80 + weather.dials.skyDark * 0.08
-            : 0.68 + weather.dials.skyDark * 0.08;
-      forestMassMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x010607 : 0x020c0b);
+            ? 0.86 + weather.dials.skyDark * 0.08
+            : 0.74 + weather.dials.skyDark * 0.08;
+      forestMassMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x010607 : 0x031411);
       forestDepthMaterial.opacity =
         activePreset === "Performance"
-          ? 0.18 + weather.dials.skyDark * 0.04
+          ? 0.20 + weather.dials.skyDark * 0.04
           : activePreset === "Scenic"
-            ? 0.40 + weather.dials.skyDark * 0.05
-            : 0.30 + weather.dials.skyDark * 0.05;
-      forestDepthMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x071012 : 0x061816);
+            ? 0.46 + weather.dials.skyDark * 0.05
+            : 0.36 + weather.dials.skyDark * 0.05;
+      forestDepthMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x071012 : 0x08221d);
       reflectionMaterial.opacity =
         activePreset === "Performance"
           ? 0

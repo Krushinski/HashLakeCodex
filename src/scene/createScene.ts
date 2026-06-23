@@ -1853,17 +1853,17 @@ const createShoreline = () => {
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x344d44,
+    color: 0x3f5b50,
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x263f2b,
+    color: 0x2a482f,
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x75b7aa,
+    color: 0x87cabc,
     transparent: true,
-    opacity: 0.065,
+    opacity: 0.082,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -2064,7 +2064,7 @@ const createDestinationMarkers = () => {
   );
   const sandbar = new THREE.Mesh(new THREE.ShapeGeometry(sandbarShape, 8), sandMaterial);
   sandbar.name = "Sandbar";
-  sandbar.position.set(sandbarCenter.x, 0.28, sandbarCenter.z);
+  sandbar.position.set(sandbarCenter.x, 0.31, sandbarCenter.z);
   sandbar.rotation.x = -Math.PI / 2;
   sandbar.rotation.z = LAKE_MAP.sandbar.rotation;
   sandbar.receiveShadow = true;
@@ -2206,8 +2206,8 @@ const createDestinationMarkers = () => {
 
 const createSunDisc = () => {
   const material = new THREE.MeshBasicMaterial({ color: 0xffd37d });
-  const sun = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), material);
-  sun.position.set(-104, 92, -170);
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(6.8, 28, 14), material);
+  sun.position.set(-154, 98, -188);
   return sun;
 };
 
