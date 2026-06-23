@@ -134,6 +134,42 @@ export const LAKE_MAP = {
   ] satisfies LakeDestination[],
 } as const;
 
+const smoothClosedPolygon = (points: readonly LakePoint[], subdivisions = 4) => {
+  const smoothed: LakePoint[] = [];
+  const count = points.length;
+
+  for (let index = 0; index < count; index += 1) {
+    const p0 = points[(index - 1 + count) % count];
+    const p1 = points[index];
+    const p2 = points[(index + 1) % count];
+    const p3 = points[(index + 2) % count];
+
+    for (let step = 0; step < subdivisions; step += 1) {
+      const t = step / subdivisions;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      smoothed.push({
+        x:
+          0.5 *
+          ((2 * p1.x) +
+            (-p0.x + p2.x) * t +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        z:
+          0.5 *
+          ((2 * p1.z) +
+            (-p0.z + p2.z) * t +
+            (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 +
+            (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3),
+      });
+    }
+  }
+
+  return smoothed;
+};
+
+export const LAKE_OUTLINE = smoothClosedPolygon(LAKE_MAP.outline, 4);
+
 export const getDistance = (a: LakePoint, b: LakePoint) =>
   Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -209,12 +245,12 @@ const closestPointOnSegment = (point: LakePoint, start: LakePoint, end: LakePoin
 };
 
 export const getNearestShorePoint = (point: LakePoint): NearestShoreResult => {
-  let nearest = LAKE_MAP.outline[0];
+  let nearest = LAKE_OUTLINE[0];
   let nearestDistance = Number.POSITIVE_INFINITY;
 
-  for (let index = 0; index < LAKE_MAP.outline.length; index += 1) {
-    const start = LAKE_MAP.outline[index];
-    const end = LAKE_MAP.outline[(index + 1) % LAKE_MAP.outline.length];
+  for (let index = 0; index < LAKE_OUTLINE.length; index += 1) {
+    const start = LAKE_OUTLINE[index];
+    const end = LAKE_OUTLINE[(index + 1) % LAKE_OUTLINE.length];
     const candidate = closestPointOnSegment(point, start, end);
     const distance = getDistance(point, candidate);
     if (distance < nearestDistance) {
@@ -289,13 +325,13 @@ export const isInIsland = (point: LakePoint) =>
   );
 
 export const isWater = (point: LakePoint) =>
-  pointInPolygon(point, LAKE_MAP.outline) && !isInIsland(point) && !isInSandbar(point);
+  pointInPolygon(point, LAKE_OUTLINE) && !isInIsland(point) && !isInSandbar(point);
 
 export const isLand = (point: LakePoint) => !isWater(point);
 
 export const distanceToShore = (point: LakePoint) => {
   const shore = getNearestShorePoint(point);
-  const signedDistance = pointInPolygon(point, LAKE_MAP.outline) ? shore.distance : -shore.distance;
+  const signedDistance = pointInPolygon(point, LAKE_OUTLINE) ? shore.distance : -shore.distance;
   const obstacleDistance = Math.min(
     getEllipseClearance(
       point,
@@ -324,7 +360,7 @@ export const getLakeNormalizedPosition = (point: LakePoint) => {
 };
 
 export const getExpandedOutline = (amount: number) =>
-  LAKE_MAP.outline.map((point) => {
+  LAKE_OUTLINE.map((point) => {
     const length = Math.max(1, Math.hypot(point.x, point.z));
     return {
       x: point.x + (point.x / length) * amount,
@@ -336,7 +372,7 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
   let next = { ...point };
   let hitBoundary = false;
 
-  if (!pointInPolygon(next, LAKE_MAP.outline)) {
+  if (!pointInPolygon(next, LAKE_OUTLINE)) {
     const shore = getNearestShorePoint(next).point;
     const towardCenter = Math.atan2(-shore.z, -shore.x);
     next = {
@@ -372,7 +408,7 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
     hitBoundary = true;
   }
 
-  if (!pointInPolygon(next, LAKE_MAP.outline)) {
+  if (!pointInPolygon(next, LAKE_OUTLINE)) {
     const shore = getNearestShorePoint(next).point;
     const towardCenter = Math.atan2(-shore.z, -shore.x);
     next = {

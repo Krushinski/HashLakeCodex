@@ -177,10 +177,13 @@ const createTerrainMaterial = (
         vec3 albedo = mix(rock, forestColor, forest);
         float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
           * smoothstep(0.18, 0.46, slope);
-        albedo = mix(albedo, vec3(0.58, 0.62, 0.58), snow * 0.12);
+        albedo = mix(albedo, vec3(0.68, 0.70, 0.66), snow * 0.20);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.18 + uAmbient * (0.38 + 0.44 * slope));
+        vec3 sideNormal = normalize(vec3(normal.x, 0.0, normal.z) + vec3(0.001, 0.0, 0.001));
+        float sideLight = smoothstep(-0.55, 0.70, dot(sideNormal, normalize(vec3(-0.72, 0.0, -0.44))));
+        color *= 0.80 + sideLight * 0.26;
         color *= 0.58 + slope * 0.24;
         float valleyShade = smoothstep(0.08, 0.52, vElev);
         float shadowBand = smoothstep(0.22, 0.82, bl_fbm(vec2(vWorldPos.x * 0.006, vWorldPos.y * 0.013) + 12.0));
@@ -340,9 +343,9 @@ export const createTerrainSystem = (): TerrainSystem => {
       shared.fire.value = weather.dials.fireWeather;
       shared.dark.value = weather.dials.skyDark;
       curtainBackMaterial.color.setHex(weather.dials.skyDark > 0.35 ? 0x26383c : 0x30484f);
-      curtainBackMaterial.opacity = 0.11 + weather.dials.fog * 0.08 + weather.dials.skyDark * 0.04;
+      curtainBackMaterial.opacity = 0.15 + weather.dials.fog * 0.08 + weather.dials.skyDark * 0.04;
       curtainFrontMaterial.color.setHex(weather.dials.skyDark > 0.38 ? 0x203135 : 0x102926);
-      curtainFrontMaterial.opacity = 0.38 + weather.dials.skyDark * 0.08;
+      curtainFrontMaterial.opacity = 0.44 + weather.dials.skyDark * 0.08;
     },
     getStats: () => ({
       mountainVertices: scenicBackdropActive ? 0 : vertexCount,

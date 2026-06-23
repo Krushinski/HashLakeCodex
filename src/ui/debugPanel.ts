@@ -14,7 +14,7 @@ import {
   WHALE_MIN_BTC,
 } from "../state/liveBitcoinStore";
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
-import { LAKE_MAP } from "../scene/lakeMap";
+import { LAKE_MAP, LAKE_OUTLINE } from "../scene/lakeMap";
 import type { ScenicAssetStatuses } from "../scene/scenicAssets";
 
 type FeedRow = {
@@ -584,7 +584,7 @@ const drawMinimap = (
   context.strokeStyle = "rgba(126, 217, 218, 0.44)";
   context.lineWidth = 1.6;
   context.beginPath();
-  tracePolygon(LAKE_MAP.outline);
+  tracePolygon(LAKE_OUTLINE);
   context.fill();
   context.stroke();
 

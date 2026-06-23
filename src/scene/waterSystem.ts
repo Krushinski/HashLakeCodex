@@ -170,11 +170,14 @@ export const createWater = (): WaterSurface => {
         vShore = shoreFactor;
         float waveSpeed = 0.30 + uWind * 1.05;
         float waveHeight = (0.052 + uChop * 1.48) * (0.34 + vDepth * 0.66);
-        float speedWake = clamp(abs(uBoatSpeed) / 90.0, 0.0, 1.0);
+        float speedWake = clamp(abs(uBoatSpeed) / 100.0, 0.0, 1.0);
         float distanceToBoat = distance(position.xz, uBoatPos);
         float localWake = smoothstep(46.0, 10.0, distanceToBoat) *
           speedWake *
           sin(distanceToBoat * 0.26 - uTime * 5.2);
+        float tidal = sin(position.x * 0.0022 - position.z * 0.0031 + uTime * (0.032 + uWind * 0.018)) *
+          waveHeight *
+          0.38;
         float longWave = sin(position.x * 0.010 + position.z * 0.0045 + uTime * waveSpeed) * waveHeight;
         float crossWave = cos(position.x * -0.0075 + position.z * 0.017 + uTime * waveSpeed * 0.72) *
           waveHeight *
@@ -184,7 +187,7 @@ export const createWater = (): WaterSurface => {
           (0.008 + uChop * 0.10) *
           (0.24 + vDepth * 0.76);
         vec3 displaced = position;
-        displaced.y += (longWave + crossWave + micro) * (1.0 - vShore * 0.54) + localWake * 0.16;
+        displaced.y += (tidal + longWave + crossWave + micro) * (1.0 - vShore * 0.54) + localWake * 0.16;
         vWake = localWake;
         vec4 worldPosition = modelMatrix * vec4(displaced, 1.0);
         vWorldPos = worldPosition.xyz;
@@ -258,8 +261,9 @@ export const createWater = (): WaterSurface => {
 
         float farBand = smoothstep(-710.0, -210.0, vWorldPos.z) * (1.0 - smoothstep(120.0, 380.0, vWorldPos.z));
         farBand *= smoothstep(0.10, 0.92, depth);
-        float forestColumns = sin(vWorldPos.x * 0.010 + sin(vWorldPos.z * 0.005) * 0.7 + uTime * 0.004) * 0.5 + 0.5;
-        forestColumns = mix(forestColumns, sin(vWorldPos.x * 0.018 + 2.4) * 0.5 + 0.5, 0.34);
+        float forestColumns = sin(vWorldPos.x * 0.006 + sin(vWorldPos.z * 0.003) * 0.45 + uTime * 0.002) * 0.5 + 0.5;
+        forestColumns = mix(forestColumns, sin(vWorldPos.x * 0.011 + 2.4) * 0.5 + 0.5, 0.22);
+        forestColumns = smoothstep(0.16, 0.90, forestColumns);
         float skySwell = bodyWave * 0.5 + 0.5;
         vec3 skyMirror = mix(uHorizonColor, uSunColor * 0.68, 0.18);
         skyMirror = mix(skyMirror, vec3(0.030, 0.046, 0.055), uDark * 0.72);
@@ -267,7 +271,7 @@ export const createWater = (): WaterSurface => {
         vec3 reflectedMood = mix(skyMirror, forestMirror, 0.32 + farBand * 0.22);
         reflectedMood += vec3(0.060, 0.126, 0.140) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.32;
 
-        float reflectionAmount = clamp((fresnel * 0.76 + farBand * 0.16 + openWater * 0.14) * uReflectionStrength, 0.0, 0.84);
+        float reflectionAmount = clamp((fresnel * 0.80 + farBand * 0.17 + openWater * 0.15) * uReflectionStrength, 0.0, 0.88);
         vec3 color = mix(base, reflectedMood, reflectionAmount);
 
         float nearCamera = smoothstep(720.0, 100.0, dist);
@@ -279,6 +283,8 @@ export const createWater = (): WaterSurface => {
         color *= 0.996 + calmMotion * openWater * (1.0 - uDark * 0.24) * 0.022;
         color += vec3(0.058, 0.142, 0.176) * (midWave - 0.48) * openWater * (0.10 + nearCamera * 0.11) * (1.0 - uDark * 0.18);
         color += vec3(0.30, 0.48, 0.54) * pow(fineRipple, 3.2) * openWater * (0.10 + nearCamera * 0.30) * (0.08 + uChop * 0.13);
+        float softSparkle = pow(fineRipple, 5.8) * smoothstep(0.24, 0.92, skySwell) * detailFade;
+        color += vec3(0.42, 0.70, 0.76) * softSparkle * openWater * (0.09 + nearCamera * 0.16) * (1.0 - uDark * 0.38);
 
         float causticA = sin(vWorldPos.x * 0.055 + vWorldPos.z * 0.030 + uTime * 0.20);
         float causticB = sin(vWorldPos.x * -0.038 + vWorldPos.z * 0.060 - uTime * 0.17);
@@ -301,6 +307,8 @@ export const createWater = (): WaterSurface => {
         float spec = pow(max(dot(normal, halfDir), 0.0), mix(158.0, 58.0, uChop + uDark * 0.20));
         float specMask = smoothstep(0.24, 1.0, skySwell) * (0.44 + openWater * 0.56);
         color += uSunColor * spec * specMask * (1.0 - uDark * 0.42) * 4.45;
+        float broadSun = pow(max(dot(reflect(-viewDir, vec3(0.0, 1.0, 0.0)), sunDir), 0.0), 2.25);
+        color += mix(uHorizonColor, uSunColor, 0.28) * broadSun * openWater * (1.0 - uDark * 0.48) * 0.075;
         float sunGlance = pow(max(dot(reflect(-viewDir, normal), sunDir), 0.0), 4.8);
         color += mix(uHorizonColor, uSunColor, 0.34) * sunGlance * openWater * (1.0 - uDark * 0.48) * 0.24;
 
@@ -334,7 +342,7 @@ export const createWater = (): WaterSurface => {
       currentPreset = preset;
       surface.reflectionEnabled = true;
       material.uniforms.uReflectionStrength.value =
-        currentPreset === "Scenic" ? 1.18 : currentPreset === "Performance" ? 0.82 : 1;
+        currentPreset === "Scenic" ? 1.24 : currentPreset === "Performance" ? 0.86 : 1.06;
     },
   };
   return surface;

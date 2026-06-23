@@ -285,31 +285,17 @@ body {
   --needle-angle: -116deg;
   position: fixed;
   left: clamp(12px, 2vw, 24px);
-  bottom: clamp(96px, calc(2vw + 82px), 114px);
+  bottom: clamp(92px, calc(2vw + 78px), 112px);
   z-index: 16;
-  display: grid;
-  grid-template-columns: 64px auto;
-  align-items: center;
-  gap: 9px;
-  min-width: 142px;
-  padding: 8px 10px 8px 8px;
-  border: 1px solid rgba(126, 217, 218, 0.42);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(13, 40, 45, 0.72), rgba(4, 14, 18, 0.72)),
-    rgba(4, 18, 22, 0.64);
+  width: 176px;
+  height: 106px;
   color: #fff6df;
-  box-shadow:
-    0 16px 44px rgba(0, 0, 0, 0.30),
-    inset 0 1px 0 rgba(255, 246, 223, 0.10),
-    inset 0 -12px 28px rgba(10, 104, 126, 0.08);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(8px) scale(0.98);
+  transform: translateY(8px) scale(0.96);
   transition:
     opacity 180ms ease,
     transform 180ms ease;
-  backdrop-filter: blur(14px);
 }
 
 .drive-speedometer--visible {
@@ -319,35 +305,37 @@ body {
 
 .drive-speedometer__dial {
   position: relative;
-  width: 64px;
-  height: 40px;
+  width: 160px;
+  height: 88px;
   overflow: hidden;
-  border-radius: 64px 64px 12px 12px;
+  border-radius: 160px 160px 24px 24px;
   background:
     conic-gradient(
-      from 242deg at 50% 88%,
-      rgba(126, 217, 218, 0.22) 0deg,
-      rgba(126, 217, 218, 0.64) calc(var(--speed-ratio) * 232deg),
+      from 244deg at 50% 91%,
+      rgba(106, 235, 221, 0.20) 0deg,
+      rgba(126, 217, 218, 0.82) calc(var(--speed-ratio) * 232deg),
       rgba(255, 246, 223, 0.10) 0deg,
-      rgba(255, 246, 223, 0.10) 232deg,
+      rgba(255, 246, 223, 0.12) 232deg,
       transparent 232deg
     ),
-    radial-gradient(circle at 50% 86%, rgba(255, 246, 223, 0.20), rgba(126, 217, 218, 0.08) 35%, rgba(0, 0, 0, 0) 58%),
-    rgba(3, 18, 22, 0.86);
+    radial-gradient(ellipse at 50% 92%, rgba(255, 246, 223, 0.22), rgba(126, 217, 218, 0.12) 34%, rgba(0, 0, 0, 0) 62%),
+    linear-gradient(180deg, rgba(6, 30, 35, 0.72), rgba(0, 6, 9, 0.30));
   box-shadow:
-    inset 0 0 0 1px rgba(255, 246, 223, 0.10),
-    inset 0 -10px 18px rgba(0, 0, 0, 0.36);
+    0 20px 48px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(126, 217, 218, 0.18),
+    inset 0 -22px 34px rgba(0, 0, 0, 0.30);
+  backdrop-filter: blur(10px);
 }
 
 .drive-speedometer__needle {
   position: absolute;
   left: 50%;
-  bottom: 6px;
-  width: 2px;
-  height: 30px;
+  bottom: 11px;
+  width: 3px;
+  height: 68px;
   border-radius: 999px;
   background: linear-gradient(180deg, #fff6df, #7ed9da);
-  box-shadow: 0 0 12px rgba(126, 217, 218, 0.58);
+  box-shadow: 0 0 16px rgba(126, 217, 218, 0.66);
   transform: translateX(-50%) rotate(var(--needle-angle));
   transform-origin: 50% 100%;
 }
@@ -355,41 +343,48 @@ body {
 .drive-speedometer__hub {
   position: absolute;
   left: 50%;
-  bottom: 3px;
-  width: 9px;
-  height: 9px;
+  bottom: 6px;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
   background: #fff6df;
-  box-shadow: 0 0 12px rgba(126, 217, 218, 0.72);
+  box-shadow:
+    0 0 16px rgba(126, 217, 218, 0.72),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.22);
   transform: translateX(-50%);
 }
 
 .drive-speedometer__tick {
   position: absolute;
-  bottom: 3px;
+  bottom: 10px;
   color: rgba(255, 246, 223, 0.58);
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 850;
 }
 
 .drive-speedometer__tick--zero {
-  left: 6px;
+  left: 13px;
 }
 
 .drive-speedometer__tick--max {
-  right: 4px;
+  right: 9px;
 }
 
 .drive-speedometer__readout {
+  position: absolute;
+  left: 0;
+  right: 16px;
+  bottom: 2px;
   display: grid;
-  gap: 0;
+  justify-items: center;
+  gap: 1px;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   line-height: 1;
 }
 
 .drive-speedometer__readout strong {
-  font-size: 22px;
+  font-size: 27px;
   font-weight: 900;
   color: #fff6df;
   text-shadow: 0 0 14px rgba(126, 217, 218, 0.26);
@@ -1241,9 +1236,9 @@ body {
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 54%, rgba(102, 218, 218, 0.095), transparent 21%),
-    radial-gradient(circle at 50% 44%, rgba(255, 214, 137, 0.045), transparent 10%),
-    linear-gradient(180deg, #000102 0%, #020506 45%, #041013 46%, #000102 100%);
+    radial-gradient(circle at 50% 42%, rgba(255, 218, 153, 0.060), transparent 12%),
+    radial-gradient(circle at 50% 54%, rgba(102, 218, 218, 0.12), transparent 24%),
+    linear-gradient(180deg, #000102 0%, #020507 39%, #041116 47%, #000102 100%);
 }
 
 .fallback-scene__field::before {
@@ -1288,7 +1283,8 @@ body {
   background: linear-gradient(90deg, transparent, rgba(155, 232, 255, 0.58), transparent);
   box-shadow:
     0 0 18px rgba(126, 217, 218, 0.34),
-    0 28px 48px rgba(42, 150, 184, 0.10);
+    0 28px 48px rgba(42, 150, 184, 0.18),
+    0 -34px 80px rgba(255, 214, 137, 0.06);
 }
 
 .fallback-scene__signal {
@@ -1341,15 +1337,21 @@ body {
   animation-delay: 360ms;
 }
 
-.fallback-scene__field .fallback-scene__lake {
+.fallback-scene__lake {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 42%;
   background:
     repeating-linear-gradient(
       175deg,
       rgba(255, 246, 223, 0.055) 0 1px,
       rgba(255, 246, 223, 0) 1px 22px
     ),
-    radial-gradient(ellipse at 50% 0%, rgba(137, 243, 223, 0.13), transparent 42%),
-    linear-gradient(180deg, #0e3b45, #061b20);
+    radial-gradient(ellipse at 50% 0%, rgba(137, 243, 223, 0.17), transparent 42%),
+    linear-gradient(180deg, #0e4250, #04181e 64%, #010608);
+  opacity: 0.86;
   transform: skewY(-1deg);
 }
 
@@ -1449,23 +1451,39 @@ body {
 
   .drive-speedometer {
     bottom: 82px;
-    min-width: 126px;
-    grid-template-columns: 56px auto;
-    gap: 7px;
-    padding: 7px 9px 7px 7px;
+    width: 150px;
+    height: 92px;
   }
 
   .drive-speedometer__dial {
-    width: 56px;
-    height: 35px;
+    width: 136px;
+    height: 75px;
+    border-radius: 136px 136px 20px 20px;
   }
 
   .drive-speedometer__needle {
-    height: 26px;
+    bottom: 9px;
+    height: 56px;
+  }
+
+  .drive-speedometer__hub {
+    bottom: 5px;
+    width: 14px;
+    height: 14px;
+  }
+
+  .drive-speedometer__tick {
+    bottom: 8px;
+    font-size: 8px;
+  }
+
+  .drive-speedometer__readout {
+    right: 14px;
+    bottom: 0;
   }
 
   .drive-speedometer__readout strong {
-    font-size: 19px;
+    font-size: 23px;
   }
 
   .debug-panel-shell {

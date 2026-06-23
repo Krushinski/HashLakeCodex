@@ -398,9 +398,9 @@ export const createSceneEffects = (
     addSplashBurst(origin, strength, color);
     addSplashBlocks(origin, strength, color);
 
-    addRing(color, strength * 2.6, origin, 1.72 + strength * 0.13, visibilityTest ? 0.82 : 0.74, 1.34);
-    addRing(0xf4feff, strength * 2.42, origin, 1.42 + strength * 0.1, visibilityTest ? 0.48 : 0.38, 1.42);
-    addRing(0xdff6f8, strength * 1.38, origin, 1.08 + strength * 0.08, visibilityTest ? 0.7 : 0.54, 1.92);
+    addRing(color, strength * 2.6, origin, 1.72 + strength * 0.13, visibilityTest ? 0.88 : 0.80, 1.34);
+    addRing(0xf4feff, strength * 2.42, origin, 1.42 + strength * 0.1, visibilityTest ? 0.52 : 0.42, 1.42);
+    addRing(0xdff6f8, strength * 1.38, origin, 1.08 + strength * 0.08, visibilityTest ? 0.74 : 0.58, 1.92);
     if (btcAmount >= 50) {
       addRing(0x9ff8ff, strength * 1.16, origin, 0.94 + strength * 0.08, visibilityTest ? 0.52 : 0.38, 2.32);
       addSplashBlocks(origin, strength * 0.58, 0xf4feff);
@@ -521,7 +521,7 @@ export const createSceneEffects = (
 
         if (isWater(pointA) && isWater(pointB) && shoreA > 5.0 && shoreB > 5.0) {
           for (let pass = 0; pass < RING_THICKNESS_PASSES; pass += 1) {
-            const offsetRadius = (pass - 1.5) * 0.66;
+            const offsetRadius = (pass - 1.5) * 0.82;
             const passRadiusA = radius + offsetRadius;
             const passRadiusB = radius + offsetRadius;
             const ax = ring.origin.x + Math.cos(angleA) * passRadiusA;

@@ -6,6 +6,7 @@ import { SCENARIO_PALETTES, getWeatherPalette } from "./artDirection";
 import { createSceneEffects } from "./effects";
 import { createForestSystem } from "./forestSystem";
 import {
+  LAKE_OUTLINE,
   LAKE_MAP,
   clampBoatToWater,
   getExpandedOutline,
@@ -43,8 +44,11 @@ const DRIVE_ACCELERATION_BASE = 23;
 const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
 const DRIVE_BOOST_MAX_SPEED = 90;
+const DRIVE_SUPER_BOOST_MAX_SPEED = 100;
 const DRIVE_BOOST_MULTIPLIER = 1.58;
+const DRIVE_SUPER_BOOST_MULTIPLIER = 1.84;
 const DRIVE_BOOST_IMPULSE = 16;
+const DRIVE_SUPER_BOOST_IMPULSE = 20;
 const DRIVE_NATURAL_BRAKE_DRAG = 34;
 const DRIVE_COAST_DRAG = 0.9;
 const DRIVE_ACTIVE_BRAKE_FORCE = 82;
@@ -249,6 +253,7 @@ type DriveInput = {
   left: boolean;
   right: boolean;
   boost: boolean;
+  superBoost: boolean;
   anchor: boolean;
 };
 
@@ -601,6 +606,7 @@ export const createHashlakeScene = ({
     left: false,
     right: false,
     boost: false,
+    superBoost: false,
     anchor: false,
   };
   let lastFrameTime = window.performance.now();
@@ -1044,6 +1050,9 @@ export const createHashlakeScene = ({
     } else if (key === "shift") {
       event.preventDefault();
       input.boost = isDown;
+    } else if (key === "control") {
+      event.preventDefault();
+      input.superBoost = isDown;
     } else if (key === " ") {
       event.preventDefault();
       input.anchor = isDown;
@@ -1364,7 +1373,7 @@ const createSkyDome = (): SkyDome => {
 
 const createLakeFill = () => {
   const shape = new THREE.Shape(
-    LAKE_MAP.outline.map((point) => new THREE.Vector2(point.x, point.z)),
+    LAKE_OUTLINE.map((point) => new THREE.Vector2(point.x, point.z)),
   );
   const islandHole = new THREE.Path();
   islandHole.absellipse(
@@ -1392,14 +1401,15 @@ const createLakeFill = () => {
   const material = new THREE.MeshBasicMaterial({
     color: 0x020911,
     transparent: true,
-    opacity: 0.12,
-    depthWrite: true,
+    opacity: 0,
+    depthWrite: false,
     side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 12), material);
   mesh.name = "Blue lake depth fill";
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = -0.08;
+  mesh.visible = false;
   return mesh;
 };
 
@@ -1602,7 +1612,12 @@ const updateDriveState = (
   }
 
   const stormDrag = weather.dials.boatInstability * 8;
-  const maxForwardSpeed = input.boost ? DRIVE_BOOST_MAX_SPEED : DRIVE_MAX_SPEED;
+  const superBoostActive = input.boost && input.superBoost && input.forward;
+  const maxForwardSpeed = input.boost
+    ? superBoostActive
+      ? DRIVE_SUPER_BOOST_MAX_SPEED
+      : DRIVE_BOOST_MAX_SPEED
+    : DRIVE_MAX_SPEED;
   const previousSpeed = driveState.speed;
 
   const keyboardSteer = Number(input.right) - Number(input.left);
@@ -1634,21 +1649,25 @@ const updateDriveState = (
   const wakeTarget = clamp(
     throttleRamp * 0.82 +
       Math.abs(driveState.speed) / DRIVE_BOOST_MAX_SPEED * 0.34 +
-      (input.boost ? 0.32 : 0),
+      (input.boost ? 0.32 : 0) +
+      (superBoostActive ? 0.12 : 0),
     0,
-    input.boost ? 1.34 : 1.04,
+    superBoostActive ? 1.48 : input.boost ? 1.34 : 1.04,
   );
   driveState.wakePower += (wakeTarget - driveState.wakePower) * Math.min(1, delta * 4.4);
 
   if (throttleActive) {
     if (boostJustPressed && driveState.speed > 8) {
-      driveState.speed = Math.min(maxForwardSpeed, driveState.speed + DRIVE_BOOST_IMPULSE);
+      driveState.speed = Math.min(
+        maxForwardSpeed,
+        driveState.speed + (superBoostActive ? DRIVE_SUPER_BOOST_IMPULSE : DRIVE_BOOST_IMPULSE),
+      );
       driveState.wakePower = Math.min(1.32, driveState.wakePower + 0.36);
       driveState.boostKick = 1;
     }
     const acceleration =
       (DRIVE_ACCELERATION_BASE + DRIVE_ACCELERATION_RAMP * throttleRamp) *
-      (input.boost ? DRIVE_BOOST_MULTIPLIER : 1);
+      (superBoostActive ? DRIVE_SUPER_BOOST_MULTIPLIER : input.boost ? DRIVE_BOOST_MULTIPLIER : 1);
     driveState.speed += acceleration * throttleAmount * delta;
   }
   driveState.boostActive = input.boost;
@@ -1841,13 +1860,6 @@ const createShoreline = () => {
     color: 0x263f2b,
     roughness: 0.94,
   });
-  const shoreDropMaterial = new THREE.MeshBasicMaterial({
-    color: 0x071615,
-    transparent: true,
-    opacity: 0.28,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
   const shallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x75b7aa,
     transparent: true,
@@ -1869,19 +1881,12 @@ const createShoreline = () => {
   group.add(land);
 
   const wetSand = new THREE.Mesh(
-    createStripGeometry(LAKE_MAP.outline, getExpandedOutline(13)),
+    createStripGeometry(LAKE_OUTLINE, getExpandedOutline(13)),
     wetSandMaterial,
   );
   wetSand.position.y = 0.14;
   wetSand.receiveShadow = true;
   group.add(wetSand);
-
-  const shoreDrop = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(-9), getExpandedOutline(5)),
-    shoreDropMaterial,
-  );
-  shoreDrop.position.y = 0.07;
-  group.add(shoreDrop);
 
   const shoreline = new THREE.Mesh(
     createStripGeometry(getExpandedOutline(13), getExpandedOutline(LAKE_MAP.shorelineWidth)),
@@ -1911,7 +1916,7 @@ const createShoreline = () => {
   group.add(raisedBank);
 
   const shallow = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(-26), LAKE_MAP.outline),
+    createStripGeometry(getExpandedOutline(-26), LAKE_OUTLINE),
     shallowMaterial,
   );
   shallow.position.y = 0.045;
@@ -1950,14 +1955,16 @@ const createDestinationMarkers = () => {
     roughness: 0.96,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x80c1b4,
+    color: 0x6fb8b0,
     transparent: true,
-    opacity: 0.09,
+    opacity: 0.18,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: SCENARIO_PALETTES.Serene.rock,
+    emissive: 0x25302c,
+    emissiveIntensity: 0.16,
     roughness: 0.9,
   });
   const darkRockMaterial = new THREE.MeshStandardMaterial({ color: 0x4c5655, roughness: 0.96 });
@@ -2030,8 +2037,8 @@ const createDestinationMarkers = () => {
   const sandbarBankShape = new THREE.Shape(
     createOrganicEllipseOutline(
       { x: 0, z: 0 },
-      LAKE_MAP.sandbar.radiusX + 8,
-      LAKE_MAP.sandbar.radiusZ + 3,
+      LAKE_MAP.sandbar.radiusX + 14,
+      LAKE_MAP.sandbar.radiusZ + 7,
       0,
       23,
       0.03,
@@ -2146,8 +2153,8 @@ const createDestinationMarkers = () => {
       new THREE.Shape(
         createOrganicEllipseOutline(
           { x: 0, z: 0 },
-          LAKE_MAP.island.radiusX + 6,
-          LAKE_MAP.island.radiusZ + 4,
+          LAKE_MAP.island.radiusX + 20,
+          LAKE_MAP.island.radiusZ + 12,
           0,
           67,
           0.032,
@@ -2157,7 +2164,7 @@ const createDestinationMarkers = () => {
     ),
     sandMaterial,
   );
-  islandBank.position.set(islandCenter.x, 0.23, islandCenter.z);
+  islandBank.position.set(islandCenter.x, 0.37, islandCenter.z);
   islandBank.rotation.x = -Math.PI / 2;
   islandBank.rotation.z = LAKE_MAP.island.rotation;
   islandBank.receiveShadow = true;
@@ -2697,8 +2704,8 @@ const applyWeatherToScene = ({
   sunDisc.material.color.setHex(palette.sunColor);
   sunDisc.visible = dark < 0.72 || fire > 0.38;
 
-  lakeFill.material.color.setHex(dark > 0.58 ? 0x02070c : 0x020911);
-  lakeFill.material.opacity = Math.max(0.08, 0.14 - weather.stormDarkness * 0.04);
+  lakeFill.visible = false;
+  lakeFill.material.opacity = 0;
   water.mesh.visible = true;
 
   clouds.children.forEach((cloud, index) => {
@@ -2866,8 +2873,7 @@ const animateDriveSpeedometer = (
     return;
   }
 
-  const speed = Math.round(clamp(Math.abs(driveState.speed), 0, DRIVE_BOOST_MAX_SPEED));
-  const displaySpeed = Math.round((speed / DRIVE_BOOST_MAX_SPEED) * 100);
+  const displaySpeed = Math.round(clamp(Math.abs(driveState.speed), 0, DRIVE_SUPER_BOOST_MAX_SPEED));
   const speedRatio = clamp(displaySpeed / 100, 0, 1);
   meter.style.setProperty("--speed-ratio", speedRatio.toFixed(3));
   meter.style.setProperty("--needle-angle", `${(-116 + speedRatio * 232).toFixed(1)}deg`);
