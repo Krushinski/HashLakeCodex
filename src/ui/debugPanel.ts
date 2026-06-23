@@ -1,3 +1,4 @@
+import { BUILD_INFO } from "../buildInfo";
 import type { HashlakeEventBus } from "../state/eventBus";
 import type {
   FeedName,
@@ -94,6 +95,14 @@ export type SceneTelemetry = {
 };
 
 const metricTiles: MetricTile[] = [
+  { group: "global", label: "Phase", value: BUILD_INFO.phase, tone: "good" },
+  { group: "global", label: "Build hash", value: BUILD_INFO.commit, tone: "muted" },
+  {
+    group: "global",
+    label: "Built",
+    value: BUILD_INFO.builtAt.replace("T", " ").slice(0, 16) + "Z",
+    tone: "muted",
+  },
   { group: "global", label: "Data mode", value: "LIVE", tone: "good" },
   { group: "global", label: "Polling", value: "active", tone: "good" },
   { group: "global", label: "Staleness", value: "0%", tone: "good" },
@@ -381,6 +390,7 @@ const renderTemplate = () => `
     <header class="debug-panel__header">
       <div>
         <strong>Hashlake - Debug</strong>
+        <span class="debug-panel__build">${BUILD_INFO.phase} / ${BUILD_INFO.commit}</span>
       </div>
       <div class="debug-panel__actions">
         <span class="debug-fps"><span data-debug-fps>--</span> fps</span>

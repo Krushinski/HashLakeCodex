@@ -18,10 +18,31 @@ export type WaterSurface = {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   basePositions: Float32Array;
   reflectionEnabled: boolean;
+  cues: WaterVisualCues;
   setQualityPreset: (preset: WaterQualityPreset) => void;
 };
 
 type WaterQualityPreset = "Performance" | "Balanced" | "Scenic";
+
+type GlintConfig = {
+  x: number;
+  z: number;
+  length: number;
+  width: number;
+  angle: number;
+  speed: number;
+  phase: number;
+  drift: number;
+};
+
+type WaterVisualCues = {
+  group: THREE.Group;
+  glints: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  glintConfigs: GlintConfig[];
+  reflectionBand: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+  shallowFeathers: Array<THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>>;
+  qualityPreset: WaterQualityPreset;
+};
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
@@ -30,6 +51,10 @@ const inspirationDeepWater = new THREE.Color(0x0a6793);
 const inspirationShallowWater = new THREE.Color(0x2b9295);
 const inspirationHorizonWater = new THREE.Color(0x77c7d2);
 const hashLake3DeepWater = new THREE.Color(0x123c40);
+const WATER_GLINT_COUNT = 78;
+const glintMatrixObject = new THREE.Object3D();
+const waterCueColor = new THREE.Color(0xa8efff);
+const fireCueColor = new THREE.Color(0xffb489);
 
 const createOrganicWaterGeometry = () => {
   const geometry = new THREE.BufferGeometry();
@@ -97,10 +122,206 @@ const createOrganicWaterGeometry = () => {
   return geometry;
 };
 
+const seededRandom = (seed: number) => {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+};
+
+const createGlintConfigs = () => {
+  const configs: GlintConfig[] = [];
+  const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
+  let attempt = 0;
+
+  while (configs.length < WATER_GLINT_COUNT && attempt < 1400) {
+    attempt += 1;
+    const x = minX + seededRandom(attempt * 1.91) * (maxX - minX);
+    const z = minZ + 42 + seededRandom(attempt * 4.17) * (maxZ - minZ - 84);
+    const point = { x, z };
+
+    if (!isWater(point) || distanceToShore(point) < 34) {
+      continue;
+    }
+
+    const farBias = z < -180 ? 1.2 : 1;
+    configs.push({
+      x,
+      z,
+      length: (18 + seededRandom(attempt * 7.11) * 36) * farBias,
+      width: 0.34 + seededRandom(attempt * 5.43) * 0.58,
+      angle: -0.18 + seededRandom(attempt * 3.33) * 0.36,
+      speed: 0.55 + seededRandom(attempt * 8.91) * 0.62,
+      phase: seededRandom(attempt * 6.27) * Math.PI * 2,
+      drift: 4 + seededRandom(attempt * 2.41) * 13,
+    });
+  }
+
+  return configs;
+};
+
+const createReflectionBand = () => {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDark: { value: 0 },
+      uStrength: { value: 1 },
+      uColor: { value: new THREE.Color(0x8fdbe0) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uDark;
+      uniform float uStrength;
+      uniform vec3 uColor;
+      varying vec2 vUv;
+
+      void main() {
+        float verticalFade = smoothstep(0.02, 0.24, vUv.y) * (1.0 - smoothstep(0.74, 1.0, vUv.y));
+        float horizonCore = pow(1.0 - abs(vUv.y - 0.42) * 2.0, 2.6);
+        float longStreak = sin(vUv.x * 46.0 + sin(vUv.y * 13.0 + uTime * 0.17) * 2.2) * 0.5 + 0.5;
+        float brokenBands = pow(longStreak, 5.0) * 0.34 + horizonCore * 0.42;
+        vec3 forestInk = vec3(0.012, 0.055, 0.046);
+        vec3 mirror = mix(forestInk, uColor, 0.26 + brokenBands * 0.38);
+        float alpha = verticalFade * (0.24 + brokenBands * 0.26) * uStrength * (1.0 - uDark * 0.48);
+        gl_FragColor = vec4(mirror, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  const band = new THREE.Mesh(new THREE.PlaneGeometry(1540, 126, 1, 1), material);
+  band.name = "Visible far treeline and sky reflection band";
+  band.rotation.x = -Math.PI / 2;
+  band.position.set(0, 0.48, -250);
+  band.renderOrder = 11;
+  return band;
+};
+
+const createShallowFeather = (
+  name: string,
+  center: THREE.Vector2,
+  radiusX: number,
+  radiusZ: number,
+  rotation: number,
+  color: number,
+) => {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDark: { value: 0 },
+      uStrength: { value: 1 },
+      uColor: { value: new THREE.Color(color) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uDark;
+      uniform float uStrength;
+      uniform vec3 uColor;
+      varying vec2 vUv;
+
+      void main() {
+        vec2 p = (vUv - 0.5) * 2.0;
+        float d = length(p);
+        float softBody = 1.0 - smoothstep(0.14, 1.0, d);
+        float edgeFoam = smoothstep(0.38, 0.66, d) * (1.0 - smoothstep(0.76, 1.0, d));
+        float lace = pow(sin((vUv.x * 18.0 + vUv.y * 9.0) + uTime * 0.18) * 0.5 + 0.5, 3.2);
+        float alpha = (softBody * 0.12 + edgeFoam * (0.12 + lace * 0.09)) *
+          uStrength *
+          (1.0 - uDark * 0.58);
+        gl_FragColor = vec4(uColor, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  const feather = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1, 1), material);
+  feather.name = name;
+  feather.rotation.x = -Math.PI / 2;
+  feather.rotation.z = rotation;
+  feather.position.set(center.x, 0.5, center.y);
+  feather.scale.set(radiusX * 2, radiusZ * 2, 1);
+  feather.renderOrder = 12;
+  return feather;
+};
+
+const createWaterCues = (): WaterVisualCues => {
+  const group = new THREE.Group();
+  group.name = "Visible water proof cues";
+
+  const glintMaterial = new THREE.MeshBasicMaterial({
+    color: waterCueColor,
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+  const glints = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1, 1, 1),
+    glintMaterial,
+    WATER_GLINT_COUNT,
+  );
+  glints.name = "Visible lake glint and wave strokes";
+  glints.frustumCulled = false;
+  glints.renderOrder = 13;
+  const glintConfigs = createGlintConfigs();
+  group.add(glints);
+
+  const reflectionBand = createReflectionBand();
+  group.add(reflectionBand);
+
+  const shallowFeathers = [
+    createShallowFeather(
+      "Soft sandbar shallow water feather",
+      new THREE.Vector2(LAKE_MAP.sandbar.center.x, LAKE_MAP.sandbar.center.z),
+      LAKE_MAP.sandbar.radiusX + 116,
+      LAKE_MAP.sandbar.radiusZ + 74,
+      -0.12,
+      0x8ed5ba,
+    ),
+    createShallowFeather(
+      "Soft island shallows feather",
+      new THREE.Vector2(LAKE_MAP.island.center.x, LAKE_MAP.island.center.z),
+      LAKE_MAP.island.radiusX + 72,
+      LAKE_MAP.island.radiusZ + 58,
+      0.18,
+      0x72c7b9,
+    ),
+  ];
+  shallowFeathers.forEach((feather) => group.add(feather));
+
+  return {
+    group,
+    glints,
+    glintConfigs,
+    reflectionBand,
+    shallowFeathers,
+    qualityPreset: "Balanced",
+  };
+};
+
 export const createWater = (): WaterSurface => {
   const geometry = createOrganicWaterGeometry();
   const normalMap = createWaterNormalTexture(192, 17);
   let currentPreset: WaterQualityPreset = "Balanced";
+  const cues = createWaterCues();
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uNormalMap: { value: normalMap },
@@ -229,11 +450,12 @@ export const createWater = (): WaterSurface => {
         needleGlint *= pow(sin(vWorldPos.x * -0.019 + vWorldPos.z * 0.038 - uTime * 0.16) * 0.5 + 0.5, 2.4);
         float readableRipples = pow(sin(vWorldPos.z * 0.052 + sin(vWorldPos.x * 0.010) * 1.8 + uTime * 0.16) * 0.5 + 0.5, 4.2);
         readableRipples *= 0.50 + 0.50 * (sin(vWorldPos.x * 0.018 - uTime * 0.05) * 0.5 + 0.5);
-        color += vec3(0.100, 0.215, 0.250) * silk * openWater * (1.0 - uDark * 0.72);
-        color += vec3(0.070, 0.170, 0.205) * readableRipples * openWater * (1.0 - uDark * 0.64) * 0.30;
-        color += vec3(0.60, 0.84, 0.88) * needleGlint * openWater * (1.0 - uDark * 0.82) * 0.31;
-        color += uHorizonColor * fresnel * openWater * (1.0 - uDark * 0.78) * 0.075;
-        color += vec3(0.16, 0.26, 0.25) * farBand * (0.08 + reflectionBreakup * 0.16) * (1.0 - uDark * 0.76);
+        color += vec3(0.135, 0.285, 0.330) * silk * openWater * (1.0 - uDark * 0.54);
+        color += vec3(0.095, 0.215, 0.255) * readableRipples * openWater * (1.0 - uDark * 0.48) * 0.44;
+        color += vec3(0.70, 0.93, 0.98) * needleGlint * openWater * (1.0 - uDark * 0.62) * 0.46;
+        color += uHorizonColor * fresnel * openWater * (1.0 - uDark * 0.58) * 0.105;
+        color += uHorizonColor * openWater * (1.0 - uDark * 0.50) * 0.026;
+        color += vec3(0.18, 0.32, 0.31) * farBand * (0.12 + reflectionBreakup * 0.22) * (1.0 - uDark * 0.52);
         color += vec3(0.014, 0.052, 0.054) * shore * (1.0 - uDark * 0.5);
 
         vec3 sunDir = normalize(vec3(-0.32, 0.74 - uDark * 0.26, -0.48));
@@ -246,8 +468,8 @@ export const createWater = (): WaterSurface => {
         color += vec3(0.66, 0.76, 0.82) * crest * uDark * 0.20;
         color += vec3(0.78, 0.86, 1.0) * uFlash * 0.27;
         color = mix(color, vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), uStale * 0.13);
-        color = mix(color, color * vec3(0.66, 0.74, 0.78), uDark * 0.22);
-        color *= 1.08 - uDark * 0.10;
+        color = mix(color, color * vec3(0.74, 0.82, 0.86), uDark * 0.12);
+        color *= 1.14 - uDark * 0.035;
 
         gl_FragColor = vec4(color, 1.0);
       }
@@ -263,19 +485,89 @@ export const createWater = (): WaterSurface => {
   mesh.receiveShadow = true;
   mesh.position.y = 0;
   mesh.renderOrder = 5;
+  mesh.add(cues.group);
   const position = geometry.attributes.position;
   const surface: WaterSurface = {
     mesh,
     basePositions: new Float32Array(position.array),
     reflectionEnabled: true,
+    cues,
     setQualityPreset: (preset) => {
       currentPreset = preset;
+      cues.qualityPreset = preset;
       surface.reflectionEnabled = true;
       material.uniforms.uReflectionStrength.value =
         currentPreset === "Scenic" ? 1.16 : currentPreset === "Performance" ? 0.86 : 1;
     },
   };
   return surface;
+};
+
+const getCueStrength = (preset: WaterQualityPreset) => {
+  if (preset === "Scenic") {
+    return 1.16;
+  }
+
+  if (preset === "Performance") {
+    return 0.74;
+  }
+
+  return 1;
+};
+
+const updateWaterCues = (
+  cues: WaterVisualCues,
+  elapsed: number,
+  weather: WeatherSnapshot,
+  driveState: DriveWaterState,
+) => {
+  const strength = getCueStrength(cues.qualityPreset);
+  const darkFade = 1 - weather.dials.skyDark * 0.28;
+  const fireLift = weather.dials.fireWeather * 0.14;
+  const windMotion = 1 + weather.dials.wind * 0.72 + Math.min(Math.abs(driveState.speed) / 120, 0.42);
+  const visibleOpacity = clamp((0.34 + fireLift) * strength * darkFade, 0.13, 0.48);
+
+  cues.glints.material.opacity = visibleOpacity;
+  cues.glints.material.color
+    .copy(waterCueColor)
+    .lerp(fireCueColor, weather.dials.fireWeather * 0.38);
+  cues.glints.visible = visibleOpacity > 0.04;
+
+  cues.glintConfigs.forEach((config, index) => {
+    const shimmer = 0.56 + Math.sin(elapsed * config.speed * windMotion + config.phase) * 0.44;
+    const driftX = Math.sin(elapsed * 0.10 * windMotion + config.phase) * config.drift;
+    const driftZ = Math.cos(elapsed * 0.075 * windMotion + config.phase * 0.7) * config.drift * 0.42;
+    const length = config.length * (0.62 + shimmer * 0.52) * strength;
+    const width = config.width * (0.78 + shimmer * 0.34);
+    glintMatrixObject.position.set(
+      config.x + driftX,
+      0.62 + shimmer * 0.055,
+      config.z + driftZ,
+    );
+    glintMatrixObject.rotation.set(
+      -Math.PI / 2,
+      0,
+      config.angle + Math.sin(elapsed * 0.14 + config.phase) * 0.025,
+    );
+    glintMatrixObject.scale.set(length, width, 1);
+    glintMatrixObject.updateMatrix();
+    cues.glints.setMatrixAt(index, glintMatrixObject.matrix);
+  });
+  cues.glints.instanceMatrix.needsUpdate = true;
+
+  cues.reflectionBand.material.uniforms.uTime.value = elapsed;
+  cues.reflectionBand.material.uniforms.uDark.value = weather.dials.skyDark;
+  cues.reflectionBand.material.uniforms.uStrength.value =
+    clamp(0.88 * strength * darkFade + weather.dials.fireWeather * 0.18, 0.22, 1.15);
+  cues.reflectionBand.material.uniforms.uColor.value
+    .setHex(getWeatherPalette(weather.stormIndex).skyHorizon)
+    .lerp(inspirationHorizonWater, Math.max(0.34, 0.74 - weather.dials.skyDark * 0.38));
+
+  cues.shallowFeathers.forEach((feather) => {
+    feather.material.uniforms.uTime.value = elapsed;
+    feather.material.uniforms.uDark.value = weather.dials.skyDark;
+    feather.material.uniforms.uStrength.value = clamp(strength * darkFade, 0.24, 1.1);
+  });
 };
 
 export const animateWater = (
@@ -311,4 +603,5 @@ export const animateWater = (
   camera.getWorldPosition(water.mesh.material.uniforms.uCamPos.value);
   water.mesh.material.uniforms.uBoatPos.value.set(driveState.x, driveState.z);
   water.mesh.material.uniforms.uBoatSpeed.value = driveState.speed;
+  updateWaterCues(water.cues, elapsed, weather, driveState);
 };

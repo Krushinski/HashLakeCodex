@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { BUILD_INFO } from "../buildInfo";
 import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { SCENARIO_PALETTES, getWeatherPalette } from "./artDirection";
@@ -2677,10 +2678,11 @@ const applyWeatherToScene = ({
 const createStatusPill = () => {
   const status = document.createElement("div");
   status.className = "status-pill";
-  status.innerHTML = `
-    <span class="status-pill__dot"></span>
-    <span>Hashlake Phase 25</span>
-  `;
+  const dot = document.createElement("span");
+  dot.className = "status-pill__dot";
+  const label = document.createElement("span");
+  label.textContent = BUILD_INFO.phase;
+  status.append(dot, label);
   return status;
 };
 
