@@ -16,6 +16,7 @@ import {
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { LAKE_MAP, LAKE_OUTLINE } from "../scene/lakeMap";
 import type { ScenicAssetStatuses } from "../scene/scenicAssets";
+import type { TreeAlphaAssetStatuses } from "../scene/forestSystem";
 
 type FeedRow = {
   name: FeedName;
@@ -85,6 +86,8 @@ export type SceneTelemetry = {
   lastSplashDistanceToBoat: number | null;
   lastBoatImpulseStrength: number;
   treeInstances: number;
+  treeAlphaInstances: number;
+  treeAlphaAssets: TreeAlphaAssetStatuses;
   forestBandInstances: number;
   forestBandMethod: string;
   reedInstances: number;
@@ -116,6 +119,8 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Splash dist", value: "--" },
   { group: "weather", label: "Boat impulse", value: "0.00" },
   { group: "weather", label: "Trees", value: "0" },
+  { group: "weather", label: "Tree alpha", value: "fallback", tone: "muted" },
+  { group: "weather", label: "Tree samples", value: "0" },
   { group: "weather", label: "Forest band", value: "0" },
   { group: "weather", label: "Band method", value: "instanced", tone: "muted" },
   { group: "weather", label: "Reeds", value: "0" },
@@ -1061,6 +1066,14 @@ export const createDebugPanel = (
     );
     setMetric("Boat impulse", telemetry.lastBoatImpulseStrength.toFixed(2));
     setMetric("Trees", String(telemetry.treeInstances));
+    const treeAlphaLoaded = Object.values(telemetry.treeAlphaAssets).filter((status) => status === "loaded").length;
+    const treeAlphaErrors = Object.values(telemetry.treeAlphaAssets).filter((status) => status === "error").length;
+    setMetric(
+      "Tree alpha",
+      treeAlphaErrors > 0 ? `${treeAlphaLoaded}/3 loaded, ${treeAlphaErrors} error` : `${treeAlphaLoaded}/3 loaded`,
+      treeAlphaLoaded === 3 ? "good" : treeAlphaErrors > 0 ? "warn" : "muted",
+    );
+    setMetric("Tree samples", String(telemetry.treeAlphaInstances));
     setMetric("Forest band", String(telemetry.forestBandInstances));
     setMetric("Band method", telemetry.forestBandMethod, "muted");
     setMetric("Reeds", String(telemetry.reedInstances));

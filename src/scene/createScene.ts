@@ -4,7 +4,7 @@ import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { SCENARIO_PALETTES, getWeatherPalette } from "./artDirection";
 import { createSceneEffects } from "./effects";
-import { createForestSystem } from "./forestSystem";
+import { createForestSystem, type TreeAlphaAssetStatuses } from "./forestSystem";
 import {
   LAKE_FEATURE_FOOTPRINTS,
   LAKE_OUTLINE,
@@ -45,11 +45,11 @@ const SCENIC_CAMERA_STORAGE_KEY = "hashlake.scenicCamera.v1";
 const DRIVE_ACCELERATION_BASE = 23;
 const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
-const DRIVE_BOOST_MAX_SPEED = 120;
+const DRIVE_BOOST_MAX_SPEED = 100;
 const DRIVE_SUPER_BOOST_MAX_SPEED = 120;
-const DRIVE_BOOST_MULTIPLIER = 1.94;
-const DRIVE_SUPER_BOOST_MULTIPLIER = 1.94;
-const DRIVE_BOOST_IMPULSE = 26;
+const DRIVE_BOOST_MULTIPLIER = 1.76;
+const DRIVE_SUPER_BOOST_MULTIPLIER = 1.98;
+const DRIVE_BOOST_IMPULSE = 20;
 const DRIVE_SUPER_BOOST_IMPULSE = 26;
 const DRIVE_NATURAL_BRAKE_DRAG = 34;
 const DRIVE_COAST_DRAG = 0.9;
@@ -158,6 +158,8 @@ type SceneTelemetry = {
   lastSplashDistanceToBoat: number | null;
   lastBoatImpulseStrength: number;
   treeInstances: number;
+  treeAlphaInstances: number;
+  treeAlphaAssets: TreeAlphaAssetStatuses;
   forestBandInstances: number;
   forestBandMethod: string;
   reedInstances: number;
@@ -1253,6 +1255,8 @@ export const createHashlakeScene = ({
           lastSplashDistanceToBoat: effectStats.lastSplashDistanceToBoat,
           lastBoatImpulseStrength: effectStats.lastBoatImpulseStrength,
           treeInstances: forestStats.treeInstances,
+          treeAlphaInstances: forestStats.treeAlphaInstances,
+          treeAlphaAssets: forestStats.treeAlphaAssets,
           forestBandInstances: forestStats.forestBandInstances,
           forestBandMethod: forestStats.forestBandMethod,
           reedInstances: forestStats.reedInstances,
@@ -1500,9 +1504,13 @@ const createBoat = () => {
     transparent: true,
     opacity: 0.62,
   });
-  const personMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2e3e47,
-    roughness: 0.8,
+  const jacketMaterial = new THREE.MeshStandardMaterial({
+    color: 0x26353a,
+    roughness: 0.82,
+  });
+  const hatMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8e5d2d,
+    roughness: 0.76,
   });
   const skinMaterial = new THREE.MeshStandardMaterial({
     color: 0xc58f65,
@@ -1623,16 +1631,53 @@ const createBoat = () => {
   sternPlate.castShadow = true;
   boat.add(sternPlate);
 
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.50, 1.16, 4, 8), personMaterial);
-  body.position.set(-0.30, 2.46, 0);
-  body.rotation.z = -0.12;
-  body.castShadow = true;
-  boat.add(body);
+  const passenger = new THREE.Group();
+  passenger.name = "Forward-facing seated passenger";
+  passenger.position.set(-0.34, 1.74, 0);
+  passenger.rotation.z = -0.04;
+  boat.add(passenger);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 12), skinMaterial);
-  head.position.set(-0.70, 3.24, 0);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.82, 4, 8), jacketMaterial);
+  torso.name = "Seated passenger torso";
+  torso.position.set(0.06, 0.68, 0);
+  torso.rotation.z = -0.18;
+  torso.castShadow = true;
+  passenger.add(torso);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 10), skinMaterial);
+  head.name = "Passenger forward-facing head";
+  head.position.set(0.42, 1.30, 0);
   head.castShadow = true;
-  boat.add(head);
+  passenger.add(head);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.16, 8), skinMaterial);
+  nose.name = "Passenger nose direction cue";
+  nose.position.set(0.72, 1.30, 0);
+  nose.rotation.z = -Math.PI / 2;
+  nose.castShadow = true;
+  passenger.add(nose);
+
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.055, 18), hatMaterial);
+  hatBrim.name = "Wide-brim fisherman hat";
+  hatBrim.position.set(0.42, 1.62, 0);
+  hatBrim.rotation.z = -0.06;
+  hatBrim.castShadow = true;
+  passenger.add(hatBrim);
+
+  const hatCrown = new THREE.Mesh(new THREE.ConeGeometry(0.30, 0.34, 16), hatMaterial);
+  hatCrown.name = "Fisherman hat crown";
+  hatCrown.position.set(0.42, 1.82, 0);
+  hatCrown.castShadow = true;
+  passenger.add(hatCrown);
+
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.54, 4, 6), jacketMaterial);
+    arm.name = "Passenger forward arm";
+    arm.position.set(0.36, 0.82, side * 0.36);
+    arm.rotation.set(0.16, 0.42, side * 0.52);
+    arm.castShadow = true;
+    passenger.add(arm);
+  }
 
   return boat;
 };
@@ -1965,14 +2010,14 @@ const createShoreline = () => {
   const shallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x93d8cb,
     transparent: true,
-    opacity: 0.092,
+    opacity: 0.070,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const shallowFadeMaterial = new THREE.MeshBasicMaterial({
     color: 0x6eb8b8,
     transparent: true,
-    opacity: 0.040,
+    opacity: 0.026,
     depthWrite: false,
     side: THREE.DoubleSide,
   });

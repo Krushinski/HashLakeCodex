@@ -1,11 +1,18 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { WeatherSnapshot } from "../state/weatherEngine";
 import { getWeatherPalette } from "./artDirection";
 import { LAKE_MAP, getExpandedOutline } from "./lakeMap";
 import { makeRng } from "./scenicUtils";
 
+export type TreeAlphaAssetKey = "tallPine" | "shortPine" | "layeredConifer";
+export type TreeAlphaAssetLoadState = "fallback" | "loading" | "loaded" | "error";
+export type TreeAlphaAssetStatuses = Record<TreeAlphaAssetKey, TreeAlphaAssetLoadState>;
+
 type ForestStats = {
   treeInstances: number;
+  treeAlphaInstances: number;
+  treeAlphaAssets: TreeAlphaAssetStatuses;
   reedInstances: number;
   rockInstances: number;
   silhouetteInstances: number;
@@ -23,6 +30,30 @@ export type ForestSystem = {
 
 type ForestQualityPreset = "Performance" | "Balanced" | "Scenic";
 
+const TREE_ALPHA_PATHS: Record<TreeAlphaAssetKey, string> = {
+  tallPine: "assets/models/hl-tree-alpha-tall-pine.glb",
+  shortPine: "assets/models/hl-tree-alpha-short-pine.glb",
+  layeredConifer: "assets/models/hl-tree-alpha-layered-conifer.glb",
+};
+
+const treeAlphaPlacements: Array<{
+  key: TreeAlphaAssetKey;
+  x: number;
+  z: number;
+  scale: number;
+  yaw: number;
+}> = [
+  { key: "tallPine", x: -562, z: -286, scale: 1.14, yaw: 0.2 },
+  { key: "tallPine", x: 520, z: -228, scale: 1.04, yaw: 1.4 },
+  { key: "shortPine", x: -536, z: 220, scale: 1.18, yaw: 2.1 },
+  { key: "shortPine", x: 622, z: 206, scale: 0.98, yaw: -0.4 },
+  { key: "layeredConifer", x: -318, z: -360, scale: 1.05, yaw: 0.9 },
+  { key: "layeredConifer", x: 396, z: 300, scale: 0.94, yaw: -1.2 },
+  { key: "tallPine", x: 224, z: 34, scale: 0.50, yaw: 0.6 },
+  { key: "shortPine", x: 266, z: 58, scale: 0.62, yaw: -0.5 },
+  { key: "layeredConifer", x: 246, z: 70, scale: 0.56, yaw: 1.2 },
+];
+
 const outlinePosition = (index: number, offset: number, jitter: number) => {
   const outline = getExpandedOutline(offset);
   const base = outline[index % outline.length];
@@ -34,6 +65,91 @@ const outlinePosition = (index: number, offset: number, jitter: number) => {
     z: base.z + Math.sin(tangent + Math.PI / 2) * jitter,
     tangent,
   };
+};
+
+const createStripGeometry = (
+  inner: readonly { x: number; z: number }[],
+  outer: readonly { x: number; z: number }[],
+) => {
+  const geometry = new THREE.BufferGeometry();
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const count = Math.min(inner.length, outer.length);
+
+  for (let index = 0; index < count; index += 1) {
+    positions.push(inner[index].x, 0, inner[index].z, outer[index].x, 0, outer[index].z);
+  }
+
+  for (let index = 0; index < count; index += 1) {
+    const next = (index + 1) % count;
+    const innerA = index * 2;
+    const outerA = innerA + 1;
+    const innerB = next * 2;
+    const outerB = innerB + 1;
+    indices.push(innerA, outerA, outerB, innerA, outerB, innerB);
+  }
+
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+const createForestGroundZones = () => {
+  const group = new THREE.Group();
+  group.name = "Forest-ready ground placement zones";
+  const zoneMaterial = new THREE.MeshStandardMaterial({
+    color: 0x183420,
+    roughness: 0.96,
+    transparent: true,
+    opacity: 0.24,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const midZoneMaterial = zoneMaterial.clone();
+  midZoneMaterial.color.setHex(0x132b1d);
+  midZoneMaterial.opacity = 0.18;
+  const farZoneMaterial = zoneMaterial.clone();
+  farZoneMaterial.color.setHex(0x0b2118);
+  farZoneMaterial.opacity = 0.14;
+
+  const zones = [
+    {
+      name: "Foreground shoreline tree-ready shelf",
+      inner: 86,
+      outer: 150,
+      y: 0.56,
+      material: zoneMaterial,
+    },
+    {
+      name: "Midground forest cluster shelf",
+      inner: 158,
+      outer: 246,
+      y: 0.44,
+      material: midZoneMaterial,
+    },
+    {
+      name: "Semi-far forest staging shelf",
+      inner: 252,
+      outer: 360,
+      y: 0.30,
+      material: farZoneMaterial,
+    },
+  ];
+
+  zones.forEach((zone) => {
+    const mesh = new THREE.Mesh(
+      createStripGeometry(getExpandedOutline(zone.inner), getExpandedOutline(zone.outer)),
+      zone.material,
+    );
+    mesh.name = zone.name;
+    mesh.position.y = zone.y;
+    mesh.renderOrder = -1;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  });
+
+  return group;
 };
 
 const installWindShader = (
@@ -99,7 +215,9 @@ const buildForestMassGeometry = (width: number, baseHeight: number, peakHeight: 
 export const createForestSystem = (): ForestSystem => {
   const group = new THREE.Group();
   group.name = "HashLake3-adapted forest and reeds";
+  group.add(createForestGroundZones());
   const rng = makeRng(4242);
+  const loader = new GLTFLoader();
   const windUniforms = {
     time: { value: 0 },
     wind: { value: 0.15 },
@@ -220,6 +338,60 @@ export const createForestSystem = (): ForestSystem => {
 
   let activePreset: ForestQualityPreset = "Balanced";
   let scenicTreelineActive = false;
+  let treeAlphaSampleCount = 0;
+  const treeAlphaStatuses: TreeAlphaAssetStatuses = {
+    tallPine: "fallback",
+    shortPine: "fallback",
+    layeredConifer: "fallback",
+  };
+  const treeAlphaGroup = new THREE.Group();
+  treeAlphaGroup.name = "Blender tree alpha sample";
+  group.add(treeAlphaGroup);
+
+  const normalizeTreeAlpha = (scene: THREE.Group) => {
+    scene.traverse((child) => {
+      child.frustumCulled = false;
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+  };
+
+  const placeTreeAlphaSamples = (key: TreeAlphaAssetKey, source: THREE.Group) => {
+    treeAlphaPlacements
+      .filter((placement) => placement.key === key)
+      .forEach((placement) => {
+        const sample = source.clone(true);
+        sample.name = `Tree alpha sample ${key}`;
+        sample.position.set(placement.x, 0.74, placement.z);
+        sample.rotation.y = placement.yaw;
+        sample.scale.setScalar(placement.scale);
+        treeAlphaGroup.add(sample);
+        treeAlphaSampleCount += 1;
+      });
+  };
+
+  const loadTreeAlpha = (key: TreeAlphaAssetKey) => {
+    treeAlphaStatuses[key] = "loading";
+    const url = `${import.meta.env.BASE_URL}${TREE_ALPHA_PATHS[key]}`;
+    loader.load(
+      url,
+      (gltf) => {
+        gltf.scene.name = `Loaded tree alpha ${key}`;
+        normalizeTreeAlpha(gltf.scene);
+        placeTreeAlphaSamples(key, gltf.scene);
+        treeAlphaStatuses[key] = "loaded";
+      },
+      undefined,
+      () => {
+        treeAlphaStatuses[key] = "error";
+      },
+    );
+  };
+
+  (Object.keys(TREE_ALPHA_PATHS) as TreeAlphaAssetKey[]).forEach(loadTreeAlpha);
+
   const silhouetteCount = 190;
   const silhouetteGeometry = new THREE.ConeGeometry(3.6, 18, 6, 1);
   const silhouetteMaterial = new THREE.MeshBasicMaterial({
@@ -331,10 +503,13 @@ export const createForestSystem = (): ForestSystem => {
             ? 0.46 + weather.dials.skyDark * 0.05
             : 0.36 + weather.dials.skyDark * 0.05;
       forestDepthMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x071012 : 0x08221d);
+      treeAlphaGroup.visible = true;
     },
     getStats: () => ({
       treeInstances:
         treeCount + (silhouettes.visible ? silhouetteCount : 0) + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
+      treeAlphaInstances: treeAlphaSampleCount,
+      treeAlphaAssets: { ...treeAlphaStatuses },
       reedInstances: reedCount,
       rockInstances: rockCount,
       silhouetteInstances: (silhouettes.visible ? silhouetteCount : 0) + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
@@ -349,6 +524,7 @@ export const createForestSystem = (): ForestSystem => {
       activePreset = preset;
       scenicSilhouettes.visible = !scenicTreelineActive && preset === "Scenic";
       forestDepthMass.visible = !scenicTreelineActive && preset !== "Performance";
+      treeAlphaGroup.visible = true;
     },
     setScenicTreelineActive: (active) => {
       scenicTreelineActive = active;

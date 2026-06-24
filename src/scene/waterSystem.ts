@@ -55,7 +55,7 @@ const createOrganicWaterGeometry = () => {
   const sandFactors: number[] = [];
   const shoreFactors: number[] = [];
   const indices: number[] = [];
-  const step = 5;
+  const step = 4.5;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
   const deepColor = new THREE.Color(0x022239);
   const midColor = new THREE.Color(0x064857);
@@ -309,18 +309,15 @@ export const createWater = (): WaterSurface => {
 
         float farBand = smoothstep(-710.0, -210.0, vWorldPos.z) * (1.0 - smoothstep(120.0, 380.0, vWorldPos.z));
         farBand *= smoothstep(0.10, 0.92, depth);
-        float forestColumns = sin(vWorldPos.x * 0.0042 + sin(vWorldPos.z * 0.0022) * 0.34 + uTime * 0.0016) * 0.5 + 0.5;
-        forestColumns = mix(forestColumns, sin(vWorldPos.x * 0.0082 + 2.4) * 0.5 + 0.5, 0.14);
-        forestColumns = smoothstep(0.06, 0.96, forestColumns);
         float skySwell = bodyWave * 0.5 + 0.5;
         vec3 skyMirror = mix(uHorizonColor, uSunColor * 0.68, 0.18);
         skyMirror = mix(skyMirror, vec3(0.030, 0.046, 0.055), uDark * 0.72);
-        vec3 forestMirror = mix(vec3(0.020, 0.072, 0.062), vec3(0.052, 0.132, 0.112), forestColumns);
-        float reflectedForest = 0.18 + farBand * 0.14 + smoothstep(-260.0, 120.0, vWorldPos.z) * 0.025;
-        vec3 reflectedMood = mix(skyMirror, forestMirror, reflectedForest);
-        reflectedMood += vec3(0.064, 0.126, 0.142) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.42;
+        float horizonGlass = smoothstep(0.18, 0.96, farBand) * (0.58 + skySwell * 0.18);
+        vec3 reflectedMood = skyMirror;
+        reflectedMood += vec3(0.064, 0.126, 0.142) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.34;
+        reflectedMood = mix(reflectedMood, uHorizonColor * 0.72, horizonGlass * 0.10);
 
-        float reflectionAmount = clamp((fresnel * 1.08 + farBand * 0.10 + openWater * 0.11) * uReflectionStrength * (1.0 - uRain * 0.15), 0.0, 0.90);
+        float reflectionAmount = clamp((fresnel * 1.08 + horizonGlass * 0.045 + openWater * 0.10) * uReflectionStrength * (1.0 - uRain * 0.15), 0.0, 0.88);
         vec3 color = mix(base, reflectedMood, reflectionAmount);
 
         float nearCamera = smoothstep(720.0, 100.0, dist);

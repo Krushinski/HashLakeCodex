@@ -1,6 +1,6 @@
 # Blender Zone Prep
 
-Phase 46 does not use Blender assets. This note defines the scene zones that are ready for future controlled Blender exploration and which systems should stay native/procedural.
+Phase 47 uses Blender only for a three-tree alpha test. This note defines the scene zones that are ready for future controlled Blender exploration and which systems should stay native/procedural.
 
 ## Water surface
 
@@ -58,27 +58,27 @@ Phase 46 does not use Blender assets. This note defines the scene zones that are
 
 ## Foreground shore
 
-- Current native state: native terrain bands, reeds, rocks, and shoreline materials.
-- Current weaknesses: foreground close-ups can reveal repeated primitive shapes.
-- Topology readiness: good for sparse accent kits, not full terrain replacement yet.
+- Current native state: native terrain bands, reeds, rocks, shoreline materials, and a subtle foreground tree-ready shelf behind the wet/sand edge.
+- Current weaknesses: foreground close-ups can reveal repeated primitive shapes and the shelf still needs handcrafted vertical variation.
+- Topology readiness: good for sparse accent kits, not full terrain replacement yet. The foreground shelf is intended for future shoreline trees and reeds without crowding the lake edge.
 - Future Blender role: reusable reed beds, rock clusters, grass shelf pieces, and small wet-edge transitions.
 - Keep native: broad land mass and collision.
 - Risk: dense individual props can hurt mobile and low-end Drive Mode.
 
 ## Midground forest band
 
-- Current native state: procedural forest massing and tree clusters support the lake silhouette.
-- Current weaknesses: individual cones still read in places.
-- Topology readiness: suitable for merged silhouette bands or low-poly cluster replacements.
-- Future Blender role: grouped conifer silhouettes, forest edge strips, and layered tree masses.
+- Current native state: procedural forest massing, tree clusters, and a midground forest cluster shelf support the lake silhouette.
+- Current weaknesses: individual cones still read in places and cluster placement is still generic around the whole outline.
+- Topology readiness: suitable for merged silhouette bands or low-poly cluster replacements. Use the midground shelf for cove-side and rear-shore clusters.
+- Future Blender role: grouped conifer silhouettes, forest edge strips, layered tree masses, and cove-side tree clusters.
 - Keep native: weather sway and quality preset density gates.
 - Risk: hundreds of separate tree meshes are too expensive; use merged/instanced geometry.
 
 ## Background forest band
 
-- Current native state: distant forest impression without the removed fake water reflection planes.
+- Current native state: distant forest impression without the removed fake water reflection planes, plus a semi-far staging shelf for future background forest silhouettes.
 - Current weaknesses: horizon forest lacks the density and realism of the inspiration image.
-- Topology readiness: ready for distant silhouette-only assets.
+- Topology readiness: ready for distant silhouette-only assets. Keep far assets above the shoreline and off the water plane.
 - Future Blender role: merged far treeline strips above shoreline, never transparent water reflection planes.
 - Keep native: shader reflection mood and atmospheric haze.
 - Risk: any water-level reflection strip can reintroduce the UFO artifact.
@@ -103,9 +103,18 @@ Phase 46 does not use Blender assets. This note defines the scene zones that are
 
 ## Hero boat
 
-- Current native state: procedural classic wooden speedboat with slimmer hull, sharper bow, chrome accents, windshield, motor, pilot, bow lift, and stern-origin voxel wake.
+- Current native state: procedural classic wooden speedboat with slimmer hull, sharper bow, chrome accents, windshield, motor, forward-facing seated passenger, bow lift, and stern-origin voxel wake.
 - Current weaknesses: still primitive-built; detailed planking and hull curvature are limited.
 - Topology readiness: good reference for a future handcrafted low-poly boat, but current drive contract depends on orientation and stern wake.
 - Future Blender role: optional single optimized hero boat model with clear bow/stern/motor and the same origin/heading convention.
 - Keep native: drive physics, camera lock, wake emitter placement, speedometer, and tableau saves.
 - Risk: imported boat must preserve forward vector, scale, waterline, and motor origin exactly.
+
+## Tree alpha assets
+
+- Current native state: three controlled Blender-generated low-poly tree alpha GLBs now exist in `public/assets/models/`: tall pine, short pine, and layered conifer.
+- Current weaknesses: only six sample placements are used; this is deliberately not a forest replacement.
+- Topology readiness: the foreground, midground, and semi-far shelves are ready for sparse alpha placement, but the full forest still needs a placement plan.
+- Future Blender role: expand from these alpha shapes into merged/instanced tree clusters and forest edge strips.
+- Keep native: quality gates, fallback cone forest, wind sway system, far silhouette bands, and scene/collision boundaries.
+- Risk: mass deploying GLB clones without instancing or merged meshes could hurt Drive Mode performance.
