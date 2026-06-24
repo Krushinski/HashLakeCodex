@@ -45,12 +45,12 @@ const SCENIC_CAMERA_STORAGE_KEY = "hashlake.scenicCamera.v1";
 const DRIVE_ACCELERATION_BASE = 23;
 const DRIVE_ACCELERATION_RAMP = 51;
 const DRIVE_MAX_SPEED = 52;
-const DRIVE_BOOST_MAX_SPEED = 90;
-const DRIVE_SUPER_BOOST_MAX_SPEED = 100;
-const DRIVE_BOOST_MULTIPLIER = 1.58;
-const DRIVE_SUPER_BOOST_MULTIPLIER = 1.84;
-const DRIVE_BOOST_IMPULSE = 16;
-const DRIVE_SUPER_BOOST_IMPULSE = 20;
+const DRIVE_BOOST_MAX_SPEED = 120;
+const DRIVE_SUPER_BOOST_MAX_SPEED = 120;
+const DRIVE_BOOST_MULTIPLIER = 1.94;
+const DRIVE_SUPER_BOOST_MULTIPLIER = 1.94;
+const DRIVE_BOOST_IMPULSE = 26;
+const DRIVE_SUPER_BOOST_IMPULSE = 26;
 const DRIVE_NATURAL_BRAKE_DRAG = 34;
 const DRIVE_COAST_DRAG = 0.9;
 const DRIVE_ACTIVE_BRAKE_FORCE = 82;
@@ -1422,22 +1422,22 @@ const createLakeFill = () => {
 };
 
 const createSpeedboatHullGeometry = () => {
-  const geometry = new THREE.BoxGeometry(13.4, 1.9, 3.6, 18, 3, 4);
+  const geometry = new THREE.BoxGeometry(14.4, 1.86, 3.32, 22, 4, 5);
   const positions = geometry.attributes.position as THREE.BufferAttribute;
 
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index);
     const y = positions.getY(index);
     const z = positions.getZ(index);
-    const t = (x + 6.7) / 13.4;
-    const bowT = smoothstepNumber(0.58, 1, t);
-    const sternT = 1 - smoothstepNumber(0, 0.18, t);
+    const t = (x + 7.2) / 14.4;
+    const bowT = smoothstepNumber(0.50, 1, t);
+    const sternT = 1 - smoothstepNumber(0, 0.16, t);
     const lower = smoothstepNumber(0.12, -0.95, y);
-    const center = 1 - Math.min(1, Math.abs(z) / 1.8);
-    const widthFactor = Math.max(0.08, 1 - bowT * 0.92 - sternT * 0.06);
-    const chineFactor = 1 - lower * (0.34 + bowT * 0.16);
-    const bowLift = Math.sin(Math.max(0, t - 0.62) / 0.38 * Math.PI * 0.5) * 0.34;
-    const keelDrop = lower * center * (0.62 + bowT * 0.20);
+    const center = 1 - Math.min(1, Math.abs(z) / 1.66);
+    const widthFactor = Math.max(0.045, 1 - bowT * 0.96 - sternT * 0.07);
+    const chineFactor = 1 - lower * (0.38 + bowT * 0.18);
+    const bowLift = Math.sin(Math.max(0, t - 0.56) / 0.44 * Math.PI * 0.5) * 0.40;
+    const keelDrop = lower * center * (0.66 + bowT * 0.24);
     positions.setXYZ(
       index,
       x,
@@ -1483,6 +1483,11 @@ const createBoat = () => {
     color: 0xf3dba5,
     roughness: 0.36,
   });
+  const chromeMaterial = new THREE.MeshStandardMaterial({
+    color: 0xdbe5df,
+    roughness: 0.18,
+    metalness: 0.46,
+  });
   const motorMaterial = new THREE.MeshStandardMaterial({
     color: 0x151b1e,
     roughness: 0.62,
@@ -1509,51 +1514,51 @@ const createBoat = () => {
   boat.add(hull);
 
   for (const side of [-1, 1]) {
-    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.18, 0.16), darkTrimMaterial);
-    rubRail.position.set(-0.52, 0.84, side * 1.78);
+    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.17, 0.14), darkTrimMaterial);
+    rubRail.position.set(-0.62, 0.84, side * 1.64);
     rubRail.rotation.x = side * -0.06;
     rubRail.castShadow = true;
     boat.add(rubRail);
 
-    const waterline = new THREE.Mesh(new THREE.BoxGeometry(10.7, 0.10, 0.10), darkTrimMaterial);
+    const waterline = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.10, 0.09), darkTrimMaterial);
     waterline.name = "Hull waterline cue";
-    waterline.position.set(-0.78, -0.34, side * 1.50);
+    waterline.position.set(-0.90, -0.34, side * 1.38);
     waterline.rotation.x = side * -0.10;
     waterline.castShadow = false;
     boat.add(waterline);
   }
 
-  const bowDeck = new THREE.Mesh(new THREE.ConeGeometry(1.38, 5.6, 4), deckMaterial);
+  const bowDeck = new THREE.Mesh(new THREE.ConeGeometry(1.30, 6.15, 4), deckMaterial);
   bowDeck.rotation.set(0, Math.PI / 4, Math.PI / 2);
-  bowDeck.position.set(4.56, 1.12, 0);
-  bowDeck.scale.set(1.0, 0.24, 0.72);
+  bowDeck.position.set(4.98, 1.12, 0);
+  bowDeck.scale.set(1.0, 0.22, 0.66);
   bowDeck.castShadow = true;
   boat.add(bowDeck);
 
-  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.34, 2.96), deckMaterial);
-  rearDeck.position.set(-4.18, 1.06, 0);
+  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(4.05, 0.34, 2.70), deckMaterial);
+  rearDeck.position.set(-4.54, 1.06, 0);
   rearDeck.castShadow = true;
   boat.add(rearDeck);
 
-  const centerDeck = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.28, 2.86), deckMaterial);
+  const centerDeck = new THREE.Mesh(new THREE.BoxGeometry(2.64, 0.28, 2.62), deckMaterial);
   centerDeck.position.set(-0.64, 1.05, 0);
   centerDeck.castShadow = true;
   boat.add(centerDeck);
 
-  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.54, 1.52, 3.22), darkTrimMaterial);
-  stern.position.set(-6.62, 0.08, 0);
+  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.52, 1.46, 2.96), darkTrimMaterial);
+  stern.position.set(-7.06, 0.08, 0);
   stern.castShadow = true;
   boat.add(stern);
 
-  for (let index = 0; index < 6; index += 1) {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.045, 0.055), creamMaterial);
-    stripe.position.set(0.1, 1.235 + index * 0.004, -1.08 + index * 0.43);
+  for (let index = 0; index < 7; index += 1) {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.045, 0.045), creamMaterial);
+    stripe.position.set(0.04, 1.235 + index * 0.004, -1.02 + index * 0.34);
     stripe.castShadow = false;
     boat.add(stripe);
   }
 
-  const centerSeam = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.055, 0.08), darkTrimMaterial);
-  centerSeam.position.set(0.38, 1.28, 0);
+  const centerSeam = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.055, 0.07), darkTrimMaterial);
+  centerSeam.position.set(0.30, 1.28, 0);
   centerSeam.castShadow = false;
   boat.add(centerSeam);
 
@@ -1572,23 +1577,23 @@ const createBoat = () => {
   windshield.rotation.z = -0.24;
   boat.add(windshield);
 
-  const windshieldCap = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 2.34), creamMaterial);
+  const windshieldCap = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 2.34), chromeMaterial);
   windshieldCap.position.set(2.14, 2.28, 0);
   windshieldCap.rotation.z = -0.24;
   boat.add(windshieldCap);
 
-  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.08, 1.6, 1.16), motorMaterial);
-  motor.position.set(-7.18, 0.10, 0);
+  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.04, 1.64, 1.08), motorMaterial);
+  motor.position.set(-7.68, 0.10, 0);
   motor.castShadow = true;
   boat.add(motor);
 
-  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.46, 0.90), creamMaterial);
-  motorCap.position.set(-7.78, 0.70, 0);
+  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.46, 0.84), chromeMaterial);
+  motorCap.position.set(-8.24, 0.70, 0);
   motorCap.castShadow = true;
   boat.add(motorCap);
 
-  const propGuard = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.42, 1.58), motorMaterial);
-  propGuard.position.set(-8.12, -0.38, 0);
+  const propGuard = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 1.46), motorMaterial);
+  propGuard.position.set(-8.62, -0.38, 0);
   propGuard.castShadow = true;
   boat.add(propGuard);
 
@@ -1602,19 +1607,19 @@ const createBoat = () => {
   boat.add(benchB);
 
   for (const side of [-1, 1]) {
-    const sidePlank = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.065, 0.06), creamMaterial);
+    const sidePlank = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.060, 0.052), creamMaterial);
     sidePlank.position.set(-0.10, 1.17, side * 1.18);
     sidePlank.castShadow = false;
     boat.add(sidePlank);
   }
 
-  const bowLight = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.22, 0.38), creamMaterial);
-  bowLight.position.set(6.84, 1.02, 0);
+  const bowLight = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.22, 0.36), chromeMaterial);
+  bowLight.position.set(7.28, 1.02, 0);
   bowLight.castShadow = true;
   boat.add(bowLight);
 
-  const sternPlate = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 2.1), creamMaterial);
-  sternPlate.position.set(-6.88, 0.72, 0);
+  const sternPlate = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 1.94), chromeMaterial);
+  sternPlate.position.set(-7.30, 0.72, 0);
   sternPlate.castShadow = true;
   boat.add(sternPlate);
 
@@ -2058,22 +2063,47 @@ const createDestinationMarkers = () => {
   group.name = "Phase 12 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xded6b8,
-    emissive: 0x302a1d,
-    emissiveIntensity: 0.045,
+    color: 0xe7dfc6,
+    emissive: 0x241e12,
+    emissiveIntensity: 0.035,
     roughness: 0.88,
+  });
+  const wetSandMaterial = new THREE.MeshStandardMaterial({
+    color: 0xbcb08d,
+    emissive: 0x1d1810,
+    emissiveIntensity: 0.025,
+    roughness: 0.94,
+    transparent: true,
+    opacity: 0.36,
+    depthWrite: false,
+  });
+  const sandPatchMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf0e8cf,
+    emissive: 0x211b10,
+    emissiveIntensity: 0.020,
+    roughness: 0.92,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+  });
+  const submergedSandMaterial = new THREE.MeshBasicMaterial({
+    color: 0xb9e8d7,
+    transparent: true,
+    opacity: 0.034,
+    depthWrite: false,
+    side: THREE.DoubleSide,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x9be1d4,
     transparent: true,
-    opacity: 0.105,
+    opacity: 0.034,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const sandShallowFadeMaterial = new THREE.MeshBasicMaterial({
     color: 0x74beb8,
     transparent: true,
-    opacity: 0.044,
+    opacity: 0.014,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -2141,6 +2171,21 @@ const createDestinationMarkers = () => {
   }
   group.add(dock);
 
+  const sandbarSubmerged = new THREE.Mesh(
+    createEllipseFillGeometry(
+      sandbarFootprint.shallowInner.radiusX,
+      sandbarFootprint.shallowInner.radiusZ,
+      91,
+      0.020,
+      144,
+    ),
+    submergedSandMaterial,
+  );
+  sandbarSubmerged.name = "Sandbar submerged sand fade";
+  sandbarSubmerged.position.set(sandbarCenter.x, 0.042, sandbarCenter.z);
+  sandbarSubmerged.rotation.y = -sandbarFootprint.rotation;
+  group.add(sandbarSubmerged);
+
   const sandbarFade = new THREE.Mesh(
     createOrganicEllipseStripGeometry(
       sandbarFootprint.shallowInner.radiusX,
@@ -2177,13 +2222,29 @@ const createDestinationMarkers = () => {
   sandbarHalo.rotation.y = -sandbarFootprint.rotation;
   group.add(sandbarHalo);
 
+  const sandbarWet = new THREE.Mesh(
+    createEllipseFillGeometry(
+      sandbarFootprint.dry.radiusX + 10,
+      sandbarFootprint.dry.radiusZ + 6,
+      67,
+      0.010,
+      128,
+    ),
+    wetSandMaterial,
+  );
+  sandbarWet.name = "Sandbar wet sand feather";
+  sandbarWet.position.set(sandbarCenter.x, 0.335, sandbarCenter.z);
+  sandbarWet.rotation.y = -sandbarFootprint.rotation;
+  sandbarWet.receiveShadow = true;
+  group.add(sandbarWet);
+
   const sandbar = new THREE.Mesh(
     createEllipseFillGeometry(
-      sandbarFootprint.dry.radiusX + 3,
-      sandbarFootprint.dry.radiusZ + 2,
+      sandbarFootprint.dry.radiusX + 1,
+      sandbarFootprint.dry.radiusZ + 1,
       61,
-      0.004,
-      128,
+      0.008,
+      144,
     ),
     sandMaterial,
   );
@@ -2192,6 +2253,21 @@ const createDestinationMarkers = () => {
   sandbar.rotation.y = -sandbarFootprint.rotation;
   sandbar.receiveShadow = true;
   group.add(sandbar);
+
+  for (let index = 0; index < 4; index += 1) {
+    const patch = new THREE.Mesh(
+      createEllipseFillGeometry(18 - index * 2.4, 4.8 + (index % 2) * 1.2, 100 + index, 0.018, 48),
+      sandPatchMaterial,
+    );
+    patch.name = "Sandbar pale sand variation";
+    patch.position.set(
+      sandbarCenter.x - 42 + index * 28,
+      0.373,
+      sandbarCenter.z + Math.sin(index * 1.2) * 7,
+    );
+    patch.rotation.y = -sandbarFootprint.rotation + Math.sin(index) * 0.22;
+    group.add(patch);
+  }
 
   const coveMarker = new THREE.Group();
   coveMarker.name = "Mountain cove";
@@ -2226,6 +2302,21 @@ const createDestinationMarkers = () => {
 
   const island = new THREE.Group();
   island.name = "Rocky island";
+  const islandSubmerged = new THREE.Mesh(
+    createEllipseFillGeometry(
+      islandFootprint.shallowInner.radiusX,
+      islandFootprint.shallowInner.radiusZ,
+      89,
+      0.018,
+      144,
+    ),
+    submergedSandMaterial,
+  );
+  islandSubmerged.name = "Island submerged sand fade";
+  islandSubmerged.position.set(islandCenter.x, 0.042, islandCenter.z);
+  islandSubmerged.rotation.y = -islandFootprint.rotation;
+  island.add(islandSubmerged);
+
   const islandFade = new THREE.Mesh(
     createOrganicEllipseStripGeometry(
       islandFootprint.shallowInner.radiusX,
@@ -2262,13 +2353,29 @@ const createDestinationMarkers = () => {
   islandHalo.rotation.y = -islandFootprint.rotation;
   island.add(islandHalo);
 
+  const islandWet = new THREE.Mesh(
+    createEllipseFillGeometry(
+      islandFootprint.dry.radiusX + 7,
+      islandFootprint.dry.radiusZ + 5,
+      83,
+      0.009,
+      128,
+    ),
+    wetSandMaterial,
+  );
+  islandWet.name = "Island wet sand feather";
+  islandWet.position.set(islandCenter.x, 0.355, islandCenter.z);
+  islandWet.rotation.y = -islandFootprint.rotation;
+  islandWet.receiveShadow = true;
+  island.add(islandWet);
+
   const islandBeach = new THREE.Mesh(
     createEllipseFillGeometry(
-      islandFootprint.dry.radiusX + 3,
-      islandFootprint.dry.radiusZ + 2,
+      islandFootprint.dry.radiusX + 1,
+      islandFootprint.dry.radiusZ + 1,
       73,
-      0.003,
-      128,
+      0.007,
+      144,
     ),
     sandMaterial,
   );
@@ -2277,6 +2384,21 @@ const createDestinationMarkers = () => {
   islandBeach.rotation.y = -islandFootprint.rotation;
   islandBeach.receiveShadow = true;
   island.add(islandBeach);
+
+  for (let index = 0; index < 3; index += 1) {
+    const patch = new THREE.Mesh(
+      createEllipseFillGeometry(12 - index * 1.8, 5 + index, 120 + index, 0.015, 44),
+      sandPatchMaterial,
+    );
+    patch.name = "Island pale sand variation";
+    patch.position.set(
+      islandCenter.x - 24 + index * 19,
+      0.404,
+      islandCenter.z + Math.cos(index * 1.1) * 9,
+    );
+    patch.rotation.y = -islandFootprint.rotation + Math.sin(index * 0.9) * 0.28;
+    island.add(patch);
+  }
 
   const islandRockShelf = new THREE.Mesh(
     createEllipseFillGeometry(
@@ -3057,7 +3179,7 @@ const createDriveSpeedometer = () => {
   meter.innerHTML = `
     <div class="drive-speedometer__dial">
       <span class="drive-speedometer__tick drive-speedometer__tick--zero">0</span>
-      <span class="drive-speedometer__tick drive-speedometer__tick--max">100</span>
+      <span class="drive-speedometer__tick drive-speedometer__tick--max">120</span>
       <span class="drive-speedometer__needle"></span>
       <span class="drive-speedometer__hub"></span>
     </div>
@@ -3127,7 +3249,7 @@ const animateDriveSpeedometer = (
   }
 
   const displaySpeed = Math.round(clamp(Math.abs(driveState.speed), 0, DRIVE_SUPER_BOOST_MAX_SPEED));
-  const speedRatio = clamp(displaySpeed / 100, 0, 1);
+  const speedRatio = clamp(displaySpeed / DRIVE_SUPER_BOOST_MAX_SPEED, 0, 1);
   meter.style.setProperty("--speed-ratio", speedRatio.toFixed(3));
   meter.style.setProperty("--needle-angle", `${(-116 + speedRatio * 232).toFixed(1)}deg`);
   const value = meter.querySelector<HTMLElement>("[data-drive-speed-value]");

@@ -149,48 +149,48 @@ export const LAKE_FEATURE_FOOTPRINTS = {
     center: LAKE_MAP.island.center,
     rotation: LAKE_MAP.island.rotation,
     blocker: {
-      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 24,
-      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 13,
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 28,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 16,
     },
     dry: {
-      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 26,
-      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 14,
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 34,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 20,
     },
     wetOuter: {
-      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 46,
-      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 28,
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 56,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 34,
     },
     shallowInner: {
-      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 68,
-      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 44,
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 82,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 52,
     },
     shallowOuter: {
-      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 102,
-      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 64,
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 118,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 74,
     },
   },
   sandbar: {
     center: LAKE_MAP.sandbar.center,
     rotation: LAKE_MAP.sandbar.rotation,
     blocker: {
-      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 12,
-      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 8,
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 18,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 12,
     },
     dry: {
-      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 14,
-      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 9,
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 26,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 16,
     },
     wetOuter: {
-      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 36,
-      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 20,
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 48,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 28,
     },
     shallowInner: {
-      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 62,
-      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 37,
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 76,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 46,
     },
     shallowOuter: {
-      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 100,
-      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 58,
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 116,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 68,
     },
   },
 } as const satisfies Record<"island" | "sandbar", LakeFeatureFootprint>;

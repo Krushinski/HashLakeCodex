@@ -121,7 +121,7 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Reeds", value: "0" },
   { group: "weather", label: "Mount verts", value: "0" },
   { group: "weather", label: "Post", value: "on", tone: "good" },
-  { group: "weather", label: "Fake reflect", value: "off", tone: "muted" },
+  { group: "weather", label: "Shader reflect", value: "off", tone: "muted" },
   { group: "weather", label: "Mountain asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Treeline asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Shoreline asset", value: "fallback", tone: "muted" },
@@ -1067,7 +1067,7 @@ export const createDebugPanel = (
     setMetric("Mount verts", String(telemetry.mountainVertices));
     setMetric("Post", telemetry.postEnabled ? "on" : "off", telemetry.postEnabled ? "good" : "muted");
     setMetric(
-      "Fake reflect",
+      "Shader reflect",
       telemetry.reflectionEnabled ? "on" : "off",
       telemetry.reflectionEnabled ? "good" : "muted",
     );
