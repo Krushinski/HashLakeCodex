@@ -58,7 +58,7 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Foreground shore
 
-- Current native state: native sloped terrain bands, reeds, rocks, shoreline materials, and raised foreground/mid/far tree-ready shelves behind the wet/sand edge.
+- Current native state: native sloped terrain bands, reeds, rocks, shoreline materials, and darker raised terrain shelves/patches behind the wet/sand edge.
 - Current weaknesses: foreground close-ups can reveal repeated primitive shapes and the shelf still needs handcrafted vertical variation.
 - Topology readiness: good for sparse accent kits, not full terrain replacement yet. The foreground shelf is intended for future shoreline trees and reeds without crowding the lake edge.
 - Future Blender role: reusable reed beds, rock clusters, grass shelf pieces, and small wet-edge transitions.
@@ -67,7 +67,7 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Midground forest band
 
-- Current native state: procedural forest massing, tree clusters, and a midground forest cluster shelf support the lake silhouette.
+- Current native state: procedural forest massing, tree clusters, and native terrain shelves support the lake silhouette. Phase 53 removed the translucent forest-ready overlay rings because they read as gray debug geometry instead of natural ground.
 - Current weaknesses: individual cones still read in places and cluster placement is still generic around the whole outline.
 - Topology readiness: suitable for merged silhouette bands or low-poly cluster replacements. Use the midground shelf for cove-side and rear-shore clusters.
 - Future Blender role: grouped conifer silhouettes, forest edge strips, layered tree masses, and cove-side tree clusters.

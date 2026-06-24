@@ -72,91 +72,6 @@ const outlinePosition = (index: number, offset: number, jitter: number) => {
   };
 };
 
-const createStripGeometry = (
-  inner: readonly { x: number; z: number }[],
-  outer: readonly { x: number; z: number }[],
-) => {
-  const geometry = new THREE.BufferGeometry();
-  const positions: number[] = [];
-  const indices: number[] = [];
-  const count = Math.min(inner.length, outer.length);
-
-  for (let index = 0; index < count; index += 1) {
-    positions.push(inner[index].x, 0, inner[index].z, outer[index].x, 0, outer[index].z);
-  }
-
-  for (let index = 0; index < count; index += 1) {
-    const next = (index + 1) % count;
-    const innerA = index * 2;
-    const outerA = innerA + 1;
-    const innerB = next * 2;
-    const outerB = innerB + 1;
-    indices.push(innerA, outerA, outerB, innerA, outerB, innerB);
-  }
-
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-};
-
-const createForestGroundZones = () => {
-  const group = new THREE.Group();
-  group.name = "Forest-ready ground placement zones";
-  const zoneMaterial = new THREE.MeshStandardMaterial({
-    color: 0x183420,
-    roughness: 0.96,
-    transparent: true,
-    opacity: 0.24,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const midZoneMaterial = zoneMaterial.clone();
-  midZoneMaterial.color.setHex(0x132b1d);
-  midZoneMaterial.opacity = 0.18;
-  const farZoneMaterial = zoneMaterial.clone();
-  farZoneMaterial.color.setHex(0x0b2118);
-  farZoneMaterial.opacity = 0.14;
-
-  const zones = [
-    {
-      name: "Foreground shoreline tree-ready shelf",
-      inner: 104,
-      outer: 178,
-      y: 1.28,
-      material: zoneMaterial,
-    },
-    {
-      name: "Midground forest cluster shelf",
-      inner: 190,
-      outer: 304,
-      y: 1.38,
-      material: midZoneMaterial,
-    },
-    {
-      name: "Semi-far forest staging shelf",
-      inner: 320,
-      outer: 436,
-      y: 1.46,
-      material: farZoneMaterial,
-    },
-  ];
-
-  zones.forEach((zone) => {
-    const mesh = new THREE.Mesh(
-      createStripGeometry(getExpandedOutline(zone.inner), getExpandedOutline(zone.outer)),
-      zone.material,
-    );
-    mesh.name = zone.name;
-    mesh.position.y = zone.y;
-    mesh.renderOrder = -1;
-    mesh.receiveShadow = true;
-    group.add(mesh);
-  });
-
-  return group;
-};
-
 const installWindShader = (
   material: THREE.MeshStandardMaterial,
   uniforms: { time: { value: number }; wind: { value: number } },
@@ -220,7 +135,6 @@ const buildForestMassGeometry = (width: number, baseHeight: number, peakHeight: 
 export const createForestSystem = (): ForestSystem => {
   const group = new THREE.Group();
   group.name = "HashLake3-adapted forest and reeds";
-  group.add(createForestGroundZones());
   const rng = makeRng(4242);
   const loader = new GLTFLoader();
   const windUniforms = {
@@ -508,9 +422,12 @@ export const createForestSystem = (): ForestSystem => {
     update: (elapsed, weather) => {
       const palette = getWeatherPalette(weather.stormIndex);
       const useProceduralFarTrees = !scenicTreelineActive;
+      const useSupportForestMass = scenicTreelineActive && activePreset !== "Performance";
       silhouettes.visible = useProceduralFarTrees;
-      forestMass.visible = useProceduralFarTrees;
-      forestDepthMass.visible = useProceduralFarTrees && activePreset !== "Performance";
+      forestMass.visible = useProceduralFarTrees || useSupportForestMass;
+      forestDepthMass.visible =
+        (useProceduralFarTrees && activePreset !== "Performance") ||
+        (scenicTreelineActive && activePreset === "Scenic");
       scenicSilhouettes.visible = useProceduralFarTrees && activePreset === "Scenic";
       windUniforms.time.value = elapsed;
       windUniforms.wind.value = 0.15 + weather.dials.wind * 1.35;
@@ -547,7 +464,7 @@ export const createForestSystem = (): ForestSystem => {
       silhouetteInstances: (silhouettes.visible ? silhouetteCount : 0) + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
       forestBandInstances: (silhouettes.visible ? silhouetteCount : 0) + (scenicSilhouettes.visible ? scenicSilhouetteCount : 0),
       forestBandMethod: scenicTreelineActive
-        ? "Blender GLB treeline"
+        ? "GLB treeline + native mass"
         : scenicSilhouettes.visible
           ? "mass + instanced x2"
           : "mass + instanced",
@@ -561,8 +478,8 @@ export const createForestSystem = (): ForestSystem => {
     setScenicTreelineActive: (active) => {
       scenicTreelineActive = active;
       silhouettes.visible = !active;
-      forestMass.visible = !active;
-      forestDepthMass.visible = !active;
+      forestMass.visible = active ? activePreset !== "Performance" : true;
+      forestDepthMass.visible = active ? activePreset === "Scenic" : activePreset !== "Performance";
       scenicSilhouettes.visible = !active && activePreset === "Scenic";
     },
   };

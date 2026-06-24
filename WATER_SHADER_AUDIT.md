@@ -68,3 +68,7 @@ Terrain integration changes:
 - Island and sandbar are raised landforms with dry mounds, wet sloped shoulders, submerged-sand fades, and restrained shallow halos.
 - The broad outer land remains visible perimeter/away-from-water geometry only; no hidden under-lake disk or fake reflection/cloud-shadow plane was restored.
 - Water remains one mesh, with deep/shallow zoning still driven by the lake mask and feature footprints.
+
+## Phase 53 Follow-Up
+
+The translucent forest-ready overlay rings were removed because they looked like gray debug terrain. Terrain visibility is now carried by darker native bank/shelf materials plus raised thicket and rocky-bank patches around dock, reeds, cove, and rear shore. Water is unchanged structurally: still one shader mesh, no hidden under-lake land disk, no cloud-shadow water darkening, and no fake reflection planes.

@@ -2128,22 +2128,32 @@ const createShoreline = () => {
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
     color: 0xe6d6aa,
+    emissive: 0x1f190d,
+    emissiveIntensity: 0.035,
     roughness: 0.9,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x5a6653,
+    color: 0x23351f,
+    emissive: 0x040c05,
+    emissiveIntensity: 0.09,
     roughness: 0.96,
   });
   const bankToeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x17281d,
+    color: 0x102916,
+    emissive: 0x020804,
+    emissiveIntensity: 0.17,
     roughness: 0.98,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2c4b34,
+    color: 0x244932,
+    emissive: 0x031007,
+    emissiveIntensity: 0.09,
     roughness: 0.94,
   });
   const forestShelfMaterial = new THREE.MeshStandardMaterial({
-    color: 0x183420,
+    color: 0x10351f,
+    emissive: 0x010805,
+    emissiveIntensity: 0.155,
     roughness: 0.96,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
@@ -2161,12 +2171,28 @@ const createShoreline = () => {
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x142a1c,
+    color: 0x0c2417,
+    emissive: 0x020805,
+    emissiveIntensity: 0.145,
     roughness: 0.92,
   });
   const midForestMaterial = new THREE.MeshStandardMaterial({
-    color: 0x10261a,
+    color: 0x081b12,
+    emissive: 0x010604,
+    emissiveIntensity: 0.18,
     roughness: 0.96,
+  });
+  const thicketPatchMaterial = new THREE.MeshStandardMaterial({
+    color: 0x183f27,
+    emissive: 0x031007,
+    emissiveIntensity: 0.125,
+    roughness: 0.97,
+  });
+  const rockyBankPatchMaterial = new THREE.MeshStandardMaterial({
+    color: 0x27352f,
+    emissive: 0x040806,
+    emissiveIntensity: 0.105,
+    roughness: 0.98,
   });
   const landInner = getExpandedOutline(280);
   const land = new THREE.Mesh(
@@ -2206,7 +2232,9 @@ const createShoreline = () => {
   const grassTransition = new THREE.Mesh(
     createSlopedStripGeometry(getExpandedOutline(24), getExpandedOutline(72), 0.74, 1.02, 17, 0.045),
     new THREE.MeshStandardMaterial({
-      color: 0x203c29,
+      color: 0x193522,
+      emissive: 0x020b05,
+      emissiveIntensity: 0.11,
       roughness: 0.96,
     }),
   );
@@ -2263,6 +2291,40 @@ const createShoreline = () => {
   addBeachPocket("dock", 28, 8, 0.42, 18, -10);
   addBeachPocket("cove", 22, 6, -0.22, -32, 24);
   addBeachPocket("reeds", 18, 5, 0.18, 18, -12);
+
+  const addTerrainPatch = (
+    name: string,
+    x: number,
+    z: number,
+    radiusX: number,
+    radiusZ: number,
+    rotation: number,
+    material: THREE.Material,
+    seed: number,
+    centerY = 1.48,
+    edgeY = 1.12,
+  ) => {
+    const patch = new THREE.Mesh(
+      createOrganicMoundedEllipseGeometry(radiusX, radiusZ, seed, 0.032, centerY, edgeY, 80, 4),
+      material,
+    );
+    patch.name = name;
+    patch.position.set(x, 0, z);
+    patch.rotation.y = rotation;
+    patch.receiveShadow = true;
+    group.add(patch);
+  };
+
+  addTerrainPatch("Dock forest bank mound", -650, 132, 74, 24, 0.34, thicketPatchMaterial, 302, 1.36, 0.92);
+  addTerrainPatch("Reed marsh raised bank", -520, 224, 90, 28, -0.12, thicketPatchMaterial, 319, 1.34, 0.88);
+  addTerrainPatch("Cove rocky green bank", 680, -142, 86, 30, -0.22, rockyBankPatchMaterial, 337, 1.42, 0.96);
+  addTerrainPatch("Rear left forest shelf mass", -420, -320, 120, 38, 0.20, thicketPatchMaterial, 349, 1.56, 1.16);
+  addTerrainPatch("Rear center forest shelf mass", -70, -358, 150, 42, -0.08, thicketPatchMaterial, 363, 1.52, 1.14);
+  addTerrainPatch("Rear right forest shelf mass", 370, -296, 126, 40, 0.16, thicketPatchMaterial, 377, 1.50, 1.12);
+  addTerrainPatch("Right shore forest bank mass", 635, 220, 118, 32, 0.16, thicketPatchMaterial, 391, 1.44, 1.02);
+  addTerrainPatch("Right rear forest bank continuation", 690, -32, 78, 184, -0.08, thicketPatchMaterial, 409, 1.46, 1.06);
+  addTerrainPatch("Far left forest bank shade", -680, -208, 128, 34, -0.16, thicketPatchMaterial, 421, 1.45, 1.05);
+  addTerrainPatch("Far right forest bank shade", 682, -224, 138, 36, 0.12, thicketPatchMaterial, 437, 1.45, 1.05);
 
   return group;
 };
@@ -2450,8 +2512,8 @@ const createDestinationMarkers = () => {
 
   const sandbarWet = new THREE.Mesh(
     createOrganicEllipseRampGeometry(
-      sandbarFootprint.dry.radiusX - 2,
-      sandbarFootprint.dry.radiusZ - 1,
+      sandbarFootprint.dry.radiusX - 16,
+      sandbarFootprint.dry.radiusZ - 7,
       sandbarFootprint.wetOuter.radiusX,
       sandbarFootprint.wetOuter.radiusZ,
       0.36,
@@ -2471,10 +2533,10 @@ const createDestinationMarkers = () => {
 
   const sandbar = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      sandbarFootprint.dry.radiusX - 2,
-      sandbarFootprint.dry.radiusZ - 2,
+      sandbarFootprint.dry.radiusX - 18,
+      sandbarFootprint.dry.radiusZ - 8,
       61,
-      0.030,
+      0.052,
       0.64,
       0.30,
       144,
@@ -2598,8 +2660,8 @@ const createDestinationMarkers = () => {
 
   const islandWet = new THREE.Mesh(
     createOrganicEllipseRampGeometry(
-      islandFootprint.dry.radiusX - 1,
-      islandFootprint.dry.radiusZ - 1,
+      islandFootprint.dry.radiusX - 7,
+      islandFootprint.dry.radiusZ - 4,
       islandFootprint.wetOuter.radiusX,
       islandFootprint.wetOuter.radiusZ,
       0.42,
@@ -2619,10 +2681,10 @@ const createDestinationMarkers = () => {
 
   const islandBeach = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      islandFootprint.dry.radiusX - 1,
-      islandFootprint.dry.radiusZ - 1,
+      islandFootprint.dry.radiusX - 9,
+      islandFootprint.dry.radiusZ - 5,
       73,
-      0.026,
+      0.050,
       0.78,
       0.34,
       144,
