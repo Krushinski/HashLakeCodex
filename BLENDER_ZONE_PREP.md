@@ -23,7 +23,7 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 ## Sandy shoreline / beach ramps
 
 - Current native state: pale sand and wet-edge feathers around the island/sandbar plus shallow shader zoning.
-- Current weaknesses: needs handcrafted slope profiles and better micro-shape in future art passes.
+- Current weaknesses: needs better micro-shape and rock/reed accents in future art passes, but Phase 52 replaced flat sand disks with native mounded/ramped landforms.
 - Topology readiness: feature footprints now align visible sand, blocker/collision, water validity, and shallow masks.
 - Future Blender role: gentle beach ramps, shell/stone clusters, and organic sand shelves as reusable pieces.
 - Keep native: broad sand fade, water zoning, and collision footprints.
@@ -58,7 +58,7 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Foreground shore
 
-- Current native state: native terrain bands, reeds, rocks, shoreline materials, and a subtle foreground tree-ready shelf behind the wet/sand edge.
+- Current native state: native sloped terrain bands, reeds, rocks, shoreline materials, and raised foreground/mid/far tree-ready shelves behind the wet/sand edge.
 - Current weaknesses: foreground close-ups can reveal repeated primitive shapes and the shelf still needs handcrafted vertical variation.
 - Topology readiness: good for sparse accent kits, not full terrain replacement yet. The foreground shelf is intended for future shoreline trees and reeds without crowding the lake edge.
 - Future Blender role: reusable reed beds, rock clusters, grass shelf pieces, and small wet-edge transitions.

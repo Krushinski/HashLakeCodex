@@ -38,7 +38,7 @@ Keep one main shader water surface, no full hidden land disk under the lake, no 
 
 ## Phase 51 Follow-Up
 
-The Phase 50 Blender sand alpha pair was removed from runtime and from the repository because it read as low-poly pasted geometry instead of natural shore treatment. The current sand/island treatment is back to the safer procedural geometry, with one bounded Poly Haven test texture: `coast_sand_01_diffuse_512.jpg`, a local 512px diffuse-only sand map used on sandbar/island materials with color fallback if it fails to load. There is no runtime external request for that texture.
+The Phase 50 Blender sand alpha pair was removed from runtime and from the repository because it read as low-poly pasted geometry instead of natural shore treatment. Phase 51 tested one bounded Poly Haven diffuse texture, `coast_sand_01_diffuse_512.jpg`, as a local sand map with no runtime external request.
 
 Visible and useful after inspection:
 
@@ -57,3 +57,14 @@ Risky terms:
 
 - Any future hidden under-lake land, wide dark cloud mask, or fake reflection plane can recreate the Phase 49 black-blob failure.
 - Very broad shallow overlays can make the whole lake edge read as beach; keep sand concentrated at the island, sandbar, and a few selected pockets.
+
+## Phase 52 Follow-Up
+
+The Poly Haven sand diffuse is retained in the repository as an experiment, but it is disabled at runtime. Sandbar and island visuals are again clean procedural materials, with form handled by native mounded/ramped geometry rather than a texture swap.
+
+Terrain integration changes:
+
+- Shoreline/bank terrain now uses sloped strip geometry so the lake reads as recessed below wet edge, bank toe, forest bank, forest shelf, and midground forest shelf.
+- Island and sandbar are raised landforms with dry mounds, wet sloped shoulders, submerged-sand fades, and restrained shallow halos.
+- The broad outer land remains visible perimeter/away-from-water geometry only; no hidden under-lake disk or fake reflection/cloud-shadow plane was restored.
+- Water remains one mesh, with deep/shallow zoning still driven by the lake mask and feature footprints.

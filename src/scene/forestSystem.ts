@@ -121,23 +121,23 @@ const createForestGroundZones = () => {
   const zones = [
     {
       name: "Foreground shoreline tree-ready shelf",
-      inner: 86,
-      outer: 150,
-      y: 0.92,
+      inner: 104,
+      outer: 178,
+      y: 1.28,
       material: zoneMaterial,
     },
     {
       name: "Midground forest cluster shelf",
-      inner: 158,
-      outer: 246,
-      y: 0.74,
+      inner: 190,
+      outer: 304,
+      y: 1.38,
       material: midZoneMaterial,
     },
     {
       name: "Semi-far forest staging shelf",
-      inner: 252,
-      outer: 360,
-      y: 0.58,
+      inner: 320,
+      outer: 436,
+      y: 1.46,
       material: farZoneMaterial,
     },
   ];
@@ -396,7 +396,7 @@ export const createForestSystem = (): ForestSystem => {
       .forEach((placement) => {
         const sample = source.clone(true);
         sample.name = `Tree alpha sample ${key}`;
-        sample.position.set(placement.x, 0.68, placement.z);
+        sample.position.set(placement.x, 1.26, placement.z);
         sample.rotation.y = placement.yaw;
         sample.scale.setScalar(placement.scale);
         treeAlphaGroup.add(sample);
