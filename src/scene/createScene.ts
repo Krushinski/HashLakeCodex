@@ -284,11 +284,11 @@ const CAMERA_PRESETS: CameraPreset[] = [
     lookHeight: 4.4,
   },
   {
-    name: "Vice City",
-    distance: 112,
-    height: 82,
-    lookAhead: 5,
-    lookHeight: 3.8,
+    name: "OJ Mode",
+    distance: 168,
+    height: 108,
+    lookAhead: 118,
+    lookHeight: 34,
   },
 ];
 
@@ -1972,28 +1972,32 @@ const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Organic mountain lake terrain";
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x9f9674,
+    color: 0xcabe94,
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x87917d,
+    color: 0x65705e,
     roughness: 0.96,
   });
+  const bankToeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x263729,
+    roughness: 0.98,
+  });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x314d35,
+    color: 0x2f4b34,
     roughness: 0.94,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x93d8cb,
     transparent: true,
-    opacity: 0.070,
+    opacity: 0.038,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const shallowFadeMaterial = new THREE.MeshBasicMaterial({
     color: 0x6eb8b8,
     transparent: true,
-    opacity: 0.026,
+    opacity: 0.016,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -2001,63 +2005,84 @@ const createShoreline = () => {
     color: 0x1b3022,
     roughness: 0.92,
   });
-  const landInner = getExpandedOutline(LAKE_MAP.shorelineWidth + 42);
+  const landInner = getExpandedOutline(LAKE_MAP.shorelineWidth + 26);
   const land = new THREE.Mesh(
     createStripGeometry(landInner, createRadialBoundary(landInner, LAKE_MAP.worldRadius)),
     landMaterial,
   );
-  land.position.y = -0.28;
+  land.position.y = 0.56;
   land.receiveShadow = true;
   group.add(land);
 
   const shallowFade = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(-58), getExpandedOutline(-22)),
+    createStripGeometry(getExpandedOutline(-34), getExpandedOutline(-8)),
     shallowFadeMaterial,
   );
   shallowFade.position.y = 0.025;
   group.add(shallowFade);
 
   const wetSand = new THREE.Mesh(
-    createStripGeometry(LAKE_OUTLINE, getExpandedOutline(13)),
+    createStripGeometry(LAKE_OUTLINE, getExpandedOutline(5)),
     wetSandMaterial,
   );
-  wetSand.position.y = 0.2;
+  wetSand.position.y = 0.18;
   wetSand.receiveShadow = true;
   group.add(wetSand);
 
   const shoreline = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(13), getExpandedOutline(LAKE_MAP.shorelineWidth)),
-    sandMaterial,
+    createStripGeometry(getExpandedOutline(5), getExpandedOutline(18)),
+    bankToeMaterial,
   );
   shoreline.position.y = 0.34;
   shoreline.receiveShadow = true;
   group.add(shoreline);
 
   const grassTransition = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(48), getExpandedOutline(82)),
+    createStripGeometry(getExpandedOutline(18), getExpandedOutline(54)),
     new THREE.MeshStandardMaterial({
       color: 0x1b3321,
       roughness: 0.96,
     }),
   );
-  grassTransition.position.y = 0.46;
+  grassTransition.position.y = 0.58;
   grassTransition.receiveShadow = true;
   group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(34), getExpandedOutline(62)),
+    createStripGeometry(getExpandedOutline(12), getExpandedOutline(36)),
     bankMaterial,
   );
-  raisedBank.position.y = 0.62;
+  raisedBank.position.y = 0.74;
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
   const shallow = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(-32), LAKE_OUTLINE),
+    createStripGeometry(getExpandedOutline(-18), LAKE_OUTLINE),
     shallowMaterial,
   );
   shallow.position.y = 0.045;
   group.add(shallow);
+
+  const addBeachPocket = (
+    key: "dock" | "cove" | "reeds",
+    radiusX: number,
+    radiusZ: number,
+    rotation: number,
+    offsetX = 0,
+    offsetZ = 0,
+  ) => {
+    const center = getDestinationCenter(key);
+    const pocket = new THREE.Mesh(createEllipseFillGeometry(radiusX, radiusZ, 250 + radiusX, 0.022, 72), sandMaterial);
+    pocket.name = `${key} small sand pocket`;
+    pocket.position.set(center.x + offsetX, 0.385, center.z + offsetZ);
+    pocket.rotation.y = rotation;
+    pocket.receiveShadow = true;
+    group.add(pocket);
+  };
+
+  addBeachPocket("dock", 34, 10, 0.42, 18, -10);
+  addBeachPocket("cove", 28, 8, -0.22, -32, 24);
+  addBeachPocket("reeds", 24, 6, 0.18, 18, -12);
 
   return group;
 };
