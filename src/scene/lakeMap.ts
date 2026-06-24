@@ -134,6 +134,67 @@ export const LAKE_MAP = {
   ] satisfies LakeDestination[],
 } as const;
 
+export type LakeFeatureFootprint = {
+  center: LakePoint;
+  rotation: number;
+  blocker: { radiusX: number; radiusZ: number };
+  dry: { radiusX: number; radiusZ: number };
+  wetOuter: { radiusX: number; radiusZ: number };
+  shallowInner: { radiusX: number; radiusZ: number };
+  shallowOuter: { radiusX: number; radiusZ: number };
+};
+
+export const LAKE_FEATURE_FOOTPRINTS = {
+  island: {
+    center: LAKE_MAP.island.center,
+    rotation: LAKE_MAP.island.rotation,
+    blocker: {
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z,
+    },
+    dry: {
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 28,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 14,
+    },
+    wetOuter: {
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 30,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 19,
+    },
+    shallowInner: {
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 48,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 31,
+    },
+    shallowOuter: {
+      radiusX: LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x + 78,
+      radiusZ: LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z + 50,
+    },
+  },
+  sandbar: {
+    center: LAKE_MAP.sandbar.center,
+    rotation: LAKE_MAP.sandbar.rotation,
+    blocker: {
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z,
+    },
+    dry: {
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 4,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 2,
+    },
+    wetOuter: {
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 26,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 12,
+    },
+    shallowInner: {
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 44,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 23,
+    },
+    shallowOuter: {
+      radiusX: LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x + 78,
+      radiusZ: LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z + 44,
+    },
+  },
+} as const satisfies Record<"island" | "sandbar", LakeFeatureFootprint>;
+
 const smoothClosedPolygon = (points: readonly LakePoint[], subdivisions = 4) => {
   const smoothed: LakePoint[] = [];
   const count = points.length;
@@ -168,7 +229,7 @@ const smoothClosedPolygon = (points: readonly LakePoint[], subdivisions = 4) => 
   return smoothed;
 };
 
-export const LAKE_OUTLINE = smoothClosedPolygon(LAKE_MAP.outline, 4);
+export const LAKE_OUTLINE = smoothClosedPolygon(LAKE_MAP.outline, 6);
 
 export const getDistance = (a: LakePoint, b: LakePoint) =>
   Math.hypot(a.x - b.x, a.z - b.z);
@@ -309,19 +370,19 @@ const pushOutOfEllipse = (
 export const isInSandbar = (point: LakePoint) =>
   isInEllipse(
     point,
-    LAKE_MAP.sandbar.center,
-    LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x,
-    LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z,
-    LAKE_MAP.sandbar.rotation,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.center,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
   );
 
 export const isInIsland = (point: LakePoint) =>
   isInEllipse(
     point,
-    LAKE_MAP.island.center,
-    LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x,
-    LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z,
-    LAKE_MAP.island.rotation,
+    LAKE_FEATURE_FOOTPRINTS.island.center,
+    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.island.rotation,
   );
 
 export const isWater = (point: LakePoint) =>
@@ -335,17 +396,17 @@ export const distanceToShore = (point: LakePoint) => {
   const obstacleDistance = Math.min(
     getEllipseClearance(
       point,
-      LAKE_MAP.island.center,
-      LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x,
-      LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z,
-      LAKE_MAP.island.rotation,
+      LAKE_FEATURE_FOOTPRINTS.island.center,
+      LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
+      LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
+      LAKE_FEATURE_FOOTPRINTS.island.rotation,
     ),
     getEllipseClearance(
       point,
-      LAKE_MAP.sandbar.center,
-      LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x,
-      LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z,
-      LAKE_MAP.sandbar.rotation,
+      LAKE_FEATURE_FOOTPRINTS.sandbar.center,
+      LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
+      LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
+      LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
     ),
   );
   return Math.min(signedDistance, obstacleDistance);
@@ -384,10 +445,10 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
 
   const afterIsland = pushOutOfEllipse(
     next,
-    LAKE_MAP.island.center,
-    LAKE_MAP.island.radiusX + ISLAND_EDGE_PADDING.x,
-    LAKE_MAP.island.radiusZ + ISLAND_EDGE_PADDING.z,
-    LAKE_MAP.island.rotation,
+    LAKE_FEATURE_FOOTPRINTS.island.center,
+    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.island.rotation,
     3,
   );
   if (afterIsland !== next) {
@@ -397,10 +458,10 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
 
   const afterSandbar = pushOutOfEllipse(
     next,
-    LAKE_MAP.sandbar.center,
-    LAKE_MAP.sandbar.radiusX + SANDBAR_EDGE_PADDING.x,
-    LAKE_MAP.sandbar.radiusZ + SANDBAR_EDGE_PADDING.z,
-    LAKE_MAP.sandbar.rotation,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.center,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
     3,
   );
   if (afterSandbar !== next) {

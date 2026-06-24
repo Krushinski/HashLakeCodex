@@ -6,6 +6,7 @@ import { SCENARIO_PALETTES, getWeatherPalette } from "./artDirection";
 import { createSceneEffects } from "./effects";
 import { createForestSystem } from "./forestSystem";
 import {
+  LAKE_FEATURE_FOOTPRINTS,
   LAKE_OUTLINE,
   LAKE_MAP,
   clampBoatToWater,
@@ -1845,19 +1846,6 @@ const createOrganicEllipseOutline = (
     };
   });
 
-const createOrganicEllipseShape = (
-  radiusX: number,
-  radiusZ: number,
-  seed: number,
-  wobble = 0.04,
-  count = 80,
-) =>
-  new THREE.Shape(
-    createOrganicEllipseOutline({ x: 0, z: 0 }, radiusX, radiusZ, 0, seed, wobble, count).map(
-      (point) => new THREE.Vector2(point.x, point.z),
-    ),
-  );
-
 const createOrganicEllipseStripGeometry = (
   innerRadiusX: number,
   innerRadiusZ: number,
@@ -1891,14 +1879,14 @@ const createShoreline = () => {
   const shallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x93d8cb,
     transparent: true,
-    opacity: 0.112,
+    opacity: 0.092,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const shallowFadeMaterial = new THREE.MeshBasicMaterial({
     color: 0x6eb8b8,
     transparent: true,
-    opacity: 0.052,
+    opacity: 0.040,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -1995,22 +1983,22 @@ const createDestinationMarkers = () => {
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x9aa28f,
-    emissive: 0x1c251f,
-    emissiveIntensity: 0.035,
+    color: 0xc0bea4,
+    emissive: 0x343226,
+    emissiveIntensity: 0.07,
     roughness: 0.96,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x9be1d4,
     transparent: true,
-    opacity: 0.16,
+    opacity: 0.105,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const sandShallowFadeMaterial = new THREE.MeshBasicMaterial({
     color: 0x74beb8,
     transparent: true,
-    opacity: 0.075,
+    opacity: 0.044,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -2019,6 +2007,12 @@ const createDestinationMarkers = () => {
     emissive: 0x25302c,
     emissiveIntensity: 0.16,
     roughness: 0.9,
+  });
+  const islandShelfMaterial = new THREE.MeshStandardMaterial({
+    color: 0xaeb8a6,
+    emissive: 0x202821,
+    emissiveIntensity: 0.08,
+    roughness: 0.92,
   });
   const darkRockMaterial = new THREE.MeshStandardMaterial({ color: 0x4c5655, roughness: 0.96 });
   const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x6f8147, roughness: 0.86 });
@@ -2033,6 +2027,8 @@ const createDestinationMarkers = () => {
   const coveCenter = getDestinationCenter("cove");
   const islandCenter = getDestinationCenter("island");
   const reedsCenter = getDestinationCenter("reeds");
+  const sandbarFootprint = LAKE_FEATURE_FOOTPRINTS.sandbar;
+  const islandFootprint = LAKE_FEATURE_FOOTPRINTS.island;
 
   const dock = new THREE.Group();
   dock.name = "Dock area";
@@ -2070,61 +2066,67 @@ const createDestinationMarkers = () => {
   }
   group.add(dock);
 
-  const sandbarFadeShape = createOrganicEllipseShape(
-    LAKE_MAP.sandbar.radiusX + 58,
-    LAKE_MAP.sandbar.radiusZ + 26,
-    7,
-    0.035,
+  const sandbarFade = new THREE.Mesh(
+    createOrganicEllipseStripGeometry(
+      sandbarFootprint.shallowInner.radiusX,
+      sandbarFootprint.shallowInner.radiusZ,
+      sandbarFootprint.shallowOuter.radiusX,
+      sandbarFootprint.shallowOuter.radiusZ,
+      7,
+      13,
+      0.026,
+      96,
+    ),
+    sandShallowFadeMaterial,
   );
-  const sandbarFade = new THREE.Mesh(new THREE.ShapeGeometry(sandbarFadeShape, 10), sandShallowFadeMaterial);
   sandbarFade.name = "Sandbar outer turquoise fade";
   sandbarFade.position.set(sandbarCenter.x, 0.046, sandbarCenter.z);
-  sandbarFade.rotation.x = -Math.PI / 2;
-  sandbarFade.rotation.z = LAKE_MAP.sandbar.rotation;
+  sandbarFade.rotation.y = -sandbarFootprint.rotation;
   group.add(sandbarFade);
 
-  const sandbarHaloShape = createOrganicEllipseShape(
-    LAKE_MAP.sandbar.radiusX + 38,
-    LAKE_MAP.sandbar.radiusZ + 18,
-    11,
-    0.038,
+  const sandbarHalo = new THREE.Mesh(
+    createOrganicEllipseStripGeometry(
+      sandbarFootprint.wetOuter.radiusX,
+      sandbarFootprint.wetOuter.radiusZ,
+      sandbarFootprint.shallowInner.radiusX,
+      sandbarFootprint.shallowInner.radiusZ,
+      11,
+      17,
+      0.030,
+      96,
+    ),
+    sandShallowMaterial,
   );
-  const sandbarHalo = new THREE.Mesh(new THREE.ShapeGeometry(sandbarHaloShape, 8), sandShallowMaterial);
   sandbarHalo.name = "Sandbar shallows";
   sandbarHalo.position.set(sandbarCenter.x, 0.06, sandbarCenter.z);
-  sandbarHalo.rotation.x = -Math.PI / 2;
-  sandbarHalo.rotation.z = LAKE_MAP.sandbar.rotation;
+  sandbarHalo.rotation.y = -sandbarFootprint.rotation;
   group.add(sandbarHalo);
 
   const sandbarBank = new THREE.Mesh(
     createOrganicEllipseStripGeometry(
-      LAKE_MAP.sandbar.radiusX - 6,
-      LAKE_MAP.sandbar.radiusZ - 2,
-      LAKE_MAP.sandbar.radiusX + 24,
-      LAKE_MAP.sandbar.radiusZ + 11,
+      sandbarFootprint.dry.radiusX,
+      sandbarFootprint.dry.radiusZ,
+      sandbarFootprint.wetOuter.radiusX,
+      sandbarFootprint.wetOuter.radiusZ,
       19,
       23,
       0.03,
+      96,
     ),
     wetSandMaterial,
   );
   sandbarBank.name = "Sandbar wet edge";
   sandbarBank.position.set(sandbarCenter.x, 0.22, sandbarCenter.z);
-  sandbarBank.rotation.y = -LAKE_MAP.sandbar.rotation;
+  sandbarBank.rotation.y = -sandbarFootprint.rotation;
   sandbarBank.receiveShadow = true;
   group.add(sandbarBank);
 
-  const sandbarShape = createOrganicEllipseShape(
-    LAKE_MAP.sandbar.radiusX + 4,
-    LAKE_MAP.sandbar.radiusZ + 2,
-    31,
-    0.026,
-  );
-  const sandbar = new THREE.Mesh(new THREE.ShapeGeometry(sandbarShape, 10), sandMaterial);
+  const sandbar = new THREE.Mesh(new THREE.CircleGeometry(1, 128), sandMaterial);
   sandbar.name = "Sandbar";
   sandbar.position.set(sandbarCenter.x, 0.36, sandbarCenter.z);
   sandbar.rotation.x = -Math.PI / 2;
-  sandbar.rotation.z = LAKE_MAP.sandbar.rotation;
+  sandbar.rotation.z = sandbarFootprint.rotation;
+  sandbar.scale.set(sandbarFootprint.dry.radiusX, sandbarFootprint.dry.radiusZ, 1);
   sandbar.receiveShadow = true;
   group.add(sandbar);
 
@@ -2161,75 +2163,57 @@ const createDestinationMarkers = () => {
 
   const island = new THREE.Group();
   island.name = "Rocky island";
-  const islandFadeShape = createOrganicEllipseShape(
-    LAKE_MAP.island.radiusX + 66,
-    LAKE_MAP.island.radiusZ + 42,
-    37,
-    0.044,
+  const islandFade = new THREE.Mesh(
+    createOrganicEllipseStripGeometry(
+      islandFootprint.shallowInner.radiusX,
+      islandFootprint.shallowInner.radiusZ,
+      islandFootprint.shallowOuter.radiusX,
+      islandFootprint.shallowOuter.radiusZ,
+      37,
+      41,
+      0.030,
+      96,
+    ),
+    sandShallowFadeMaterial,
   );
-  const islandFade = new THREE.Mesh(new THREE.ShapeGeometry(islandFadeShape, 10), sandShallowFadeMaterial);
   islandFade.name = "Island outer shallow fade";
   islandFade.position.set(islandCenter.x, 0.046, islandCenter.z);
-  islandFade.rotation.x = -Math.PI / 2;
-  islandFade.rotation.z = LAKE_MAP.island.rotation;
+  islandFade.rotation.y = -islandFootprint.rotation;
   island.add(islandFade);
 
-  const islandHaloShape = createOrganicEllipseShape(
-    LAKE_MAP.island.radiusX + 44,
-    LAKE_MAP.island.radiusZ + 28,
-    43,
-    0.048,
+  const islandHalo = new THREE.Mesh(
+    createOrganicEllipseStripGeometry(
+      islandFootprint.wetOuter.radiusX,
+      islandFootprint.wetOuter.radiusZ,
+      islandFootprint.shallowInner.radiusX,
+      islandFootprint.shallowInner.radiusZ,
+      43,
+      47,
+      0.034,
+      96,
+    ),
+    sandShallowMaterial,
   );
-  const islandHalo = new THREE.Mesh(new THREE.ShapeGeometry(islandHaloShape, 8), sandShallowMaterial);
   islandHalo.name = "Island shallow transition";
   islandHalo.position.set(islandCenter.x, 0.06, islandCenter.z);
-  islandHalo.rotation.x = -Math.PI / 2;
-  islandHalo.rotation.z = LAKE_MAP.island.rotation;
+  islandHalo.rotation.y = -islandFootprint.rotation;
   island.add(islandHalo);
 
-  const islandWetEdge = new THREE.Mesh(
-    createOrganicEllipseStripGeometry(
-      LAKE_MAP.island.radiusX + 5,
-      LAKE_MAP.island.radiusZ + 3,
-      LAKE_MAP.island.radiusX + 32,
-      LAKE_MAP.island.radiusZ + 19,
-      51,
-      53,
-      0.036,
-    ),
-    wetSandMaterial,
-  );
-  islandWetEdge.name = "Island wet white-sand edge";
-  islandWetEdge.position.set(islandCenter.x, 0.24, islandCenter.z);
-  islandWetEdge.rotation.y = -LAKE_MAP.island.rotation;
-  islandWetEdge.receiveShadow = true;
-  island.add(islandWetEdge);
-
-  const islandBeachShape = createOrganicEllipseShape(
-    LAKE_MAP.island.radiusX + 16,
-    LAKE_MAP.island.radiusZ + 9,
-    59,
-    0.035,
-  );
-  const islandBeach = new THREE.Mesh(new THREE.ShapeGeometry(islandBeachShape, 10), sandMaterial);
+  const islandBeach = new THREE.Mesh(new THREE.CircleGeometry(1, 128), sandMaterial);
   islandBeach.name = "White sand island beach";
   islandBeach.position.set(islandCenter.x, 0.39, islandCenter.z);
   islandBeach.rotation.x = -Math.PI / 2;
-  islandBeach.rotation.z = LAKE_MAP.island.rotation;
+  islandBeach.rotation.z = islandFootprint.rotation;
+  islandBeach.scale.set(islandFootprint.dry.radiusX, islandFootprint.dry.radiusZ, 1);
   islandBeach.receiveShadow = true;
   island.add(islandBeach);
 
-  const islandRockShelfShape = createOrganicEllipseShape(
-    LAKE_MAP.island.radiusX * 0.52,
-    LAKE_MAP.island.radiusZ * 0.58,
-    61,
-    0.04,
-  );
-  const islandRockShelf = new THREE.Mesh(new THREE.ShapeGeometry(islandRockShelfShape, 8), rockMaterial);
+  const islandRockShelf = new THREE.Mesh(new THREE.CircleGeometry(1, 72), islandShelfMaterial);
   islandRockShelf.name = "Island rock shelf";
   islandRockShelf.position.set(islandCenter.x, 0.51, islandCenter.z);
   islandRockShelf.rotation.x = -Math.PI / 2;
-  islandRockShelf.rotation.z = LAKE_MAP.island.rotation;
+  islandRockShelf.rotation.z = islandFootprint.rotation;
+  islandRockShelf.scale.set(islandFootprint.blocker.radiusX * 0.3, islandFootprint.blocker.radiusZ * 0.34, 1);
   islandRockShelf.receiveShadow = true;
   island.add(islandRockShelf);
   for (let index = 0; index < 8; index += 1) {
@@ -2289,32 +2273,66 @@ const createSunDisc = () => {
 
 const createClouds = () => {
   const group = new THREE.Group();
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xd6ded0,
-    roughness: 0.75,
-    transparent: true,
-    opacity: 0.74,
-  });
+  group.name = "Distributed atmospheric cloud banks";
+  const puffGeometry = new THREE.SphereGeometry(1, 14, 9);
+  const cloudConfigs = [
+    { x: -620, y: 118, z: -360, scale: 1.42, width: 86, depth: 28, puffs: 8, phase: 0.2 },
+    { x: -420, y: 132, z: -430, scale: 1.16, width: 118, depth: 34, puffs: 9, phase: 1.8 },
+    { x: -230, y: 106, z: -250, scale: 0.94, width: 78, depth: 26, puffs: 7, phase: 3.0 },
+    { x: -60, y: 142, z: -520, scale: 1.34, width: 142, depth: 42, puffs: 10, phase: 4.4 },
+    { x: 180, y: 122, z: -330, scale: 1.12, width: 110, depth: 34, puffs: 8, phase: 5.8 },
+    { x: 430, y: 136, z: -420, scale: 1.28, width: 132, depth: 36, puffs: 10, phase: 7.3 },
+    { x: 640, y: 112, z: -250, scale: 1.02, width: 82, depth: 28, puffs: 7, phase: 8.5 },
+    { x: -560, y: 126, z: 6, scale: 0.88, width: 84, depth: 30, puffs: 6, phase: 9.7 },
+    { x: -160, y: 150, z: 64, scale: 1.08, width: 114, depth: 38, puffs: 8, phase: 11.0 },
+    { x: 240, y: 142, z: 24, scale: 0.96, width: 96, depth: 32, puffs: 7, phase: 12.5 },
+    { x: 560, y: 124, z: 80, scale: 0.82, width: 78, depth: 26, puffs: 6, phase: 13.8 },
+  ];
 
-  for (let index = 0; index < 8; index += 1) {
+  cloudConfigs.forEach((config, bankIndex) => {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xd8dfd6,
+      roughness: 0.82,
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+    });
     const cloud = new THREE.Group();
-    cloud.name = "Procedural cloud";
-    cloud.position.set(
-      -270 + index * 74,
-      82 + (index % 4) * 6,
-      -185 - (index % 5) * 22,
-    );
-    cloud.scale.setScalar(0.68 + (index % 5) * 0.1);
+    cloud.name = "Atmospheric cloud bank";
+    cloud.position.set(config.x, config.y, config.z);
+    cloud.scale.setScalar(config.scale);
+    cloud.userData.baseX = config.x;
+    cloud.userData.baseY = config.y;
+    cloud.userData.baseZ = config.z;
+    cloud.userData.baseScale = config.scale;
+    cloud.userData.phase = config.phase;
 
-    for (let puff = 0; puff < 4; puff += 1) {
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(6 + puff * 0.9, 10, 6), material);
-      sphere.position.set(puff * 7.4, Math.sin(puff + index) * 2.2, Math.cos(puff) * 2.8);
-      sphere.scale.set(1.1 + puff * 0.08, 0.45 + (puff % 2) * 0.08, 0.72);
-      cloud.add(sphere);
+    for (let puff = 0; puff < config.puffs; puff += 1) {
+      const t = config.puffs <= 1 ? 0.5 : puff / (config.puffs - 1);
+      const side = (t - 0.5) * config.width * 0.64;
+      const layer = Math.sin((puff + bankIndex) * 1.7);
+      const heightLayer = Math.sin(config.phase * 0.9 + puff * 1.13);
+      const mesh = new THREE.Mesh(puffGeometry, material);
+      mesh.position.set(
+        side + Math.sin(config.phase + puff * 1.4) * 15,
+        heightLayer * 7.2 + (puff % 4 === 0 ? 5.8 : 0),
+        layer * config.depth * 0.82 + Math.cos(config.phase + puff * 0.9) * 8,
+      );
+      mesh.scale.set(
+        14 + (puff % 3) * 4.2 + Math.sin(config.phase + puff) * 1.8,
+        7.6 + (puff % 3) * 2.1,
+        12 + (puff % 4) * 3.4,
+      );
+      mesh.rotation.set(
+        Math.sin(config.phase + puff) * 0.08,
+        config.phase * 0.17 + puff * 0.11,
+        Math.cos(config.phase + puff) * 0.04,
+      );
+      cloud.add(mesh);
     }
 
     group.add(cloud);
-  }
+  });
 
   return group;
 };
@@ -2785,13 +2803,22 @@ const applyWeatherToScene = ({
   water.mesh.visible = true;
 
   clouds.children.forEach((cloud, index) => {
-    cloud.position.y = 70 - dark * 18 + Math.sin(elapsed * 0.2 + index) * 0.8;
-    cloud.scale.setScalar(1 + dark * 1.35);
+    const baseX = Number(cloud.userData.baseX ?? cloud.position.x);
+    const baseY = Number(cloud.userData.baseY ?? cloud.position.y);
+    const baseZ = Number(cloud.userData.baseZ ?? cloud.position.z);
+    const baseScale = Number(cloud.userData.baseScale ?? 1);
+    const phase = Number(cloud.userData.phase ?? index);
+    cloud.position.set(
+      baseX + Math.sin(elapsed * 0.018 + phase) * (3.6 + weather.dials.wind * 5.2),
+      baseY - dark * 14 + Math.sin(elapsed * 0.12 + phase) * 1.2,
+      baseZ + Math.cos(elapsed * 0.014 + phase * 0.7) * (2.2 + weather.dials.wind * 4.2),
+    );
+    cloud.scale.setScalar(baseScale * (1 + dark * 0.34 + weather.dials.wind * 0.05));
     cloud.children.forEach((child) => {
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-        cloudColorScratch.setHex(dark > 0.48 ? palette.stormTint : 0xd6ded0);
+        cloudColorScratch.setHex(dark > 0.48 ? palette.stormTint : 0xd8dfd6);
         child.material.color.copy(cloudColorScratch);
-        child.material.opacity = 0.46 + dark * 0.24;
+        child.material.opacity = 0.38 + dark * 0.18 + weather.dials.fog * 0.06;
       }
     });
   });
