@@ -83,6 +83,12 @@ export const LAKE_MAP = {
   worldRadius: 960,
   shorelineWidth: 42,
   landWidth: 330,
+  mainlandBeach: {
+    center: { x: -576, z: 156 },
+    radiusX: 54,
+    radiusZ: 14,
+    rotation: 0.34,
+  },
   island: {
     center: { x: 248, z: 46 },
     radiusX: 60,
@@ -385,10 +391,16 @@ export const isInIsland = (point: LakePoint) =>
     LAKE_FEATURE_FOOTPRINTS.island.rotation,
   );
 
+export const isInsideLakeOutline = (point: LakePoint) =>
+  pointInPolygon(point, LAKE_OUTLINE);
+
 export const isWater = (point: LakePoint) =>
   pointInPolygon(point, LAKE_OUTLINE) && !isInIsland(point) && !isInSandbar(point);
 
 export const isLand = (point: LakePoint) => !isWater(point);
+
+export const isMainland = (point: LakePoint) =>
+  !isInsideLakeOutline(point) && !isInIsland(point) && !isInSandbar(point);
 
 export const distanceToShore = (point: LakePoint) => {
   const shore = getNearestShorePoint(point);
@@ -410,6 +422,63 @@ export const distanceToShore = (point: LakePoint) => {
     ),
   );
   return Math.min(signedDistance, obstacleDistance);
+};
+
+export const ZONE_TRUTH = {
+  wetEdgeWidth: 10,
+  shorelineGrassOuter: 88,
+  raisedBankOuter: 142,
+  forestShelfInner: 142,
+  forestShelfOuter: 260,
+  forestTreeMinShoreClearance: 38,
+  forestTreeMaxShoreClearance: 330,
+  farForestMinShoreClearance: 88,
+  farForestMaxShoreClearance: 360,
+  rockMinShoreClearance: 6,
+  rockMaxShoreClearance: 58,
+  reedWaterSideMax: 22,
+  reedLandSideMax: 12,
+  mainlandBeach: LAKE_MAP.mainlandBeach,
+} as const;
+
+export const isMainlandShoreZone = (
+  point: LakePoint,
+  minClearance: number = ZONE_TRUTH.rockMinShoreClearance,
+  maxClearance: number = ZONE_TRUTH.rockMaxShoreClearance,
+) => {
+  const shoreDistance = distanceToShore(point);
+  return (
+    isMainland(point) &&
+    shoreDistance <= -minClearance &&
+    shoreDistance >= -maxClearance
+  );
+};
+
+export const isMainlandForestZone = (
+  point: LakePoint,
+  minClearance: number = ZONE_TRUTH.forestTreeMinShoreClearance,
+  maxClearance: number = ZONE_TRUTH.forestTreeMaxShoreClearance,
+) => {
+  const shoreDistance = distanceToShore(point);
+  return (
+    isMainland(point) &&
+    shoreDistance <= -minClearance &&
+    shoreDistance >= -maxClearance
+  );
+};
+
+export const isReedWetlandZone = (point: LakePoint) => {
+  const reedCenter =
+    LAKE_MAP.destinations.find((destination) => destination.key === "reeds")?.center ??
+    LAKE_MAP.mainlandBeach.center;
+  const shoreDistance = distanceToShore(point);
+  return (
+    !isInIsland(point) &&
+    !isInSandbar(point) &&
+    getDistance(point, reedCenter) <= 126 &&
+    shoreDistance <= ZONE_TRUTH.reedWaterSideMax &&
+    shoreDistance >= -ZONE_TRUTH.reedLandSideMax
+  );
 };
 
 export const getLakeNormalizedPosition = (point: LakePoint) => {

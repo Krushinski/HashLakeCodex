@@ -9,9 +9,11 @@ import {
   LAKE_FEATURE_FOOTPRINTS,
   LAKE_OUTLINE,
   LAKE_MAP,
+  ZONE_TRUTH,
   clampBoatToWater,
   getExpandedOutline,
   getNearestLocation,
+  isReedWetlandZone,
 } from "./lakeMap";
 import { createPostSystem } from "./postSystem";
 import { createScenicAssetSystem, type ScenicAssetStatuses } from "./scenicAssets";
@@ -1921,49 +1923,6 @@ const createRadialBoundary = (
     };
   });
 
-const createOrganicEllipseRampGeometry = (
-  innerRadiusX: number,
-  innerRadiusZ: number,
-  outerRadiusX: number,
-  outerRadiusZ: number,
-  innerY: number,
-  outerY: number,
-  innerSeed: number,
-  outerSeed: number,
-  wobble = 0.035,
-  count = 96,
-) => {
-  const inner: { x: number; z: number }[] = [];
-  const outer: { x: number; z: number }[] = [];
-  const minGapX = Math.max(4, (outerRadiusX - innerRadiusX) * 0.22);
-  const minGapZ = Math.max(2, (outerRadiusZ - innerRadiusZ) * 0.22);
-
-  for (let index = 0; index < count; index += 1) {
-    const angle = (index / count) * Math.PI * 2;
-    const shared =
-      Math.sin(angle * 2.7 + innerSeed * 0.29) * wobble +
-      Math.cos(angle * 4.6 + outerSeed * 0.17) * wobble * 0.42 +
-      Math.sin(angle * 7.9 + (innerSeed + outerSeed) * 0.08) * wobble * 0.18;
-    const innerNoise = shared * 0.42;
-    const outerNoise = shared * 0.72;
-    const innerX = innerRadiusX * (1 + innerNoise);
-    const innerZ = innerRadiusZ * (1 + innerNoise * 0.72);
-    const outerX = Math.max(innerX + minGapX, outerRadiusX * (1 + outerNoise));
-    const outerZ = Math.max(innerZ + minGapZ, outerRadiusZ * (1 + outerNoise * 0.72));
-
-    inner.push({
-      x: Math.cos(angle) * innerX,
-      z: Math.sin(angle) * innerZ,
-    });
-    outer.push({
-      x: Math.cos(angle) * outerX,
-      z: Math.sin(angle) * outerZ,
-    });
-  }
-
-  return createSlopedStripGeometry(inner, outer, innerY, outerY, innerSeed + outerSeed, wobble * 0.45);
-};
-
 const createOrganicMoundedEllipseGeometry = (
   radiusX: number,
   radiusZ: number,
@@ -2030,13 +1989,13 @@ const createShoreline = () => {
       fog: true,
       side: THREE.DoubleSide,
     });
-  const wetSandMaterial = makeTerrainMaterial(0x334633);
-  const bankToeMaterial = makeTerrainMaterial(0x17331d);
-  const bankMaterial = makeTerrainMaterial(0x21452a);
-  const forestShelfMaterial = makeTerrainMaterial(0x112f1d);
+  const wetSandMaterial = makeTerrainMaterial(0x4b5d44);
+  const bankToeMaterial = makeTerrainMaterial(0x286039);
+  const bankMaterial = makeTerrainMaterial(0x1f4a2b);
+  const forestShelfMaterial = makeTerrainMaterial(0x102d1c);
   const landMaterial = makeTerrainMaterial(0x08170f);
-  const midForestMaterial = makeTerrainMaterial(0x0b2114);
-  const landInner = getExpandedOutline(260);
+  const midForestMaterial = makeTerrainMaterial(0x0a2014);
+  const landInner = getExpandedOutline(ZONE_TRUTH.forestShelfOuter);
   const land = new THREE.Mesh(
     createSlopedStripGeometry(
       landInner,
@@ -2052,35 +2011,35 @@ const createShoreline = () => {
   group.add(land);
 
   const wetSand = new THREE.Mesh(
-    createSlopedStripGeometry(LAKE_OUTLINE, getExpandedOutline(10), 0.10, 0.20, 9, 0.004),
+    createSlopedStripGeometry(LAKE_OUTLINE, getExpandedOutline(ZONE_TRUTH.wetEdgeWidth), 0.10, 0.20, 9, 0.004),
     wetSandMaterial,
   );
   wetSand.receiveShadow = true;
   group.add(wetSand);
 
   const shoreline = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(10), getExpandedOutline(42), 0.20, 0.72, 13, 0.016),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.wetEdgeWidth), getExpandedOutline(42), 0.20, 0.72, 13, 0.012),
     bankToeMaterial,
   );
   shoreline.receiveShadow = true;
   group.add(shoreline);
 
   const grassTransition = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(42), getExpandedOutline(88), 0.72, 1.02, 17, 0.020),
-    makeTerrainMaterial(0x1c3f27),
+    createSlopedStripGeometry(getExpandedOutline(42), getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), 0.72, 1.02, 17, 0.014),
+    makeTerrainMaterial(0x2f6b3f),
   );
   grassTransition.receiveShadow = true;
   group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(88), getExpandedOutline(142), 1.02, 1.24, 29, 0.020),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.24, 29, 0.014),
     bankMaterial,
   );
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
   const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(142), getExpandedOutline(214), 1.24, 1.38, 37, 0.018),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.24, 1.38, 37, 0.012),
     forestShelfMaterial,
   );
   forestShelf.receiveShadow = true;
@@ -2123,18 +2082,6 @@ const createDestinationMarkers = () => {
     emissiveIntensity: 0.030,
     roughness: 0.92,
   });
-  const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x776946,
-    emissive: 0x120d05,
-    emissiveIntensity: 0.028,
-    roughness: 0.94,
-  });
-  const sandPatchMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffe4ad,
-    emissive: 0x2f2817,
-    emissiveIntensity: 0.030,
-    roughness: 0.92,
-  });
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: SCENARIO_PALETTES.Serene.rock,
     emissive: 0x25302c,
@@ -2162,6 +2109,7 @@ const createDestinationMarkers = () => {
   const reedsCenter = getDestinationCenter("reeds");
   const sandbarFootprint = LAKE_FEATURE_FOOTPRINTS.sandbar;
   const islandFootprint = LAKE_FEATURE_FOOTPRINTS.island;
+  const beachPocket = ZONE_TRUTH.mainlandBeach;
 
   const dock = new THREE.Group();
   dock.name = "Dock area";
@@ -2199,31 +2147,29 @@ const createDestinationMarkers = () => {
   }
   group.add(dock);
 
-  const sandbarWet = new THREE.Mesh(
-    createOrganicEllipseRampGeometry(
-      sandbarFootprint.dry.radiusX - 22,
-      sandbarFootprint.dry.radiusZ - 9,
-      sandbarFootprint.wetOuter.radiusX - 20,
-      sandbarFootprint.wetOuter.radiusZ - 10,
-      0.34,
-      0.10,
-      67,
-      71,
-      0.040,
-      160,
+  const mainlandBeach = new THREE.Mesh(
+    createOrganicMoundedEllipseGeometry(
+      beachPocket.radiusX,
+      beachPocket.radiusZ,
+      451,
+      0.030,
+      0.48,
+      0.18,
+      120,
+      4,
     ),
-    wetSandMaterial,
+    sandMaterial,
   );
-  sandbarWet.name = "Sandbar wet sand feather";
-  sandbarWet.position.set(sandbarCenter.x, 0, sandbarCenter.z);
-  sandbarWet.rotation.y = -sandbarFootprint.rotation;
-  sandbarWet.receiveShadow = true;
-  group.add(sandbarWet);
+  mainlandBeach.name = "Zone-validated mainland beach pocket";
+  mainlandBeach.position.set(beachPocket.center.x, 0, beachPocket.center.z);
+  mainlandBeach.rotation.y = beachPocket.rotation;
+  mainlandBeach.receiveShadow = true;
+  group.add(mainlandBeach);
 
   const sandbar = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      sandbarFootprint.dry.radiusX - 28,
-      sandbarFootprint.dry.radiusZ - 11,
+      sandbarFootprint.dry.radiusX - 20,
+      sandbarFootprint.dry.radiusZ - 9,
       61,
       0.070,
       0.68,
@@ -2238,30 +2184,6 @@ const createDestinationMarkers = () => {
   sandbar.rotation.y = -sandbarFootprint.rotation;
   sandbar.receiveShadow = true;
   group.add(sandbar);
-
-  for (let index = 0; index < 4; index += 1) {
-    const patch = new THREE.Mesh(
-      createOrganicMoundedEllipseGeometry(
-        15 - index * 2.1,
-        3.8 + (index % 2) * 1.0,
-        100 + index,
-        0.020,
-        0.69,
-        0.58,
-        48,
-        3,
-      ),
-      sandPatchMaterial,
-    );
-    patch.name = "Sandbar pale sand variation";
-    patch.position.set(
-      sandbarCenter.x - 42 + index * 28,
-      0,
-      sandbarCenter.z + Math.sin(index * 1.2) * 7,
-    );
-    patch.rotation.y = -sandbarFootprint.rotation + Math.sin(index) * 0.22;
-    group.add(patch);
-  }
 
   const coveMarker = new THREE.Group();
   coveMarker.name = "Mountain cove";
@@ -2296,31 +2218,10 @@ const createDestinationMarkers = () => {
 
   const island = new THREE.Group();
   island.name = "Rocky island";
-  const islandWet = new THREE.Mesh(
-    createOrganicEllipseRampGeometry(
-      islandFootprint.dry.radiusX - 12,
-      islandFootprint.dry.radiusZ - 7,
-      islandFootprint.wetOuter.radiusX - 14,
-      islandFootprint.wetOuter.radiusZ - 9,
-      0.40,
-      0.12,
-      83,
-      87,
-      0.046,
-      160,
-    ),
-    wetSandMaterial,
-  );
-  islandWet.name = "Island wet sand feather";
-  islandWet.position.set(islandCenter.x, 0, islandCenter.z);
-  islandWet.rotation.y = -islandFootprint.rotation;
-  islandWet.receiveShadow = true;
-  island.add(islandWet);
-
   const islandBeach = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      islandFootprint.dry.radiusX - 17,
-      islandFootprint.dry.radiusZ - 9,
+      islandFootprint.dry.radiusX - 9,
+      islandFootprint.dry.radiusZ - 6,
       73,
       0.066,
       0.82,
@@ -2335,30 +2236,6 @@ const createDestinationMarkers = () => {
   islandBeach.rotation.y = -islandFootprint.rotation;
   islandBeach.receiveShadow = true;
   island.add(islandBeach);
-
-  for (let index = 0; index < 3; index += 1) {
-    const patch = new THREE.Mesh(
-      createOrganicMoundedEllipseGeometry(
-        12 - index * 1.8,
-        5 + index,
-        120 + index,
-        0.016,
-        0.84,
-        0.70,
-        44,
-        3,
-      ),
-      sandPatchMaterial,
-    );
-    patch.name = "Island pale sand variation";
-    patch.position.set(
-      islandCenter.x - 24 + index * 19,
-      0,
-      islandCenter.z + Math.cos(index * 1.1) * 9,
-    );
-    patch.rotation.y = -islandFootprint.rotation + Math.sin(index * 0.9) * 0.28;
-    island.add(patch);
-  }
 
   const islandRockShelf = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
@@ -2407,15 +2284,22 @@ const createDestinationMarkers = () => {
   const reeds = new THREE.Group();
   reeds.name = "Reed shoreline";
   for (let index = 0; index < 46; index += 1) {
-    const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 6 + (index % 4), 5), reedMaterial);
     const base = {
       x: reedsCenter.x + (index % 12) * 3.2 - 16,
       z: reedsCenter.z + Math.floor(index / 12) * 5 - 7,
     };
+    const reedPoint = {
+      x: base.x + Math.sin(index * 1.8) * 2.8,
+      z: base.z + Math.cos(index * 1.3) * 2.2,
+    };
+    if (!isReedWetlandZone(reedPoint)) {
+      continue;
+    }
+    const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 6 + (index % 4), 5), reedMaterial);
     reed.position.set(
-      base.x + Math.sin(index * 1.8) * 2.8,
+      reedPoint.x,
       2.5,
-      base.z + Math.cos(index * 1.3) * 2.2,
+      reedPoint.z,
     );
     reed.rotation.z = Math.sin(index) * 0.12;
     reed.castShadow = true;

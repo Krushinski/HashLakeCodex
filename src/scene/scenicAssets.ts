@@ -18,6 +18,8 @@ const ASSET_PATHS: Record<ScenicAssetKey, string> = {
   shoreline: "assets/models/hl-shoreline-kit-v1.glb",
 };
 
+const ACTIVE_SCENIC_ASSET_LOADS: ScenicAssetKey[] = [];
+
 const scenicMaterials = {
   mountainFar: new THREE.MeshBasicMaterial({ color: 0x8fa2a1, toneMapped: false }),
   mountainMid: new THREE.MeshBasicMaterial({ color: 0x3d5554, toneMapped: false }),
@@ -111,7 +113,7 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
     );
   };
 
-  (["treeline"] as ScenicAssetKey[]).forEach(loadAsset);
+  ACTIVE_SCENIC_ASSET_LOADS.forEach(loadAsset);
 
   return {
     group,
