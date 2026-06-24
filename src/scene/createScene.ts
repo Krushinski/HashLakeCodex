@@ -1882,6 +1882,18 @@ const createStripGeometry = (
   return geometry;
 };
 
+const createRadialBoundary = (
+  inner: readonly { x: number; z: number }[],
+  radius: number,
+) =>
+  inner.map((point) => {
+    const length = Math.max(1, Math.hypot(point.x, point.z));
+    return {
+      x: (point.x / length) * radius,
+      z: (point.z / length) * radius,
+    };
+  });
+
 const createOrganicEllipseStripGeometry = (
   innerRadiusX: number,
   innerRadiusZ: number,
@@ -1989,11 +2001,11 @@ const createShoreline = () => {
     color: 0x1b3022,
     roughness: 0.92,
   });
+  const landInner = getExpandedOutline(LAKE_MAP.shorelineWidth + 42);
   const land = new THREE.Mesh(
-    new THREE.CircleGeometry(LAKE_MAP.worldRadius, 128),
+    createStripGeometry(landInner, createRadialBoundary(landInner, LAKE_MAP.worldRadius)),
     landMaterial,
   );
-  land.rotation.x = -Math.PI / 2;
   land.position.y = -0.28;
   land.receiveShadow = true;
   group.add(land);

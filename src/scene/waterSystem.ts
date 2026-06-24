@@ -116,7 +116,16 @@ const createOrganicWaterGeometry = () => {
       { x: center.x + inset, z: center.z + inset },
       { x: center.x - inset, z: center.z + inset },
     ];
-    return samples.every((sample) => isWater(sample) && distanceToShore(sample) > 0.55);
+    const centerShoreDistance = distanceToShore(center);
+    const waterSamples = samples.reduce(
+      (count, sample) => count + (isWater(sample) ? 1 : 0),
+      0,
+    );
+
+    return (
+      (isWater(center) && centerShoreDistance > -step * 0.7) ||
+      (waterSamples >= 3 && centerShoreDistance > -step * 1.15)
+    );
   };
 
   for (let x = minX; x < maxX; x += step) {
@@ -310,7 +319,7 @@ export const createWater = (): WaterSurface => {
         vec3 base = mix(shallow, deep, smoothstep(0.04, 1.0, depth));
         base = mix(base, vColor, 0.014 + shore * 0.024);
         base = mix(base, vec3(0.46, 0.86, 0.78), sandGlow * (1.0 - uDark * 0.42) * 0.22);
-        base = mix(base, vec3(0.32, 0.10, 0.035), uFire * 0.42);
+        base = mix(base, vec3(0.050, 0.096, 0.112), uFire * 0.10);
 
         float bodyWaveA = sin(vWorldPos.x * 0.0052 + vWorldPos.z * 0.0032 + uTime * (0.036 + uWind * 0.034));
         float bodyWaveB = sin(vWorldPos.x * -0.0030 + vWorldPos.z * 0.0064 - uTime * (0.032 + uWind * 0.029));
@@ -430,6 +439,7 @@ export const animateWater = (
   camera: THREE.PerspectiveCamera,
 ) => {
   const palette = getWeatherPalette(weather.stormIndex);
+  const waterPalette = getWeatherPalette(Math.min(weather.stormIndex, 72));
   water.mesh.material.uniforms.uTime.value = elapsed;
   water.mesh.material.uniforms.uChop.value = weather.dials.chop;
   water.mesh.material.uniforms.uWind.value = weather.dials.wind;
@@ -442,16 +452,16 @@ export const animateWater = (
       : 0;
   water.mesh.material.uniforms.uStale.value = weather.staleData ? 1 : 0;
   water.mesh.material.uniforms.uDeepColor.value
-    .setHex(palette.waterDeep)
+    .setHex(waterPalette.waterDeep)
     .lerp(inspirationDeepWater, Math.max(0.18, 0.50 - weather.dials.skyDark * 0.34))
     .lerp(hashLake3DeepWater, 0.24);
   water.mesh.material.uniforms.uShallowColor.value
-    .setHex(palette.waterShallow)
+    .setHex(waterPalette.waterShallow)
     .lerp(inspirationShallowWater, Math.max(0.24, 0.66 - weather.dials.skyDark * 0.34));
   water.mesh.material.uniforms.uHorizonColor.value
-    .setHex(palette.skyHorizon)
+    .setHex(waterPalette.skyHorizon)
     .lerp(inspirationHorizonWater, Math.max(0.18, 0.50 - weather.dials.skyDark * 0.24));
-  water.mesh.material.uniforms.uStormColor.value.setHex(palette.waterDeep);
+  water.mesh.material.uniforms.uStormColor.value.setHex(waterPalette.waterDeep);
   water.mesh.material.uniforms.uSunColor.value.setHex(palette.sunColor);
   camera.getWorldPosition(water.mesh.material.uniforms.uCamPos.value);
   water.mesh.material.uniforms.uBoatPos.value.set(driveState.x, driveState.z);
