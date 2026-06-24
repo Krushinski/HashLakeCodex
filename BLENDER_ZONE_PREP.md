@@ -13,9 +13,9 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Main shoreline
 
-- Current native state: smoother shared polygon outline with shallow water, wet edge, raised bank, forest shelf, mid-forest shelf, and drive/collision boundaries derived from the same map.
-- Current weaknesses: some full-perimeter silhouette sections still feel procedural and faceted at close angles.
-- Topology readiness: ready for lightweight accent placement, but not for replacing collision. Phase 54 strengthened the vertical terrain steps so future shore props can sit on raised green/earth bands instead of a flat gray perimeter.
+- Current native state: Phase 55 renders clean opaque wet-edge, raised-bank, forest-shelf, mid-forest, and outer-land bands from the shared lake polygon only. Collision, minimap, ripple blocking, and visual shoreline all derive from `lakeMap.ts`.
+- Current weaknesses: some full-perimeter silhouette sections still feel procedural and faceted at close angles, but random green mound ovals, gray shallow-card fields, and visible filler terrain patches are removed.
+- Topology readiness: ready for lightweight accent placement, but not for replacing collision. Future shore props should sit on the existing raised green/earth bands and must not rebuild hidden under-lake land, transparent shallow cards, or disconnected patch ovals.
 - Future Blender role: modular low-poly shoreline shelves, rocky caps, and terrain transition pieces that sit above the existing outline.
 - Keep native: collision, minimap, ripple blocking, drive boundaries, lake outline, and shoreline masks.
 - Risk: imported shore pieces must not disagree with `lakeMap.ts` or visible boat collision will feel wrong.

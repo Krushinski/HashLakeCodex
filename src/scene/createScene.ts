@@ -2023,206 +2023,75 @@ const createOrganicMoundedEllipseGeometry = (
 
 const createShoreline = () => {
   const group = new THREE.Group();
-  group.name = "Organic mountain lake terrain";
-  const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe6d6aa,
-    emissive: 0x1f190d,
-    emissiveIntensity: 0.035,
-    roughness: 0.9,
-  });
-  const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x23351f,
-    emissive: 0x040c05,
-    emissiveIntensity: 0.09,
-    roughness: 0.96,
-  });
-  const bankToeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x102916,
-    emissive: 0x020804,
-    emissiveIntensity: 0.17,
-    roughness: 0.98,
-  });
-  const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x244932,
-    emissive: 0x031007,
-    emissiveIntensity: 0.09,
-    roughness: 0.94,
-  });
-  const forestShelfMaterial = new THREE.MeshStandardMaterial({
-    color: 0x10351f,
-    emissive: 0x010805,
-    emissiveIntensity: 0.155,
-    roughness: 0.96,
-  });
-  const shallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x93d8cb,
-    transparent: true,
-    opacity: 0.032,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const shallowFadeMaterial = new THREE.MeshBasicMaterial({
-    color: 0x6eb8b8,
-    transparent: true,
-    opacity: 0.012,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x0c2417,
-    emissive: 0x020805,
-    emissiveIntensity: 0.145,
-    roughness: 0.92,
-  });
-  const midForestMaterial = new THREE.MeshStandardMaterial({
-    color: 0x081b12,
-    emissive: 0x010604,
-    emissiveIntensity: 0.18,
-    roughness: 0.96,
-  });
-  const thicketPatchMaterial = new THREE.MeshStandardMaterial({
-    color: 0x183f27,
-    emissive: 0x031007,
-    emissiveIntensity: 0.125,
-    roughness: 0.97,
-  });
-  const rockyBankPatchMaterial = new THREE.MeshStandardMaterial({
-    color: 0x27352f,
-    emissive: 0x040806,
-    emissiveIntensity: 0.105,
-    roughness: 0.98,
-  });
-  const landInner = getExpandedOutline(340);
+  group.name = "Clean lake basin terrain";
+  const makeTerrainMaterial = (color: number) =>
+    new THREE.MeshBasicMaterial({
+      color,
+      fog: true,
+      side: THREE.DoubleSide,
+    });
+  const wetSandMaterial = makeTerrainMaterial(0x334633);
+  const bankToeMaterial = makeTerrainMaterial(0x17331d);
+  const bankMaterial = makeTerrainMaterial(0x21452a);
+  const forestShelfMaterial = makeTerrainMaterial(0x112f1d);
+  const landMaterial = makeTerrainMaterial(0x08170f);
+  const midForestMaterial = makeTerrainMaterial(0x0b2114);
+  const landInner = getExpandedOutline(260);
   const land = new THREE.Mesh(
     createSlopedStripGeometry(
       landInner,
       createRadialBoundary(landInner, LAKE_MAP.worldRadius),
-      1.58,
-      1.72,
+      1.42,
+      1.50,
       22,
-      0.055,
+      0.018,
     ),
     landMaterial,
   );
   land.receiveShadow = true;
   group.add(land);
 
-  const shallowFade = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(-44), getExpandedOutline(-10), 0.012, 0.026, 4, 0.004),
-    shallowFadeMaterial,
-  );
-  group.add(shallowFade);
-
   const wetSand = new THREE.Mesh(
-    createSlopedStripGeometry(LAKE_OUTLINE, getExpandedOutline(7), 0.10, 0.22, 9, 0.006),
+    createSlopedStripGeometry(LAKE_OUTLINE, getExpandedOutline(10), 0.10, 0.20, 9, 0.004),
     wetSandMaterial,
   );
   wetSand.receiveShadow = true;
   group.add(wetSand);
 
   const shoreline = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(7), getExpandedOutline(34), 0.22, 0.86, 13, 0.024),
+    createSlopedStripGeometry(getExpandedOutline(10), getExpandedOutline(42), 0.20, 0.72, 13, 0.016),
     bankToeMaterial,
   );
   shoreline.receiveShadow = true;
   group.add(shoreline);
 
   const grassTransition = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(34), getExpandedOutline(82), 0.86, 1.14, 17, 0.040),
-    new THREE.MeshStandardMaterial({
-      color: 0x193522,
-      emissive: 0x020b05,
-      emissiveIntensity: 0.11,
-      roughness: 0.96,
-    }),
+    createSlopedStripGeometry(getExpandedOutline(42), getExpandedOutline(88), 0.72, 1.02, 17, 0.020),
+    makeTerrainMaterial(0x1c3f27),
   );
   grassTransition.receiveShadow = true;
   group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(82), getExpandedOutline(132), 1.14, 1.34, 29, 0.044),
+    createSlopedStripGeometry(getExpandedOutline(88), getExpandedOutline(142), 1.02, 1.24, 29, 0.020),
     bankMaterial,
   );
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
   const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(132), getExpandedOutline(226), 1.34, 1.52, 37, 0.044),
+    createSlopedStripGeometry(getExpandedOutline(142), getExpandedOutline(214), 1.24, 1.38, 37, 0.018),
     forestShelfMaterial,
   );
   forestShelf.receiveShadow = true;
   group.add(forestShelf);
 
   const midForestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(226), getExpandedOutline(340), 1.52, 1.62, 43, 0.038),
+    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.38, 1.44, 43, 0.014),
     midForestMaterial,
   );
   midForestShelf.receiveShadow = true;
   group.add(midForestShelf);
-
-  const shallow = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(-28), LAKE_OUTLINE, 0.022, 0.038, 5, 0.004),
-    shallowMaterial,
-  );
-  group.add(shallow);
-
-  const addBeachPocket = (
-    key: "dock" | "cove" | "reeds",
-    radiusX: number,
-    radiusZ: number,
-    rotation: number,
-    offsetX = 0,
-    offsetZ = 0,
-  ) => {
-    const center = getDestinationCenter(key);
-    const pocket = new THREE.Mesh(
-      createOrganicMoundedEllipseGeometry(radiusX, radiusZ, 250 + radiusX, 0.020, 0.46, 0.22, 72, 4),
-      sandMaterial,
-    );
-    pocket.name = `${key} small sand pocket`;
-    pocket.position.set(center.x + offsetX, 0, center.z + offsetZ);
-    pocket.rotation.y = rotation;
-    pocket.receiveShadow = true;
-    group.add(pocket);
-  };
-
-  addBeachPocket("dock", 28, 8, 0.42, 18, -10);
-  addBeachPocket("cove", 22, 6, -0.22, -32, 24);
-  addBeachPocket("reeds", 18, 5, 0.18, 18, -12);
-
-  const addTerrainPatch = (
-    name: string,
-    x: number,
-    z: number,
-    radiusX: number,
-    radiusZ: number,
-    rotation: number,
-    material: THREE.Material,
-    seed: number,
-    centerY = 1.48,
-    edgeY = 1.12,
-  ) => {
-    const patch = new THREE.Mesh(
-      createOrganicMoundedEllipseGeometry(radiusX, radiusZ, seed, 0.032, centerY, edgeY, 80, 4),
-      material,
-    );
-    patch.name = name;
-    patch.position.set(x, 0, z);
-    patch.rotation.y = rotation;
-    patch.receiveShadow = true;
-    group.add(patch);
-  };
-
-  addTerrainPatch("Dock forest bank mound", -650, 132, 74, 24, 0.34, thicketPatchMaterial, 302, 1.36, 0.92);
-  addTerrainPatch("Reed marsh raised bank", -520, 224, 90, 28, -0.12, thicketPatchMaterial, 319, 1.34, 0.88);
-  addTerrainPatch("Cove rocky green bank", 680, -142, 86, 30, -0.22, rockyBankPatchMaterial, 337, 1.42, 0.96);
-  addTerrainPatch("Rear left forest shelf mass", -420, -320, 120, 38, 0.20, thicketPatchMaterial, 349, 1.56, 1.16);
-  addTerrainPatch("Rear center forest shelf mass", -70, -358, 150, 42, -0.08, thicketPatchMaterial, 363, 1.52, 1.14);
-  addTerrainPatch("Rear right forest shelf mass", 370, -296, 126, 40, 0.16, thicketPatchMaterial, 377, 1.50, 1.12);
-  addTerrainPatch("Right shore forest bank mass", 635, 220, 118, 32, 0.16, thicketPatchMaterial, 391, 1.44, 1.02);
-  addTerrainPatch("Right rear forest bank continuation", 690, -32, 78, 184, -0.08, thicketPatchMaterial, 409, 1.46, 1.06);
-  addTerrainPatch("Far left forest bank shade", -680, -208, 128, 34, -0.16, thicketPatchMaterial, 421, 1.45, 1.05);
-  addTerrainPatch("Far right forest bank shade", 682, -224, 138, 36, 0.12, thicketPatchMaterial, 437, 1.45, 1.05);
 
   return group;
 };
@@ -2255,9 +2124,9 @@ const createDestinationMarkers = () => {
     roughness: 0.92,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x9f8f68,
-    emissive: 0x171106,
-    emissiveIntensity: 0.036,
+    color: 0x776946,
+    emissive: 0x120d05,
+    emissiveIntensity: 0.028,
     roughness: 0.94,
   });
   const sandPatchMaterial = new THREE.MeshStandardMaterial({
@@ -2704,28 +2573,7 @@ const createClouds = () => {
 
 const createHorizonHaze = () => {
   const group = new THREE.Group();
-  group.name = "Atmospheric horizon haze";
-  const bands = [
-    { y: 30, z: -548, height: 64, opacity: 0.07 },
-    { y: 72, z: -704, height: 104, opacity: 0.052 },
-    { y: 126, z: -864, height: 142, opacity: 0.038 },
-  ];
-
-  bands.forEach((band, index) => {
-    const material = new THREE.MeshBasicMaterial({
-      color: index === 0 ? 0x41595a : 0x2f474d,
-      transparent: true,
-      opacity: band.opacity,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1700, band.height), material);
-    mesh.position.set(0, band.y, band.z);
-    mesh.userData.baseOpacity = band.opacity;
-    mesh.name = "Horizon haze band";
-    group.add(mesh);
-  });
-
+  group.name = "Atmospheric horizon haze disabled";
   return group;
 };
 

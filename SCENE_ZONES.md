@@ -7,6 +7,7 @@ This file is an executable art-direction contract. Native procedural work should
 - Preserve: Drive coordinate contract, hard-locked Drive camera, mobile controls, live zero-cost data, Debug, Legend, minimap, Bitcoin pill, whale splashes, New Block swell, stale fog, quality presets, GitHub Pages.
 - Must not: add paid APIs, API keys, CoinGecko runtime calls, external assets, global weather changes from BTC amounts, debug strobe behavior, or required heavyweight visuals.
 - Performance: prefer shader math, merged geometry, instancing, bounded pools, and quality preset gates. Performance mode must keep the lake playable and readable.
+- Phase 55 zone truth reset: `src/scene/lakeMap.ts` is the shared geometry truth for the lake outline, shore expansion, island/sandbar footprints, collision, ripple blocking, and minimap validation. Do not reintroduce random terrain-patch ovals, translucent full-lake shallow cards, fake treeline reflection planes, hidden under-lake land disks, or flat mountain/banner curtain planes as stage-building shortcuts.
 
 ## Sky
 

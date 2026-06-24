@@ -199,50 +199,6 @@ const createTerrainMaterial = (
     `,
   });
 
-const buildMountainCurtain = (width: number, baseHeight: number, peakHeight: number, seed: number) => {
-  const noise = makeNoise2D(seed);
-  const segments = 72;
-  const vertices: number[] = [];
-  const indices: number[] = [];
-
-  for (let index = 0; index <= segments; index += 1) {
-    const t = index / segments;
-    const x = (t - 0.5) * width;
-    const ridge =
-      baseHeight +
-      peakHeight *
-        (0.35 +
-          0.65 *
-            Math.max(
-              0,
-              noise.fbm(t * 3.1 + seed * 0.01, Math.sin(t * Math.PI * 2) + 3.5, 4) + 0.56,
-            ));
-    const heroPeak = Math.exp(-((t - 0.52) * (t - 0.52)) / 0.018) * peakHeight * 0.45;
-    const tooth =
-      (Math.sin(t * Math.PI * 18 + seed) * 0.5 + 0.5) *
-      Math.max(0, noise.fbm(t * 9.0 + seed, 5.1, 3)) *
-      peakHeight *
-      0.28;
-    const blade =
-      Math.pow(Math.max(0, Math.sin(t * Math.PI * 31 + seed * 0.1)), 4) *
-      peakHeight *
-      0.16;
-    const top = ridge + heroPeak + tooth + blade;
-    vertices.push(x, 0, 0, x, top, 0);
-  }
-
-  for (let index = 0; index < segments; index += 1) {
-    const base = index * 2;
-    indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-};
-
 export const createTerrainSystem = (): TerrainSystem => {
   const shared = {
     sunDir: { value: new THREE.Vector3(-0.36, 0.72, -0.44).normalize() },
@@ -285,48 +241,18 @@ export const createTerrainSystem = (): TerrainSystem => {
   mid.name = "Mid HashLake ridge";
   far.frustumCulled = false;
   mid.frustumCulled = false;
-  const curtainBackMaterial = new THREE.MeshBasicMaterial({
-    color: 0x30484f,
-    transparent: true,
-    opacity: 0.30,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const curtainFrontMaterial = new THREE.MeshBasicMaterial({
-    color: 0x102926,
-    transparent: true,
-    opacity: 0.58,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const backCurtain = new THREE.Mesh(
-    buildMountainCurtain(1900, 58, 158, 181),
-    curtainBackMaterial,
-  );
-  backCurtain.name = "Far painterly mountain silhouette";
-  backCurtain.position.set(0, 20, -1020);
-  const frontCurtain = new THREE.Mesh(
-    buildMountainCurtain(1700, 36, 96, 331),
-    curtainFrontMaterial,
-  );
-  frontCurtain.name = "Near painterly mountain silhouette";
-  frontCurtain.position.set(0, 8, -760);
-  group.add(backCurtain, far, frontCurtain, mid);
+  group.add(far, mid);
   let scenicBackdropActive = false;
 
   const vertexCount =
     far.geometry.attributes.position.count +
-    mid.geometry.attributes.position.count +
-    backCurtain.geometry.attributes.position.count +
-    frontCurtain.geometry.attributes.position.count;
+    mid.geometry.attributes.position.count;
 
   return {
     group,
     update: (weather, camera) => {
       far.visible = !scenicBackdropActive;
       mid.visible = !scenicBackdropActive;
-      backCurtain.visible = !scenicBackdropActive;
-      frontCurtain.visible = !scenicBackdropActive;
       const palette = getWeatherPalette(weather.stormIndex);
       shared.sunDir.value.set(-0.36, 0.72 - weather.dials.skyDark * 0.28, -0.44).normalize();
       shared.sunColor.value.setHex(palette.sunColor);
@@ -342,10 +268,6 @@ export const createTerrainSystem = (): TerrainSystem => {
       shared.hazeDensity.value = 0.00008 + weather.dials.fog * 0.00040 + weather.dials.skyDark * 0.00006;
       shared.fire.value = weather.dials.fireWeather;
       shared.dark.value = weather.dials.skyDark;
-      curtainBackMaterial.color.setHex(weather.dials.skyDark > 0.35 ? 0x26383c : 0x30484f);
-      curtainBackMaterial.opacity = 0.18 + weather.dials.fog * 0.08 + weather.dials.skyDark * 0.04;
-      curtainFrontMaterial.color.setHex(weather.dials.skyDark > 0.38 ? 0x203135 : 0x102926);
-      curtainFrontMaterial.opacity = 0.48 + weather.dials.skyDark * 0.08;
     },
     getStats: () => ({
       mountainVertices: scenicBackdropActive ? 0 : vertexCount,
