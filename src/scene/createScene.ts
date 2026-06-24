@@ -7,7 +7,6 @@ import { createSceneEffects } from "./effects";
 import { createForestSystem, type TreeAlphaAssetStatuses } from "./forestSystem";
 import {
   LAKE_FEATURE_FOOTPRINTS,
-  LAKE_OUTLINE,
   LAKE_MAP,
   ZONE_TRUTH,
   clampBoatToWater,
@@ -1989,10 +1988,10 @@ const createShoreline = () => {
       fog: true,
       side: THREE.DoubleSide,
     });
-  const wetSandMaterial = makeTerrainMaterial(0x4b5d44);
-  const bankToeMaterial = makeTerrainMaterial(0x286039);
-  const bankMaterial = makeTerrainMaterial(0x1f4a2b);
-  const forestShelfMaterial = makeTerrainMaterial(0x102d1c);
+  const wetSandMaterial = makeTerrainMaterial(0x384c38);
+  const bankToeMaterial = makeTerrainMaterial(0x2d6b40);
+  const bankMaterial = makeTerrainMaterial(0x235331);
+  const forestShelfMaterial = makeTerrainMaterial(0x123321);
   const landMaterial = makeTerrainMaterial(0x08170f);
   const midForestMaterial = makeTerrainMaterial(0x0a2014);
   const landInner = getExpandedOutline(ZONE_TRUTH.forestShelfOuter);
@@ -2011,14 +2010,14 @@ const createShoreline = () => {
   group.add(land);
 
   const wetSand = new THREE.Mesh(
-    createSlopedStripGeometry(LAKE_OUTLINE, getExpandedOutline(ZONE_TRUTH.wetEdgeWidth), 0.10, 0.20, 9, 0.004),
+    createSlopedStripGeometry(getExpandedOutline(-6), getExpandedOutline(ZONE_TRUTH.wetEdgeWidth + 4), 0.09, 0.22, 9, 0.003),
     wetSandMaterial,
   );
   wetSand.receiveShadow = true;
   group.add(wetSand);
 
   const shoreline = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.wetEdgeWidth), getExpandedOutline(42), 0.20, 0.72, 13, 0.012),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.wetEdgeWidth + 4), getExpandedOutline(42), 0.22, 0.72, 13, 0.010),
     bankToeMaterial,
   );
   shoreline.receiveShadow = true;
@@ -2168,14 +2167,14 @@ const createDestinationMarkers = () => {
 
   const sandbar = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      sandbarFootprint.dry.radiusX - 20,
-      sandbarFootprint.dry.radiusZ - 9,
+      sandbarFootprint.blocker.radiusX + 8,
+      sandbarFootprint.blocker.radiusZ + 5,
       61,
-      0.070,
-      0.68,
-      0.25,
-      176,
-      6,
+      0.026,
+      0.66,
+      0.19,
+      208,
+      7,
     ),
     sandMaterial,
   );
@@ -2220,14 +2219,14 @@ const createDestinationMarkers = () => {
   island.name = "Rocky island";
   const islandBeach = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      islandFootprint.dry.radiusX - 9,
-      islandFootprint.dry.radiusZ - 6,
+      islandFootprint.blocker.radiusX + 6,
+      islandFootprint.blocker.radiusZ + 4,
       73,
-      0.066,
+      0.024,
       0.82,
-      0.30,
-      176,
-      6,
+      0.24,
+      208,
+      7,
     ),
     sandMaterial,
   );
