@@ -39,7 +39,7 @@ type HashlakeScene = {
 
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
 const BOAT_HOME = new THREE.Vector3(0, 2.2, 0);
-const BOAT_WATERLINE_SINK = 0.26;
+const BOAT_WATERLINE_SINK = 1.16;
 const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
 const SCENIC_CAMERA_STORAGE_KEY = "hashlake.scenicCamera.v1";
 const DRIVE_ACCELERATION_BASE = 23;
@@ -340,6 +340,11 @@ export const webGLCanRun = () => {
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
+
+const smoothstepNumber = (edge0: number, edge1: number, value: number) => {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
 
 const approach = (value: number, target: number, amount: number) => {
   if (value < target) {
@@ -1416,36 +1421,79 @@ const createLakeFill = () => {
   return mesh;
 };
 
+const createSpeedboatHullGeometry = () => {
+  const geometry = new THREE.BoxGeometry(13.4, 1.9, 3.6, 18, 3, 4);
+  const positions = geometry.attributes.position as THREE.BufferAttribute;
+
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    const y = positions.getY(index);
+    const z = positions.getZ(index);
+    const t = (x + 6.7) / 13.4;
+    const bowT = smoothstepNumber(0.58, 1, t);
+    const sternT = 1 - smoothstepNumber(0, 0.18, t);
+    const lower = smoothstepNumber(0.12, -0.95, y);
+    const center = 1 - Math.min(1, Math.abs(z) / 1.8);
+    const widthFactor = Math.max(0.08, 1 - bowT * 0.92 - sternT * 0.06);
+    const chineFactor = 1 - lower * (0.34 + bowT * 0.16);
+    const bowLift = Math.sin(Math.max(0, t - 0.62) / 0.38 * Math.PI * 0.5) * 0.34;
+    const keelDrop = lower * center * (0.62 + bowT * 0.20);
+    positions.setXYZ(
+      index,
+      x,
+      y + bowLift - keelDrop,
+      z * widthFactor * chineFactor,
+    );
+  }
+
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 const createBoat = () => {
   const boat = new THREE.Group();
-  boat.name = "Procedural motor skiff";
+  boat.name = "Classic wooden speedboat";
   boat.position.copy(BOAT_HOME);
-  boat.scale.setScalar(0.78);
+  boat.scale.setScalar(0.82);
 
   const hullMaterial = new THREE.MeshStandardMaterial({
-    color: 0x6f3f25,
-    roughness: 0.54,
-    metalness: 0.04,
+    color: 0x7a3f1d,
+    roughness: 0.34,
+    metalness: 0.03,
+    emissive: 0x160704,
+    emissiveIntensity: 0.055,
   });
   const trimMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd8b57c,
-    roughness: 0.42,
+    color: 0xc79655,
+    roughness: 0.30,
+    metalness: 0.02,
   });
-  const bowMarkerMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf7f2dd,
-    roughness: 0.34,
+  const deckMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb87538,
+    roughness: 0.28,
+    metalness: 0.02,
+    emissive: 0x150805,
+    emissiveIntensity: 0.04,
+  });
+  const darkTrimMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2f160c,
+    roughness: 0.44,
+  });
+  const creamMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf3dba5,
+    roughness: 0.36,
   });
   const motorMaterial = new THREE.MeshStandardMaterial({
-    color: 0x20292d,
+    color: 0x151b1e,
     roughness: 0.62,
-    metalness: 0.08,
+    metalness: 0.16,
   });
   const windshieldMaterial = new THREE.MeshStandardMaterial({
-    color: 0xa9d9ef,
-    roughness: 0.2,
+    color: 0xbce8f2,
+    roughness: 0.14,
     metalness: 0.02,
     transparent: true,
-    opacity: 0.68,
+    opacity: 0.62,
   });
   const personMaterial = new THREE.MeshStandardMaterial({
     color: 0x2e3e47,
@@ -1456,134 +1504,128 @@ const createBoat = () => {
     roughness: 0.7,
   });
 
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(11.5, 1.62, 3.12), hullMaterial);
+  const hull = new THREE.Mesh(createSpeedboatHullGeometry(), hullMaterial);
   hull.castShadow = true;
-  hull.scale.set(1, 0.82, 1);
   boat.add(hull);
 
   for (const side of [-1, 1]) {
-    const hullSide = new THREE.Mesh(new THREE.BoxGeometry(10.35, 1.06, 0.36), hullMaterial);
-    hullSide.position.set(-0.58, 0.08, side * 1.82);
-    hullSide.rotation.x = side * -0.22;
-    hullSide.castShadow = true;
-    boat.add(hullSide);
+    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.18, 0.16), darkTrimMaterial);
+    rubRail.position.set(-0.52, 0.84, side * 1.78);
+    rubRail.rotation.x = side * -0.06;
+    rubRail.castShadow = true;
+    boat.add(rubRail);
+
+    const waterline = new THREE.Mesh(new THREE.BoxGeometry(10.7, 0.10, 0.10), darkTrimMaterial);
+    waterline.name = "Hull waterline cue";
+    waterline.position.set(-0.78, -0.34, side * 1.50);
+    waterline.rotation.x = side * -0.10;
+    waterline.castShadow = false;
+    boat.add(waterline);
   }
 
-  const lowerHull = new THREE.Mesh(new THREE.BoxGeometry(10.1, 1.02, 2.36), hullMaterial);
-  lowerHull.position.set(-0.72, -0.7, 0);
-  lowerHull.scale.set(1, 0.68, 0.92);
-  lowerHull.castShadow = true;
-  boat.add(lowerHull);
-
-  const bow = new THREE.Mesh(new THREE.ConeGeometry(1.76, 6.15, 4), hullMaterial);
-  bow.rotation.z = Math.PI / 2;
-  bow.rotation.y = Math.PI / 4;
-  bow.position.x = 6.75;
-  bow.scale.set(1.14, 0.8, 0.68);
-  bow.castShadow = true;
-  boat.add(bow);
-
-  const bowStripe = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.14, 0.42), bowMarkerMaterial);
-  bowStripe.position.set(4.35, 1.06, 0);
-  bowStripe.castShadow = true;
-  boat.add(bowStripe);
-
-  const bowDeck = new THREE.Mesh(new THREE.ConeGeometry(1.05, 3.65, 4), trimMaterial);
-  bowDeck.rotation.z = Math.PI / 2;
-  bowDeck.rotation.y = Math.PI / 4;
-  bowDeck.position.set(4.7, 1.34, 0);
-  bowDeck.scale.set(0.98, 0.24, 0.62);
+  const bowDeck = new THREE.Mesh(new THREE.ConeGeometry(1.38, 5.6, 4), deckMaterial);
+  bowDeck.rotation.set(0, Math.PI / 4, Math.PI / 2);
+  bowDeck.position.set(4.56, 1.12, 0);
+  bowDeck.scale.set(1.0, 0.24, 0.72);
   bowDeck.castShadow = true;
   boat.add(bowDeck);
 
-  const bowLight = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.34, 0.62), bowMarkerMaterial);
-  bowLight.position.set(7.48, 0.98, 0);
-  bowLight.castShadow = true;
-  boat.add(bowLight);
-
-  const keel = new THREE.Mesh(new THREE.ConeGeometry(0.96, 10.45, 4), hullMaterial);
-  keel.rotation.z = Math.PI / 2;
-  keel.rotation.y = Math.PI / 4;
-  keel.scale.set(1, 0.32, 0.58);
-  keel.position.set(-0.72, -0.73, 0);
-  keel.castShadow = true;
-  boat.add(keel);
-
-  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.82, 2.0, 3.62), trimMaterial);
-  stern.position.set(-6.22, 0.04, 0);
-  stern.castShadow = true;
-  boat.add(stern);
-
-  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.38, 3.18), trimMaterial);
-  rearDeck.position.set(-4.55, 1.18, 0);
+  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.34, 2.96), deckMaterial);
+  rearDeck.position.set(-4.18, 1.06, 0);
   rearDeck.castShadow = true;
   boat.add(rearDeck);
 
-  for (const side of [-1, 1]) {
-    const gunwale = new THREE.Mesh(new THREE.BoxGeometry(10.25, 0.3, 0.28), trimMaterial);
-    gunwale.position.set(-0.5, 1.16, side * 1.84);
-    gunwale.castShadow = true;
-    boat.add(gunwale);
+  const centerDeck = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.28, 2.86), deckMaterial);
+  centerDeck.position.set(-0.64, 1.05, 0);
+  centerDeck.castShadow = true;
+  boat.add(centerDeck);
+
+  const stern = new THREE.Mesh(new THREE.BoxGeometry(0.54, 1.52, 3.22), darkTrimMaterial);
+  stern.position.set(-6.62, 0.08, 0);
+  stern.castShadow = true;
+  boat.add(stern);
+
+  for (let index = 0; index < 6; index += 1) {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.045, 0.055), creamMaterial);
+    stripe.position.set(0.1, 1.235 + index * 0.004, -1.08 + index * 0.43);
+    stripe.castShadow = false;
+    boat.add(stripe);
   }
 
-  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.82, 1.82), trimMaterial);
-  cockpit.position.set(1.0, 1.58, 0);
+  const centerSeam = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.055, 0.08), darkTrimMaterial);
+  centerSeam.position.set(0.38, 1.28, 0);
+  centerSeam.castShadow = false;
+  boat.add(centerSeam);
+
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.64, 1.8), darkTrimMaterial);
+  cockpit.position.set(0.42, 1.45, 0);
   cockpit.castShadow = true;
   boat.add(cockpit);
 
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.98, 1.98), windshieldMaterial);
-  windshield.position.set(2.26, 2.08, 0);
-  windshield.rotation.z = -0.18;
+  const cockpitInset = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.26, 1.28), motorMaterial);
+  cockpitInset.position.set(0.28, 1.76, 0);
+  cockpitInset.castShadow = true;
+  boat.add(cockpitInset);
+
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.72, 2.15), windshieldMaterial);
+  windshield.position.set(2.18, 1.90, 0);
+  windshield.rotation.z = -0.24;
   boat.add(windshield);
 
-  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.22, 1.7, 1.3), motorMaterial);
-  motor.position.set(-7.0, 0.28, 0);
+  const windshieldCap = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 2.34), creamMaterial);
+  windshieldCap.position.set(2.14, 2.28, 0);
+  windshieldCap.rotation.z = -0.24;
+  boat.add(windshieldCap);
+
+  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.08, 1.6, 1.16), motorMaterial);
+  motor.position.set(-7.18, 0.10, 0);
   motor.castShadow = true;
   boat.add(motor);
 
-  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.54, 0.94), bowMarkerMaterial);
-  motorCap.position.set(-7.62, 0.88, 0);
+  const motorCap = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.46, 0.90), creamMaterial);
+  motorCap.position.set(-7.78, 0.70, 0);
   motorCap.castShadow = true;
   boat.add(motorCap);
 
-  const propGuard = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.44, 1.68), motorMaterial);
-  propGuard.position.set(-8.02, -0.18, 0);
+  const propGuard = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.42, 1.58), motorMaterial);
+  propGuard.position.set(-8.12, -0.38, 0);
   propGuard.castShadow = true;
   boat.add(propGuard);
 
-  const benchA = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.25, 3.0), trimMaterial);
-  benchA.position.set(-2.1, 1.28, 0);
+  const benchA = new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.22, 2.22), trimMaterial);
+  benchA.position.set(-1.72, 1.58, 0);
   benchA.castShadow = true;
   boat.add(benchA);
 
   const benchB = benchA.clone();
-  benchB.position.x = 2.74;
+  benchB.position.x = 1.12;
   boat.add(benchB);
 
-  const deckLineMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf0d9a6,
-    roughness: 0.38,
-  });
   for (const side of [-1, 1]) {
-    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(10.65, 0.14, 0.14), deckLineMaterial);
-    rubRail.position.set(-0.44, 0.76, side * 2.12);
-    rubRail.castShadow = true;
-    boat.add(rubRail);
+    const sidePlank = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.065, 0.06), creamMaterial);
+    sidePlank.position.set(-0.10, 1.17, side * 1.18);
+    sidePlank.castShadow = false;
+    boat.add(sidePlank);
   }
 
-  const sternPlate = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, 2.2), deckLineMaterial);
-  sternPlate.position.set(-6.65, 0.84, 0);
+  const bowLight = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.22, 0.38), creamMaterial);
+  bowLight.position.set(6.84, 1.02, 0);
+  bowLight.castShadow = true;
+  boat.add(bowLight);
+
+  const sternPlate = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 2.1), creamMaterial);
+  sternPlate.position.set(-6.88, 0.72, 0);
   sternPlate.castShadow = true;
   boat.add(sternPlate);
 
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 1.5, 4, 8), personMaterial);
-  body.position.set(-0.42, 2.75, 0);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.50, 1.16, 4, 8), personMaterial);
+  body.position.set(-0.30, 2.46, 0);
   body.rotation.z = -0.12;
   body.castShadow = true;
   boat.add(body);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 12), skinMaterial);
-  head.position.set(-0.84, 3.8, 0);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 12), skinMaterial);
+  head.position.set(-0.70, 3.24, 0);
   head.castShadow = true;
   boat.add(head);
 

@@ -299,25 +299,6 @@ export const createForestSystem = (): ForestSystem => {
   scenicSilhouettes.instanceMatrix.needsUpdate = true;
   group.add(scenicSilhouettes);
 
-  const reflectionMaterial = new THREE.MeshBasicMaterial({
-    color: 0x010b0c,
-    transparent: true,
-    opacity: 0.16,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const reflectionGroup = new THREE.Group();
-  reflectionGroup.name = "Treeline fake reflection strips";
-  for (let index = 0; index < 7; index += 1) {
-    const reflection = new THREE.Mesh(new THREE.PlaneGeometry(240 + index * 74, 24 + index * 7), reflectionMaterial);
-    reflection.name = "Cheap treeline water reflection";
-    reflection.rotation.x = -Math.PI / 2;
-    reflection.position.set(-520 + index * 176, 0.22 + index * 0.002, -188 + Math.sin(index) * 18);
-    reflection.rotation.z = (index - 3) * 0.032;
-    reflectionGroup.add(reflection);
-  }
-  group.add(reflectionGroup);
-
   return {
     group,
     update: (elapsed, weather) => {
@@ -350,12 +331,6 @@ export const createForestSystem = (): ForestSystem => {
             ? 0.46 + weather.dials.skyDark * 0.05
             : 0.36 + weather.dials.skyDark * 0.05;
       forestDepthMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x071012 : 0x08221d);
-      reflectionMaterial.opacity =
-        activePreset === "Performance"
-          ? 0
-          : activePreset === "Scenic"
-            ? 0.19 + (1 - weather.dials.skyDark) * 0.04
-            : 0.13 + (1 - weather.dials.skyDark) * 0.03;
     },
     getStats: () => ({
       treeInstances:
@@ -374,7 +349,6 @@ export const createForestSystem = (): ForestSystem => {
       activePreset = preset;
       scenicSilhouettes.visible = !scenicTreelineActive && preset === "Scenic";
       forestDepthMass.visible = !scenicTreelineActive && preset !== "Performance";
-      reflectionGroup.visible = preset !== "Performance";
     },
     setScenicTreelineActive: (active) => {
       scenicTreelineActive = active;
