@@ -142,8 +142,8 @@ const createOrganicWaterGeometry = () => {
 
 export const createWater = (): WaterSurface => {
   const geometry = createOrganicWaterGeometry();
-  const normalMap = createWaterNormalTexture(320, 17);
-  const detailNormalMap = createWaterNormalTexture(224, 41);
+  const normalMap = createWaterNormalTexture(384, 17);
+  const detailNormalMap = createWaterNormalTexture(256, 41);
   let currentPreset: WaterQualityPreset = "Balanced";
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -189,8 +189,8 @@ export const createWater = (): WaterSurface => {
         vDepth = depthFactor;
         vSand = sandFactor;
         vShore = shoreFactor;
-        float waveSpeed = 0.44 + uWind * 1.48 + uRain * 0.42;
-        float waveHeight = (0.096 + uChop * 1.86 + uRain * 0.27) * (0.30 + vDepth * 0.70);
+        float waveSpeed = 0.48 + uWind * 1.58 + uRain * 0.44;
+        float waveHeight = (0.108 + uChop * 1.96 + uRain * 0.29) * (0.30 + vDepth * 0.70);
         float speedWake = clamp(abs(uBoatSpeed) / 100.0, 0.0, 1.0);
         float distanceToBoat = distance(position.xz, uBoatPos);
         float localWake = smoothstep(46.0, 10.0, distanceToBoat) *
@@ -198,16 +198,19 @@ export const createWater = (): WaterSurface => {
           sin(distanceToBoat * 0.26 - uTime * 5.2);
         float tidal = sin(position.x * 0.0022 - position.z * 0.0031 + uTime * (0.032 + uWind * 0.018)) *
           waveHeight *
-          0.52;
+          0.56;
         float breeze = sin(position.x * 0.018 - position.z * 0.012 + uTime * (0.18 + uWind * 0.22)) *
           waveHeight *
-          (0.25 + uWind * 0.16);
+          (0.30 + uWind * 0.18);
         float lakeBreath = sin(position.x * -0.006 + position.z * 0.011 + uTime * (0.092 + uWind * 0.046)) *
           waveHeight *
-          0.36;
+          0.42;
         float travelingRipple = sin(position.x * 0.030 + position.z * -0.021 + uTime * (0.44 + uWind * 0.34)) *
           waveHeight *
-          (0.10 + uWind * 0.08);
+          (0.14 + uWind * 0.10);
+        float glassRoll = sin(position.x * 0.0044 + position.z * -0.0036 + uTime * (0.052 + uWind * 0.040)) *
+          waveHeight *
+          0.38;
         float longWave = sin(position.x * 0.010 + position.z * 0.0045 + uTime * waveSpeed) * waveHeight;
         float crossWave = cos(position.x * -0.0075 + position.z * 0.017 + uTime * waveSpeed * 0.72) *
           waveHeight *
@@ -217,7 +220,7 @@ export const createWater = (): WaterSurface => {
           (0.012 + uChop * 0.11 + uRain * 0.035) *
           (0.24 + vDepth * 0.76);
         vec3 displaced = position;
-        displaced.y += (tidal + breeze + lakeBreath + travelingRipple + longWave + crossWave + micro) * (1.0 - vShore * 0.54) + localWake * 0.16;
+        displaced.y += (tidal + breeze + lakeBreath + travelingRipple + glassRoll + longWave + crossWave + micro) * (1.0 - vShore * 0.54) + localWake * 0.16;
         vWake = localWake;
         vec4 worldPosition = modelMatrix * vec4(displaced, 1.0);
         vWorldPos = worldPosition.xyz;
@@ -251,14 +254,15 @@ export const createWater = (): WaterSurface => {
       varying float vWake;
 
       vec3 sampleNormal(vec2 uv) {
-        float t = uTime * (0.66 + uWind * 1.34 + uChop * 1.26 + uRain * 0.48);
+        float t = uTime * (0.74 + uWind * 1.42 + uChop * 1.34 + uRain * 0.50);
         vec3 n1 = texture2D(uNormalMap, uv * 0.014 + vec2(t * 0.0066, t * 0.0038)).rgb;
         vec3 n2 = texture2D(uNormalMap, uv * 0.037 + vec2(-t * 0.0080, t * 0.0058)).rgb;
         vec3 n3 = texture2D(uDetailNormalMap, uv * 0.102 + vec2(t * 0.0050, -t * 0.0078)).rgb;
         vec3 n4 = texture2D(uDetailNormalMap, uv * 0.188 + vec2(-t * 0.0040, t * 0.0090)).rgb;
         vec3 n5 = texture2D(uDetailNormalMap, uv * 0.292 + vec2(t * 0.0025, t * 0.0104)).rgb;
-        vec3 n = (n1 * 0.38 + n2 * 0.29 + n3 * 0.18 + n4 * 0.10 + n5 * 0.05) * 2.0 - 1.0;
-        return normalize(vec3(n.x, 1.76, n.z));
+        vec3 n6 = texture2D(uDetailNormalMap, uv * 0.420 + vec2(-t * 0.0018, t * 0.0118)).rgb;
+        vec3 n = (n1 * 0.35 + n2 * 0.28 + n3 * 0.18 + n4 * 0.10 + n5 * 0.06 + n6 * 0.03) * 2.0 - 1.0;
+        return normalize(vec3(n.x, 1.66, n.z));
       }
 
       void main() {
@@ -266,7 +270,7 @@ export const createWater = (): WaterSurface => {
         float dist = length(uCamPos - vWorldPos);
         float detailFade = exp(-dist * 0.0032);
         vec3 normal = sampleNormal(vWorldPos.xz);
-        float normalStrength = (0.30 + uWind * 0.12 + uRain * 0.17 + uChop * uChop * 1.04) * (0.42 + detailFade * 0.58);
+        float normalStrength = (0.34 + uWind * 0.14 + uRain * 0.18 + uChop * uChop * 1.10) * (0.44 + detailFade * 0.56);
         normal = normalize(mix(vec3(0.0, 1.0, 0.0), normal, normalStrength));
 
         float facing = max(dot(viewDir, normal), 0.0);
@@ -303,35 +307,34 @@ export const createWater = (): WaterSurface => {
         vec3 forestMirror = mix(vec3(0.008, 0.036, 0.032), vec3(0.026, 0.076, 0.062), forestColumns);
         float reflectedForest = 0.34 + farBand * 0.28 + smoothstep(-260.0, 120.0, vWorldPos.z) * 0.05;
         vec3 reflectedMood = mix(skyMirror, forestMirror, reflectedForest);
-        reflectedMood += vec3(0.096, 0.180, 0.190) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.54;
+        reflectedMood += vec3(0.104, 0.194, 0.204) * skySwell * openWater * (1.0 - uDark * 0.36) * 0.60;
 
-        float reflectionAmount = clamp((fresnel * 0.94 + farBand * 0.24 + openWater * 0.20) * uReflectionStrength * (1.0 - uRain * 0.15), 0.0, 0.94);
+        float reflectionAmount = clamp((fresnel * 0.98 + farBand * 0.26 + openWater * 0.22) * uReflectionStrength * (1.0 - uRain * 0.15), 0.0, 0.95);
         vec3 color = mix(base, reflectedMood, reflectionAmount);
 
         float nearCamera = smoothstep(720.0, 100.0, dist);
         float midWave = sin(vWorldPos.x * 0.012 + vWorldPos.z * 0.009 + uTime * (0.116 + uWind * 0.084)) * 0.5 + 0.5;
         midWave = mix(midWave, sin(vWorldPos.x * -0.009 + vWorldPos.z * 0.014 - uTime * (0.102 + uWind * 0.052)) * 0.5 + 0.5, 0.34);
-        float windSheet = sin(vWorldPos.x * 0.022 - vWorldPos.z * 0.016 + uTime * (0.29 + uWind * 0.34)) * 0.5 + 0.5;
-        float fineRipple = sin(vWorldPos.x * 0.054 + vWorldPos.z * 0.035 + uTime * (0.64 + uChop * 0.48 + uWind * 0.24)) * 0.5 + 0.5;
-        fineRipple *= sin(vWorldPos.x * -0.030 + vWorldPos.z * 0.050 - uTime * (0.50 + uRain * 0.30)) * 0.5 + 0.5;
-        float glassRipple = sin(vWorldPos.x * 0.084 - vWorldPos.z * 0.059 + uTime * (0.94 + uWind * 0.40)) * 0.5 + 0.5;
-        glassRipple *= sin(vWorldPos.x * -0.071 + vWorldPos.z * 0.078 - uTime * 0.76) * 0.5 + 0.5;
-        float threadRipple = sin(vWorldPos.x * 0.145 + vWorldPos.z * -0.108 + uTime * (1.18 + uWind * 0.34)) * 0.5 + 0.5;
-        threadRipple *= sin(vWorldPos.x * -0.126 + vWorldPos.z * 0.118 - uTime * 1.04) * 0.5 + 0.5;
-        float cloudMood = sin(vWorldPos.x * 0.0024 + vWorldPos.z * 0.0033 + uTime * 0.010) * 0.5 + 0.5;
-        cloudMood = mix(cloudMood, sin(vWorldPos.x * -0.0018 + vWorldPos.z * 0.0022 - uTime * 0.008) * 0.5 + 0.5, 0.45);
+        float windSheet = sin(vWorldPos.x * 0.022 - vWorldPos.z * 0.016 + uTime * (0.34 + uWind * 0.38)) * 0.5 + 0.5;
+        float fineRipple = sin(vWorldPos.x * 0.056 + vWorldPos.z * 0.037 + uTime * (0.74 + uChop * 0.54 + uWind * 0.28)) * 0.5 + 0.5;
+        fineRipple *= sin(vWorldPos.x * -0.032 + vWorldPos.z * 0.052 - uTime * (0.58 + uRain * 0.32)) * 0.5 + 0.5;
+        float glassRipple = sin(vWorldPos.x * 0.088 - vWorldPos.z * 0.062 + uTime * (1.06 + uWind * 0.46)) * 0.5 + 0.5;
+        glassRipple *= sin(vWorldPos.x * -0.076 + vWorldPos.z * 0.083 - uTime * 0.86) * 0.5 + 0.5;
+        float threadRipple = sin(vWorldPos.x * 0.156 + vWorldPos.z * -0.116 + uTime * (1.34 + uWind * 0.40)) * 0.5 + 0.5;
+        threadRipple *= sin(vWorldPos.x * -0.136 + vWorldPos.z * 0.126 - uTime * 1.18) * 0.5 + 0.5;
+        float needleRipple = sin(vWorldPos.x * 0.245 + vWorldPos.z * 0.172 + uTime * (1.62 + uWind * 0.44)) * 0.5 + 0.5;
+        needleRipple *= sin(vWorldPos.x * -0.218 + vWorldPos.z * 0.236 - uTime * 1.44) * 0.5 + 0.5;
         float calmMotion = bodyWave * 0.5 + (midWave - 0.5) * 0.34 + (windSheet - 0.5) * 0.14;
-        color *= 0.992 + calmMotion * openWater * (1.0 - uDark * 0.24) * (0.044 + uWind * 0.014);
-        color *= 1.0 - smoothstep(0.58, 0.96, cloudMood) * openWater * (0.016 + uDark * 0.014);
-        color += vec3(0.070, 0.172, 0.204) * (midWave - 0.45) * openWater * (0.18 + nearCamera * 0.20) * (1.0 - uDark * 0.18);
-        color += vec3(0.38, 0.60, 0.67) * pow(fineRipple, 2.45) * openWater * (0.19 + nearCamera * 0.40) * (0.13 + uChop * 0.18 + uWind * 0.07);
-        float rippleLace = pow(max(0.0, fineRipple * 0.50 + windSheet * 0.24 + glassRipple * 0.18 + threadRipple * 0.08), 3.9);
-        color += vec3(0.46, 0.74, 0.80) * rippleLace * openWater * (0.13 + nearCamera * 0.21) * (1.0 - uDark * 0.38);
-        float softSparkle = pow(max(0.0, fineRipple * 0.56 + glassRipple * 0.30 + threadRipple * 0.14), 4.1) * smoothstep(0.16, 0.86, skySwell) * detailFade;
-        color += vec3(0.62, 0.91, 0.95) * softSparkle * openWater * (0.20 + nearCamera * 0.29) * (1.0 - uDark * 0.38);
-        float glintLane = pow(max(0.0, windSheet * 0.42 + glassRipple * 0.42 + threadRipple * 0.16), 6.4) * smoothstep(0.18, 0.94, fresnel);
-        glintLane *= (0.40 + nearCamera * 0.72) * openWater * (1.0 - uDark * 0.46);
-        color += vec3(0.86, 0.99, 1.0) * glintLane * (0.13 + uWind * 0.05 + uChop * 0.05);
+        color *= 0.992 + calmMotion * openWater * (1.0 - uDark * 0.24) * (0.052 + uWind * 0.018);
+        color += vec3(0.074, 0.184, 0.214) * (midWave - 0.44) * openWater * (0.21 + nearCamera * 0.22) * (1.0 - uDark * 0.18);
+        color += vec3(0.41, 0.64, 0.70) * pow(fineRipple, 2.28) * openWater * (0.22 + nearCamera * 0.46) * (0.14 + uChop * 0.19 + uWind * 0.08);
+        float rippleLace = pow(max(0.0, fineRipple * 0.44 + windSheet * 0.22 + glassRipple * 0.18 + threadRipple * 0.10 + needleRipple * 0.06), 3.65);
+        color += vec3(0.50, 0.78, 0.83) * rippleLace * openWater * (0.16 + nearCamera * 0.25) * (1.0 - uDark * 0.38);
+        float softSparkle = pow(max(0.0, fineRipple * 0.48 + glassRipple * 0.29 + threadRipple * 0.15 + needleRipple * 0.08), 3.75) * smoothstep(0.14, 0.84, skySwell) * detailFade;
+        color += vec3(0.66, 0.94, 0.98) * softSparkle * openWater * (0.24 + nearCamera * 0.34) * (1.0 - uDark * 0.38);
+        float glintLane = pow(max(0.0, windSheet * 0.36 + glassRipple * 0.39 + threadRipple * 0.17 + needleRipple * 0.08), 5.8) * smoothstep(0.16, 0.94, fresnel);
+        glintLane *= (0.44 + nearCamera * 0.78) * openWater * (1.0 - uDark * 0.46);
+        color += vec3(0.90, 1.0, 1.0) * glintLane * (0.15 + uWind * 0.06 + uChop * 0.055);
 
         float causticA = sin(vWorldPos.x * 0.055 + vWorldPos.z * 0.030 + uTime * 0.20);
         float causticB = sin(vWorldPos.x * -0.038 + vWorldPos.z * 0.060 - uTime * 0.17);
@@ -378,7 +381,7 @@ export const createWater = (): WaterSurface => {
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = "Single-surface world-space procedural lake water";
   mesh.receiveShadow = true;
-  mesh.position.y = 0;
+  mesh.position.y = -0.035;
   mesh.renderOrder = 5;
   const position = geometry.attributes.position;
   const surface: WaterSurface = {

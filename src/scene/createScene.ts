@@ -39,6 +39,7 @@ type HashlakeScene = {
 
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
 const BOAT_HOME = new THREE.Vector3(0, 2.2, 0);
+const BOAT_WATERLINE_SINK = 0.26;
 const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
 const SCENIC_CAMERA_STORAGE_KEY = "hashlake.scenicCamera.v1";
 const DRIVE_ACCELERATION_BASE = 23;
@@ -600,6 +601,7 @@ export const createHashlakeScene = ({
   };
   boat.position.x = driveState.x;
   boat.position.z = driveState.z;
+  boat.position.y = BOAT_HOME.y - BOAT_WATERLINE_SINK;
   boat.rotation.y = getVisualRotationForHeading(driveState.yaw);
   const input: DriveInput = {
     forward: false,
@@ -1378,25 +1380,25 @@ const createLakeFill = () => {
   );
   const islandHole = new THREE.Path();
   islandHole.absellipse(
-    LAKE_MAP.island.center.x,
-    LAKE_MAP.island.center.z,
-    LAKE_MAP.island.radiusX + 6,
-    LAKE_MAP.island.radiusZ + 4,
+    LAKE_FEATURE_FOOTPRINTS.island.center.x,
+    LAKE_FEATURE_FOOTPRINTS.island.center.z,
+    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
     0,
     Math.PI * 2,
     true,
-    LAKE_MAP.island.rotation,
+    LAKE_FEATURE_FOOTPRINTS.island.rotation,
   );
   const sandbarHole = new THREE.Path();
   sandbarHole.absellipse(
-    LAKE_MAP.sandbar.center.x,
-    LAKE_MAP.sandbar.center.z,
-    LAKE_MAP.sandbar.radiusX + 8,
-    LAKE_MAP.sandbar.radiusZ + 3,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.center.x,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.center.z,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
     0,
     Math.PI * 2,
     true,
-    LAKE_MAP.sandbar.rotation,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
   );
   shape.holes.push(islandHole, sandbarHole);
   const material = new THREE.MeshBasicMaterial({
@@ -1785,7 +1787,10 @@ const animateBoat = (
   boat.position.x = driveState.x;
   boat.position.z = driveState.z;
   boat.position.y =
-    BOAT_HOME.y + hop * 2.2 + Math.sin(elapsed * speed) * (0.24 + instability * 1.2);
+    BOAT_HOME.y -
+    BOAT_WATERLINE_SINK +
+    hop * 2.2 +
+    Math.sin(elapsed * speed) * (0.18 + instability * 1.08);
   boat.rotation.z =
     Math.sin(elapsed * (0.9 + instability)) * (0.05 + instability * 0.25) - turnBank;
   boat.rotation.x =
@@ -1821,31 +1826,6 @@ const createStripGeometry = (
   return geometry;
 };
 
-const createOrganicEllipseOutline = (
-  center: { x: number; z: number },
-  radiusX: number,
-  radiusZ: number,
-  rotation: number,
-  seed: number,
-  wobble = 0.04,
-  count = 64,
-) =>
-  Array.from({ length: count }, (_, index) => {
-    const angle = (index / count) * Math.PI * 2;
-    const ripple =
-      1 +
-      Math.sin(angle * 3 + seed) * wobble +
-      Math.sin(angle * 7 + seed * 0.43) * wobble * 0.42;
-    const localX = Math.cos(angle) * radiusX * ripple;
-    const localZ = Math.sin(angle) * radiusZ * (1 + (ripple - 1) * 0.72);
-    const cos = Math.cos(rotation);
-    const sin = Math.sin(rotation);
-    return {
-      x: center.x + localX * cos - localZ * sin,
-      z: center.z + localX * sin + localZ * cos,
-    };
-  });
-
 const createOrganicEllipseStripGeometry = (
   innerRadiusX: number,
   innerRadiusZ: number,
@@ -1855,11 +1835,70 @@ const createOrganicEllipseStripGeometry = (
   outerSeed: number,
   wobble = 0.035,
   count = 80,
-) =>
-  createStripGeometry(
-    createOrganicEllipseOutline({ x: 0, z: 0 }, innerRadiusX, innerRadiusZ, 0, innerSeed, wobble, count),
-    createOrganicEllipseOutline({ x: 0, z: 0 }, outerRadiusX, outerRadiusZ, 0, outerSeed, wobble, count),
-  );
+) => {
+  const inner: { x: number; z: number }[] = [];
+  const outer: { x: number; z: number }[] = [];
+  const minGapX = Math.max(4, (outerRadiusX - innerRadiusX) * 0.22);
+  const minGapZ = Math.max(2, (outerRadiusZ - innerRadiusZ) * 0.22);
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = (index / count) * Math.PI * 2;
+    const shared =
+      Math.sin(angle * 2.7 + innerSeed * 0.29) * wobble +
+      Math.cos(angle * 4.6 + outerSeed * 0.17) * wobble * 0.42 +
+      Math.sin(angle * 7.9 + (innerSeed + outerSeed) * 0.08) * wobble * 0.18;
+    const innerNoise = shared * 0.42;
+    const outerNoise = shared * 0.72;
+    const innerX = innerRadiusX * (1 + innerNoise);
+    const innerZ = innerRadiusZ * (1 + innerNoise * 0.72);
+    const outerX = Math.max(innerX + minGapX, outerRadiusX * (1 + outerNoise));
+    const outerZ = Math.max(innerZ + minGapZ, outerRadiusZ * (1 + outerNoise * 0.72));
+
+    inner.push({
+      x: Math.cos(angle) * innerX,
+      z: Math.sin(angle) * innerZ,
+    });
+    outer.push({
+      x: Math.cos(angle) * outerX,
+      z: Math.sin(angle) * outerZ,
+    });
+  }
+
+  return createStripGeometry(inner, outer);
+};
+
+const createEllipseFillGeometry = (
+  radiusX: number,
+  radiusZ: number,
+  seed = 0,
+  wobble = 0,
+  count = 128,
+) => {
+  const positions: number[] = [0, 0, 0];
+  const indices: number[] = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = (index / count) * Math.PI * 2;
+    const noise =
+      Math.sin(angle * 2.4 + seed * 0.19) * wobble +
+      Math.cos(angle * 5.1 + seed * 0.31) * wobble * 0.42;
+    positions.push(
+      Math.cos(angle) * radiusX * (1 + noise),
+      0,
+      Math.sin(angle) * radiusZ * (1 + noise * 0.7),
+    );
+  }
+
+  for (let index = 0; index < count; index += 1) {
+    indices.push(0, ((index + 1) % count) + 1, index + 1);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
 
 const createShoreline = () => {
   const group = new THREE.Group();
@@ -1869,7 +1908,7 @@ const createShoreline = () => {
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x64776c,
+    color: 0x87917d,
     roughness: 0.96,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
@@ -1891,7 +1930,7 @@ const createShoreline = () => {
     side: THREE.DoubleSide,
   });
   const landMaterial = new THREE.MeshStandardMaterial({
-    color: 0x14291c,
+    color: 0x1b3022,
     roughness: 0.92,
   });
   const land = new THREE.Mesh(
@@ -1907,14 +1946,14 @@ const createShoreline = () => {
     createStripGeometry(getExpandedOutline(-58), getExpandedOutline(-22)),
     shallowFadeMaterial,
   );
-  shallowFade.position.y = 0.035;
+  shallowFade.position.y = 0.025;
   group.add(shallowFade);
 
   const wetSand = new THREE.Mesh(
     createStripGeometry(LAKE_OUTLINE, getExpandedOutline(13)),
     wetSandMaterial,
   );
-  wetSand.position.y = 0.18;
+  wetSand.position.y = 0.2;
   wetSand.receiveShadow = true;
   group.add(wetSand);
 
@@ -1922,7 +1961,7 @@ const createShoreline = () => {
     createStripGeometry(getExpandedOutline(13), getExpandedOutline(LAKE_MAP.shorelineWidth)),
     sandMaterial,
   );
-  shoreline.position.y = 0.28;
+  shoreline.position.y = 0.34;
   shoreline.receiveShadow = true;
   group.add(shoreline);
 
@@ -1933,7 +1972,7 @@ const createShoreline = () => {
       roughness: 0.96,
     }),
   );
-  grassTransition.position.y = 0.38;
+  grassTransition.position.y = 0.46;
   grassTransition.receiveShadow = true;
   group.add(grassTransition);
 
@@ -1941,7 +1980,7 @@ const createShoreline = () => {
     createStripGeometry(getExpandedOutline(34), getExpandedOutline(62)),
     bankMaterial,
   );
-  raisedBank.position.y = 0.54;
+  raisedBank.position.y = 0.62;
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
@@ -1949,7 +1988,7 @@ const createShoreline = () => {
     createStripGeometry(getExpandedOutline(-32), LAKE_OUTLINE),
     shallowMaterial,
   );
-  shallow.position.y = 0.055;
+  shallow.position.y = 0.045;
   group.add(shallow);
 
   return group;
@@ -1981,12 +2020,6 @@ const createDestinationMarkers = () => {
     emissive: 0x302a1d,
     emissiveIntensity: 0.045,
     roughness: 0.88,
-  });
-  const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xc0bea4,
-    emissive: 0x343226,
-    emissiveIntensity: 0.07,
-    roughness: 0.96,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x9be1d4,
@@ -2102,31 +2135,19 @@ const createDestinationMarkers = () => {
   sandbarHalo.rotation.y = -sandbarFootprint.rotation;
   group.add(sandbarHalo);
 
-  const sandbarBank = new THREE.Mesh(
-    createOrganicEllipseStripGeometry(
-      sandbarFootprint.dry.radiusX,
-      sandbarFootprint.dry.radiusZ,
-      sandbarFootprint.wetOuter.radiusX,
-      sandbarFootprint.wetOuter.radiusZ,
-      19,
-      23,
-      0.03,
-      96,
+  const sandbar = new THREE.Mesh(
+    createEllipseFillGeometry(
+      sandbarFootprint.dry.radiusX + 3,
+      sandbarFootprint.dry.radiusZ + 2,
+      61,
+      0.004,
+      128,
     ),
-    wetSandMaterial,
+    sandMaterial,
   );
-  sandbarBank.name = "Sandbar wet edge";
-  sandbarBank.position.set(sandbarCenter.x, 0.22, sandbarCenter.z);
-  sandbarBank.rotation.y = -sandbarFootprint.rotation;
-  sandbarBank.receiveShadow = true;
-  group.add(sandbarBank);
-
-  const sandbar = new THREE.Mesh(new THREE.CircleGeometry(1, 128), sandMaterial);
   sandbar.name = "Sandbar";
   sandbar.position.set(sandbarCenter.x, 0.36, sandbarCenter.z);
-  sandbar.rotation.x = -Math.PI / 2;
-  sandbar.rotation.z = sandbarFootprint.rotation;
-  sandbar.scale.set(sandbarFootprint.dry.radiusX, sandbarFootprint.dry.radiusZ, 1);
+  sandbar.rotation.y = -sandbarFootprint.rotation;
   sandbar.receiveShadow = true;
   group.add(sandbar);
 
@@ -2199,21 +2220,35 @@ const createDestinationMarkers = () => {
   islandHalo.rotation.y = -islandFootprint.rotation;
   island.add(islandHalo);
 
-  const islandBeach = new THREE.Mesh(new THREE.CircleGeometry(1, 128), sandMaterial);
+  const islandBeach = new THREE.Mesh(
+    createEllipseFillGeometry(
+      islandFootprint.dry.radiusX + 3,
+      islandFootprint.dry.radiusZ + 2,
+      73,
+      0.003,
+      128,
+    ),
+    sandMaterial,
+  );
   islandBeach.name = "White sand island beach";
   islandBeach.position.set(islandCenter.x, 0.39, islandCenter.z);
-  islandBeach.rotation.x = -Math.PI / 2;
-  islandBeach.rotation.z = islandFootprint.rotation;
-  islandBeach.scale.set(islandFootprint.dry.radiusX, islandFootprint.dry.radiusZ, 1);
+  islandBeach.rotation.y = -islandFootprint.rotation;
   islandBeach.receiveShadow = true;
   island.add(islandBeach);
 
-  const islandRockShelf = new THREE.Mesh(new THREE.CircleGeometry(1, 72), islandShelfMaterial);
+  const islandRockShelf = new THREE.Mesh(
+    createEllipseFillGeometry(
+      islandFootprint.blocker.radiusX * 0.3,
+      islandFootprint.blocker.radiusZ * 0.34,
+      79,
+      0.018,
+      72,
+    ),
+    islandShelfMaterial,
+  );
   islandRockShelf.name = "Island rock shelf";
   islandRockShelf.position.set(islandCenter.x, 0.51, islandCenter.z);
-  islandRockShelf.rotation.x = -Math.PI / 2;
-  islandRockShelf.rotation.z = islandFootprint.rotation;
-  islandRockShelf.scale.set(islandFootprint.blocker.radiusX * 0.3, islandFootprint.blocker.radiusZ * 0.34, 1);
+  islandRockShelf.rotation.y = -islandFootprint.rotation;
   islandRockShelf.receiveShadow = true;
   island.add(islandRockShelf);
   for (let index = 0; index < 8; index += 1) {
@@ -2271,34 +2306,96 @@ const createSunDisc = () => {
   return sun;
 };
 
+const createSeededRandom = (seed: number) => {
+  let state = seed >>> 0;
+  return () => {
+    state ^= state << 13;
+    state >>>= 0;
+    state ^= state >> 17;
+    state >>>= 0;
+    state ^= state << 5;
+    state >>>= 0;
+    return state / 4294967296;
+  };
+};
+
+const createCloudWispTexture = (seed: number) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 384;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return null;
+  }
+
+  const random = createSeededRandom(seed);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.globalCompositeOperation = "lighter";
+
+  for (let index = 0; index < 30; index += 1) {
+    const x = canvas.width * (0.08 + random() * 0.84);
+    const y = canvas.height * (0.26 + random() * 0.48);
+    const radiusX = 28 + random() * 86;
+    const radiusY = 10 + random() * 28;
+    const gradient = context.createRadialGradient(x, y, 0, x, y, Math.max(radiusX, radiusY));
+    const opacity = 0.045 + random() * 0.08;
+    gradient.addColorStop(0, `rgba(255,255,255,${opacity})`);
+    gradient.addColorStop(0.46, `rgba(225,235,232,${opacity * 0.52})`);
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    context.save();
+    context.translate(x, y);
+    context.rotate((random() - 0.5) * 0.42);
+    context.scale(radiusX / Math.max(radiusY, 1), 1);
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(0, 0, radiusY, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  context.globalCompositeOperation = "source-over";
+  const fade = context.createLinearGradient(0, 0, canvas.width, 0);
+  fade.addColorStop(0, "rgba(255,255,255,0)");
+  fade.addColorStop(0.18, "rgba(255,255,255,0.85)");
+  fade.addColorStop(0.82, "rgba(255,255,255,0.85)");
+  fade.addColorStop(1, "rgba(255,255,255,0)");
+  context.globalCompositeOperation = "destination-in";
+  context.fillStyle = fade;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+};
+
 const createClouds = () => {
   const group = new THREE.Group();
-  group.name = "Distributed atmospheric cloud banks";
-  const puffGeometry = new THREE.SphereGeometry(1, 14, 9);
+  group.name = "Wispy atmospheric cloud banks";
+  const planeGeometry = new THREE.PlaneGeometry(1, 1, 1, 1);
+  const cloudTextures = [createCloudWispTexture(101), createCloudWispTexture(211), createCloudWispTexture(337)].filter(
+    (texture): texture is THREE.CanvasTexture => texture !== null,
+  );
+  if (cloudTextures.length === 0) {
+    return group;
+  }
   const cloudConfigs = [
-    { x: -620, y: 118, z: -360, scale: 1.42, width: 86, depth: 28, puffs: 8, phase: 0.2 },
-    { x: -420, y: 132, z: -430, scale: 1.16, width: 118, depth: 34, puffs: 9, phase: 1.8 },
-    { x: -230, y: 106, z: -250, scale: 0.94, width: 78, depth: 26, puffs: 7, phase: 3.0 },
-    { x: -60, y: 142, z: -520, scale: 1.34, width: 142, depth: 42, puffs: 10, phase: 4.4 },
-    { x: 180, y: 122, z: -330, scale: 1.12, width: 110, depth: 34, puffs: 8, phase: 5.8 },
-    { x: 430, y: 136, z: -420, scale: 1.28, width: 132, depth: 36, puffs: 10, phase: 7.3 },
-    { x: 640, y: 112, z: -250, scale: 1.02, width: 82, depth: 28, puffs: 7, phase: 8.5 },
-    { x: -560, y: 126, z: 6, scale: 0.88, width: 84, depth: 30, puffs: 6, phase: 9.7 },
-    { x: -160, y: 150, z: 64, scale: 1.08, width: 114, depth: 38, puffs: 8, phase: 11.0 },
-    { x: 240, y: 142, z: 24, scale: 0.96, width: 96, depth: 32, puffs: 7, phase: 12.5 },
-    { x: 560, y: 124, z: 80, scale: 0.82, width: 78, depth: 26, puffs: 6, phase: 13.8 },
+    { x: -610, y: 188, z: -650, scale: 1.0, width: 270, depth: 30, wisps: 4, phase: 0.2, yaw: 0.08 },
+    { x: -330, y: 214, z: -720, scale: 1.12, width: 330, depth: 38, wisps: 5, phase: 1.8, yaw: -0.04 },
+    { x: -70, y: 176, z: -560, scale: 0.92, width: 230, depth: 28, wisps: 4, phase: 3.1, yaw: 0.13 },
+    { x: 210, y: 206, z: -690, scale: 1.08, width: 310, depth: 36, wisps: 5, phase: 4.7, yaw: -0.10 },
+    { x: 520, y: 184, z: -610, scale: 0.94, width: 260, depth: 30, wisps: 4, phase: 6.0, yaw: 0.06 },
+    { x: -500, y: 162, z: -330, scale: 0.72, width: 190, depth: 24, wisps: 3, phase: 7.4, yaw: -0.16 },
+    { x: -150, y: 232, z: -820, scale: 0.86, width: 260, depth: 34, wisps: 4, phase: 8.9, yaw: 0.04 },
+    { x: 390, y: 156, z: -300, scale: 0.70, width: 180, depth: 22, wisps: 3, phase: 10.3, yaw: 0.18 },
+    { x: 690, y: 224, z: -760, scale: 0.82, width: 220, depth: 32, wisps: 3, phase: 11.6, yaw: -0.08 },
   ];
 
   cloudConfigs.forEach((config, bankIndex) => {
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xd8dfd6,
-      roughness: 0.82,
-      transparent: true,
-      opacity: 0.4,
-      depthWrite: false,
-    });
     const cloud = new THREE.Group();
-    cloud.name = "Atmospheric cloud bank";
+    cloud.name = "Wispy cloud bank";
     cloud.position.set(config.x, config.y, config.z);
     cloud.scale.setScalar(config.scale);
     cloud.userData.baseX = config.x;
@@ -2307,27 +2404,37 @@ const createClouds = () => {
     cloud.userData.baseScale = config.scale;
     cloud.userData.phase = config.phase;
 
-    for (let puff = 0; puff < config.puffs; puff += 1) {
-      const t = config.puffs <= 1 ? 0.5 : puff / (config.puffs - 1);
-      const side = (t - 0.5) * config.width * 0.64;
-      const layer = Math.sin((puff + bankIndex) * 1.7);
-      const heightLayer = Math.sin(config.phase * 0.9 + puff * 1.13);
-      const mesh = new THREE.Mesh(puffGeometry, material);
+    for (let wisp = 0; wisp < config.wisps; wisp += 1) {
+      const t = config.wisps <= 1 ? 0.5 : wisp / (config.wisps - 1);
+      const side = (t - 0.5) * config.width;
+      const layer = Math.sin((wisp + bankIndex) * 1.41);
+      const material = new THREE.MeshBasicMaterial({
+        map: cloudTextures[(bankIndex + wisp) % cloudTextures.length],
+        color: 0xdfe8e3,
+        transparent: true,
+        opacity: 0.20 + (wisp % 3) * 0.035,
+        depthWrite: false,
+        depthTest: true,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(planeGeometry, material);
+      mesh.name = "Wispy cloud veil";
       mesh.position.set(
-        side + Math.sin(config.phase + puff * 1.4) * 15,
-        heightLayer * 7.2 + (puff % 4 === 0 ? 5.8 : 0),
-        layer * config.depth * 0.82 + Math.cos(config.phase + puff * 0.9) * 8,
+        side + Math.sin(config.phase + wisp * 1.13) * 18,
+        Math.sin(config.phase * 0.7 + wisp * 1.17) * 11,
+        layer * config.depth + Math.cos(config.phase + wisp * 0.8) * 9,
       );
       mesh.scale.set(
-        14 + (puff % 3) * 4.2 + Math.sin(config.phase + puff) * 1.8,
-        7.6 + (puff % 3) * 2.1,
-        12 + (puff % 4) * 3.4,
+        118 + (wisp % 3) * 34 + Math.sin(config.phase + wisp) * 16,
+        28 + (wisp % 2) * 12,
+        1,
       );
       mesh.rotation.set(
-        Math.sin(config.phase + puff) * 0.08,
-        config.phase * 0.17 + puff * 0.11,
-        Math.cos(config.phase + puff) * 0.04,
+        Math.sin(config.phase + wisp) * 0.035,
+        config.yaw + Math.sin(config.phase + wisp * 0.8) * 0.16,
+        Math.cos(config.phase + wisp) * 0.085,
       );
+      mesh.userData.baseOpacity = material.opacity;
       cloud.add(mesh);
     }
 
@@ -2813,12 +2920,13 @@ const applyWeatherToScene = ({
       baseY - dark * 14 + Math.sin(elapsed * 0.12 + phase) * 1.2,
       baseZ + Math.cos(elapsed * 0.014 + phase * 0.7) * (2.2 + weather.dials.wind * 4.2),
     );
-    cloud.scale.setScalar(baseScale * (1 + dark * 0.34 + weather.dials.wind * 0.05));
+    cloud.scale.setScalar(baseScale * (1 + dark * 0.18 + weather.dials.wind * 0.04));
     cloud.children.forEach((child) => {
-      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
         cloudColorScratch.setHex(dark > 0.48 ? palette.stormTint : 0xd8dfd6);
         child.material.color.copy(cloudColorScratch);
-        child.material.opacity = 0.38 + dark * 0.18 + weather.dials.fog * 0.06;
+        const baseOpacity = Number(child.userData.baseOpacity ?? 0.22);
+        child.material.opacity = baseOpacity * (0.82 + dark * 0.42 + weather.dials.fog * 0.24);
       }
     });
   });
