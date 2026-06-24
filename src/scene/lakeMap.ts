@@ -420,12 +420,42 @@ export const getLakeNormalizedPosition = (point: LakePoint) => {
   };
 };
 
+const getPolygonSignedArea = (points: readonly LakePoint[]) => {
+  let area = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index];
+    const next = points[(index + 1) % points.length];
+    area += current.x * next.z - next.x * current.z;
+  }
+  return area * 0.5;
+};
+
+const lakeWinding = Math.sign(getPolygonSignedArea(LAKE_OUTLINE)) || 1;
+
 export const getExpandedOutline = (amount: number) =>
-  LAKE_OUTLINE.map((point) => {
-    const length = Math.max(1, Math.hypot(point.x, point.z));
+  LAKE_OUTLINE.map((point, index) => {
+    const previous = LAKE_OUTLINE[(index - 1 + LAKE_OUTLINE.length) % LAKE_OUTLINE.length];
+    const next = LAKE_OUTLINE[(index + 1) % LAKE_OUTLINE.length];
+    const inX = point.x - previous.x;
+    const inZ = point.z - previous.z;
+    const outX = next.x - point.x;
+    const outZ = next.z - point.z;
+    const inLength = Math.max(1, Math.hypot(inX, inZ));
+    const outLength = Math.max(1, Math.hypot(outX, outZ));
+    const inNormal = {
+      x: lakeWinding * (inZ / inLength),
+      z: lakeWinding * (-inX / inLength),
+    };
+    const outNormal = {
+      x: lakeWinding * (outZ / outLength),
+      z: lakeWinding * (-outX / outLength),
+    };
+    const normalX = inNormal.x + outNormal.x;
+    const normalZ = inNormal.z + outNormal.z;
+    const normalLength = Math.max(0.001, Math.hypot(normalX, normalZ));
     return {
-      x: point.x + (point.x / length) * amount,
-      z: point.z + (point.z / length) * amount,
+      x: point.x + (normalX / normalLength) * amount,
+      z: point.z + (normalZ / normalLength) * amount,
     };
   });
 

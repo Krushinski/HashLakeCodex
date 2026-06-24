@@ -1,12 +1,12 @@
 # Blender Zone Prep
 
-Phase 47 uses Blender only for a three-tree alpha test. This note defines the scene zones that are ready for future controlled Blender exploration and which systems should stay native/procedural.
+Phase 48 uses Blender only for a corrected three-tree alpha test. This note defines the scene zones that are ready for future controlled Blender exploration and which systems should stay native/procedural.
 
 ## Water surface
 
 - Current native state: one shader-driven lake mesh with procedural normal textures, storm/weather uniforms, land-aware rings, motor wake blocks, BTC splashes, and New Block pulse visibility.
 - Current weaknesses: high-end reflection realism is still approximated; shader zoning must stay subtle to avoid dark slabs or fake-object artifacts.
-- Topology readiness: water mask and feature holes are coherent enough for asset-adjacent shoreline work, but water itself should remain native.
+- Topology readiness: Phase 48 removed the stale hidden lake-fill/inverted-hole layer and tightened water tile sampling so island/sandbar/shore blockers no longer leave dark animated water fragments under land.
 - Future Blender role: none for water surface; Blender may provide shoreline rocks, docks, or reflected silhouettes only as real geometry above land.
 - Keep native: water shader, weather mapping, ripples, wakes, splashes, rings, and all runtime motion.
 - Risk: any transparent fake reflection strip can recreate the old UFO artifact; avoid large water-plane overlays.
@@ -15,7 +15,7 @@ Phase 47 uses Blender only for a three-tree alpha test. This note defines the sc
 
 - Current native state: smoothed polygon outline with raised bank, wet edge, shallow strip, and drive/collision boundaries derived from the same map.
 - Current weaknesses: some full-perimeter silhouette sections still feel procedural and faceted at close angles.
-- Topology readiness: ready for lightweight accent placement, but not for replacing collision.
+- Topology readiness: ready for lightweight accent placement, but not for replacing collision. Phase 48 changed shoreline expansion from radial-from-origin offsets to averaged shoreline-normal offsets so wet/shallow/land bands agree better with the actual coast.
 - Future Blender role: modular low-poly shoreline shelves, rocky caps, and terrain transition pieces that sit above the existing outline.
 - Keep native: collision, minimap, ripple blocking, drive boundaries, lake outline, and shoreline masks.
 - Risk: imported shore pieces must not disagree with `lakeMap.ts` or visible boat collision will feel wrong.
@@ -112,8 +112,9 @@ Phase 47 uses Blender only for a three-tree alpha test. This note defines the sc
 
 ## Tree alpha assets
 
-- Current native state: three controlled Blender-generated low-poly tree alpha GLBs now exist in `public/assets/models/`: tall pine, short pine, and layered conifer.
-- Current weaknesses: only six sample placements are used; this is deliberately not a forest replacement.
+- Current native state: three corrected Blender-generated low-poly tree alpha GLBs now exist in `public/assets/models/`: tall pine, short pine, and layered conifer.
+- Current weaknesses: only six corrected sample placements are used in one dock/reed-side test cluster; this is deliberately not a forest replacement.
+- Correction notes: Phase 48 regenerated the GLBs with attached trunks, dark materials, base origins, and a loader-side scale/material normalization plus cache-bust query. The bad tiny/white ghost-test placements near `-351, -218` and `501, -218` are not used.
 - Topology readiness: the foreground, midground, and semi-far shelves are ready for sparse alpha placement, but the full forest still needs a placement plan.
 - Future Blender role: expand from these alpha shapes into merged/instanced tree clusters and forest edge strips.
 - Keep native: quality gates, fallback cone forest, wind sway system, far silhouette bands, and scene/collision boundaries.

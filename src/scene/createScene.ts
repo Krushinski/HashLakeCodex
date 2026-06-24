@@ -39,7 +39,7 @@ type HashlakeScene = {
 
 const CAMERA_HOME = new THREE.Vector3(0, 46, 126);
 const BOAT_HOME = new THREE.Vector3(0, 2.2, 0);
-const BOAT_WATERLINE_SINK = 1.16;
+const BOAT_WATERLINE_SINK = 1.22;
 const TABLEAU_STORAGE_KEY = "hashlake.tableau.v1";
 const SCENIC_CAMERA_STORAGE_KEY = "hashlake.scenicCamera.v1";
 const DRIVE_ACCELERATION_BASE = 23;
@@ -282,6 +282,13 @@ const CAMERA_PRESETS: CameraPreset[] = [
     height: 42,
     lookAhead: 9,
     lookHeight: 4.4,
+  },
+  {
+    name: "Vice City",
+    distance: 112,
+    height: 82,
+    lookAhead: 5,
+    lookHeight: 3.8,
   },
 ];
 
@@ -543,8 +550,6 @@ export const createHashlakeScene = ({
 
   const skyDome = createSkyDome();
   scene.add(skyDome.mesh);
-  const lakeFill = createLakeFill();
-  scene.add(lakeFill);
   const water = createWater();
   scene.add(water.mesh);
   const shoreline = createShoreline();
@@ -830,7 +835,6 @@ export const createHashlakeScene = ({
       skyDome,
       horizonHaze,
       water,
-      lakeFill,
       sunDisc,
       clouds,
       weather,
@@ -1383,48 +1387,6 @@ const createSkyDome = (): SkyDome => {
   return { mesh };
 };
 
-const createLakeFill = () => {
-  const shape = new THREE.Shape(
-    LAKE_OUTLINE.map((point) => new THREE.Vector2(point.x, point.z)),
-  );
-  const islandHole = new THREE.Path();
-  islandHole.absellipse(
-    LAKE_FEATURE_FOOTPRINTS.island.center.x,
-    LAKE_FEATURE_FOOTPRINTS.island.center.z,
-    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
-    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
-    0,
-    Math.PI * 2,
-    true,
-    LAKE_FEATURE_FOOTPRINTS.island.rotation,
-  );
-  const sandbarHole = new THREE.Path();
-  sandbarHole.absellipse(
-    LAKE_FEATURE_FOOTPRINTS.sandbar.center.x,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.center.z,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
-    0,
-    Math.PI * 2,
-    true,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
-  );
-  shape.holes.push(islandHole, sandbarHole);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x020911,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 12), material);
-  mesh.name = "Blue lake depth fill";
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = -0.08;
-  mesh.visible = false;
-  return mesh;
-};
-
 const createSpeedboatHullGeometry = () => {
   const geometry = new THREE.BoxGeometry(14.4, 1.86, 3.32, 22, 4, 5);
   const positions = geometry.attributes.position as THREE.BufferAttribute;
@@ -1509,8 +1471,8 @@ const createBoat = () => {
     roughness: 0.82,
   });
   const hatMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8e5d2d,
-    roughness: 0.76,
+    color: 0xb68a45,
+    roughness: 0.82,
   });
   const skinMaterial = new THREE.MeshStandardMaterial({
     color: 0xc58f65,
@@ -1657,18 +1619,20 @@ const createBoat = () => {
   nose.castShadow = true;
   passenger.add(nose);
 
-  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.055, 18), hatMaterial);
-  hatBrim.name = "Wide-brim fisherman hat";
-  hatBrim.position.set(0.42, 1.62, 0);
-  hatBrim.rotation.z = -0.06;
-  hatBrim.castShadow = true;
-  passenger.add(hatBrim);
+  const conicalHat = new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.30, 24), hatMaterial);
+  conicalHat.name = "Chinese conical passenger hat";
+  conicalHat.position.set(0.42, 1.66, 0);
+  conicalHat.rotation.z = -0.06;
+  conicalHat.scale.y = 0.72;
+  conicalHat.castShadow = true;
+  passenger.add(conicalHat);
 
-  const hatCrown = new THREE.Mesh(new THREE.ConeGeometry(0.30, 0.34, 16), hatMaterial);
-  hatCrown.name = "Fisherman hat crown";
-  hatCrown.position.set(0.42, 1.82, 0);
-  hatCrown.castShadow = true;
-  passenger.add(hatCrown);
+  const hatRim = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.018, 6, 24), hatMaterial);
+  hatRim.name = "Conical hat low rim";
+  hatRim.position.set(0.42, 1.55, 0);
+  hatRim.rotation.x = Math.PI / 2;
+  hatRim.rotation.z = -0.06;
+  passenger.add(hatRim);
 
   for (const side of [-1, 1]) {
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.54, 4, 6), jacketMaterial);
@@ -3005,7 +2969,6 @@ type WeatherSceneTargets = {
   skyDome: SkyDome;
   horizonHaze: THREE.Group;
   water: WaterSurface;
-  lakeFill: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
   sunDisc: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   clouds: THREE.Group;
   weather: WeatherSnapshot;
@@ -3061,7 +3024,6 @@ const applyWeatherToScene = ({
   skyDome,
   horizonHaze,
   water,
-  lakeFill,
   sunDisc,
   clouds,
   weather,
@@ -3114,8 +3076,6 @@ const applyWeatherToScene = ({
   sunDisc.material.color.setHex(palette.sunColor);
   sunDisc.visible = dark < 0.72 || fire > 0.38;
 
-  lakeFill.visible = false;
-  lakeFill.material.opacity = 0;
   water.mesh.visible = true;
 
   clouds.children.forEach((cloud, index) => {

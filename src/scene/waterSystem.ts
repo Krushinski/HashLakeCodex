@@ -55,7 +55,7 @@ const createOrganicWaterGeometry = () => {
   const sandFactors: number[] = [];
   const shoreFactors: number[] = [];
   const indices: number[] = [];
-  const step = 4.5;
+  const step = 4.0;
   const { minX, maxX, minZ, maxZ } = LAKE_MAP.mapBounds;
   const deepColor = new THREE.Color(0x022239);
   const midColor = new THREE.Color(0x064857);
@@ -107,6 +107,18 @@ const createOrganicWaterGeometry = () => {
     };
   };
 
+  const isStableWaterTile = (center: { x: number; z: number }) => {
+    const inset = step * 0.42;
+    const samples = [
+      center,
+      { x: center.x - inset, z: center.z - inset },
+      { x: center.x + inset, z: center.z - inset },
+      { x: center.x + inset, z: center.z + inset },
+      { x: center.x - inset, z: center.z + inset },
+    ];
+    return samples.every((sample) => isWater(sample) && distanceToShore(sample) > 0.55);
+  };
+
   for (let x = minX; x < maxX; x += step) {
     for (let z = minZ; z < maxZ; z += step) {
       const center = {
@@ -120,7 +132,7 @@ const createOrganicWaterGeometry = () => {
         { x: x + step, z: z + step },
         { x, z: z + step },
       ];
-      if (!isWater(center)) {
+      if (!isStableWaterTile(center)) {
         continue;
       }
 

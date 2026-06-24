@@ -36,6 +36,14 @@ const TREE_ALPHA_PATHS: Record<TreeAlphaAssetKey, string> = {
   layeredConifer: "assets/models/hl-tree-alpha-layered-conifer.glb",
 };
 
+const TREE_ALPHA_VERSION = "phase48";
+
+const TREE_ALPHA_TARGET_HEIGHTS: Record<TreeAlphaAssetKey, number> = {
+  tallPine: 30,
+  shortPine: 19,
+  layeredConifer: 24,
+};
+
 const treeAlphaPlacements: Array<{
   key: TreeAlphaAssetKey;
   x: number;
@@ -43,15 +51,12 @@ const treeAlphaPlacements: Array<{
   scale: number;
   yaw: number;
 }> = [
-  { key: "tallPine", x: -562, z: -286, scale: 1.14, yaw: 0.2 },
-  { key: "tallPine", x: 520, z: -228, scale: 1.04, yaw: 1.4 },
-  { key: "shortPine", x: -536, z: 220, scale: 1.18, yaw: 2.1 },
-  { key: "shortPine", x: 622, z: 206, scale: 0.98, yaw: -0.4 },
-  { key: "layeredConifer", x: -318, z: -360, scale: 1.05, yaw: 0.9 },
-  { key: "layeredConifer", x: 396, z: 300, scale: 0.94, yaw: -1.2 },
-  { key: "tallPine", x: 224, z: 34, scale: 0.50, yaw: 0.6 },
-  { key: "shortPine", x: 266, z: 58, scale: 0.62, yaw: -0.5 },
-  { key: "layeredConifer", x: 246, z: 70, scale: 0.56, yaw: 1.2 },
+  { key: "tallPine", x: -92, z: -372, scale: 0.86, yaw: 0.2 },
+  { key: "tallPine", x: 122, z: -332, scale: 0.78, yaw: 1.4 },
+  { key: "shortPine", x: -46, z: -358, scale: 0.96, yaw: 2.1 },
+  { key: "shortPine", x: 78, z: -344, scale: 0.84, yaw: -0.4 },
+  { key: "layeredConifer", x: 18, z: -376, scale: 0.86, yaw: 0.9 },
+  { key: "layeredConifer", x: 160, z: -318, scale: 0.78, yaw: -1.2 },
 ];
 
 const outlinePosition = (index: number, offset: number, jitter: number) => {
@@ -348,12 +353,39 @@ export const createForestSystem = (): ForestSystem => {
   treeAlphaGroup.name = "Blender tree alpha sample";
   group.add(treeAlphaGroup);
 
-  const normalizeTreeAlpha = (scene: THREE.Group) => {
+  const normalizeTreeAlpha = (scene: THREE.Group, key: TreeAlphaAssetKey) => {
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = box.getSize(new THREE.Vector3());
+    const height = Math.max(0.001, size.y);
+    const targetHeight = TREE_ALPHA_TARGET_HEIGHTS[key];
+    const assetScale = targetHeight / height;
+    const center = box.getCenter(new THREE.Vector3());
+    scene.scale.multiplyScalar(assetScale);
+    scene.position.x -= center.x * assetScale;
+    scene.position.z -= center.z * assetScale;
+    scene.position.y -= box.min.y * assetScale;
     scene.traverse((child) => {
       child.frustumCulled = false;
       if (child instanceof THREE.Mesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+        const childName = child.name.toLowerCase();
+        const materialName = Array.isArray(child.material)
+          ? child.material.map((material) => material.name).join(" ")
+          : child.material.name;
+        const isTrunk = `${childName} ${materialName}`.toLowerCase().includes("trunk");
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material) => {
+          if ("color" in material) {
+            (material as THREE.MeshStandardMaterial).color.setHex(isTrunk ? 0x3b2718 : 0x123321);
+          }
+          if ("roughness" in material) {
+            (material as THREE.MeshStandardMaterial).roughness = 0.92;
+          }
+          if ("metalness" in material) {
+            (material as THREE.MeshStandardMaterial).metalness = 0;
+          }
+        });
       }
     });
   };
@@ -364,7 +396,7 @@ export const createForestSystem = (): ForestSystem => {
       .forEach((placement) => {
         const sample = source.clone(true);
         sample.name = `Tree alpha sample ${key}`;
-        sample.position.set(placement.x, 0.74, placement.z);
+        sample.position.set(placement.x, 0.68, placement.z);
         sample.rotation.y = placement.yaw;
         sample.scale.setScalar(placement.scale);
         treeAlphaGroup.add(sample);
@@ -374,12 +406,12 @@ export const createForestSystem = (): ForestSystem => {
 
   const loadTreeAlpha = (key: TreeAlphaAssetKey) => {
     treeAlphaStatuses[key] = "loading";
-    const url = `${import.meta.env.BASE_URL}${TREE_ALPHA_PATHS[key]}`;
+    const url = `${import.meta.env.BASE_URL}${TREE_ALPHA_PATHS[key]}?v=${TREE_ALPHA_VERSION}`;
     loader.load(
       url,
       (gltf) => {
         gltf.scene.name = `Loaded tree alpha ${key}`;
-        normalizeTreeAlpha(gltf.scene);
+        normalizeTreeAlpha(gltf.scene, key);
         placeTreeAlphaSamples(key, gltf.scene);
         treeAlphaStatuses[key] = "loaded";
       },
