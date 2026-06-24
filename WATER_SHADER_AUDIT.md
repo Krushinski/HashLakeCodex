@@ -72,3 +72,15 @@ Terrain integration changes:
 ## Phase 53 Follow-Up
 
 The translucent forest-ready overlay rings were removed because they looked like gray debug terrain. Terrain visibility is now carried by darker native bank/shelf materials plus raised thicket and rocky-bank patches around dock, reeds, cove, and rear shore. Water is unchanged structurally: still one shader mesh, no hidden under-lake land disk, no cloud-shadow water darkening, and no fake reflection planes.
+
+## Phase 54 Follow-Up
+
+The light gray island/sandbar triangles came from transparent auxiliary feature meshes: submerged ellipse fills, turquoise shallow strips, and halo strips sitting just above the water surface. They were redundant because the main shader already computes island/sandbar shallow influence from `LAKE_FEATURE_FOOTPRINTS`. Phase 54 removed those overlay meshes and keeps island/sandbar underwater color in the single water shader.
+
+Water and terrain changes:
+
+- Island and sandbar now use opaque raised dry-sand cores plus opaque wet-sand ramps; no transparent triangle-fan or halo geometry remains around them.
+- Shallow-to-deep feature blending now lives in `waterSystem.ts` through smoother sand/shallow/depth factors, reducing hard rings around the island and sandbar.
+- The shared lake outline was smoothed from 6 to 8 subdivisions so visible shoreline, water validity, collision, and ripple blocking continue to agree.
+- The raised bank, forest shelf, and mid-forest shelf were widened/lifted to strengthen the recessed container-lake read.
+- The Phase 49 rule remains intact: one main water mesh, no hidden under-lake land disk, no fake reflection planes, and no cloud-shadow water darkening.

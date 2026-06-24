@@ -4,26 +4,26 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Water surface
 
-- Current native state: one shader-driven lake mesh with procedural normal textures, storm/weather uniforms, land-aware rings, motor wake blocks, BTC splashes, and New Block pulse visibility.
+- Current native state: one shader-driven lake mesh with procedural normal textures, storm/weather uniforms, land-aware rings, motor wake blocks, BTC splashes, New Block pulse visibility, and Phase 54 shader-owned island/sandbar shallow zoning.
 - Current weaknesses: high-end reflection realism is still approximated; shader zoning must stay subtle to avoid dark slabs or fake-object artifacts.
-- Topology readiness: Phase 48 removed the stale hidden lake-fill/inverted-hole layer and tightened water tile sampling so island/sandbar/shore blockers no longer leave dark animated water fragments under land.
+- Topology readiness: Phase 48 removed the stale hidden lake-fill/inverted-hole layer and tightened water tile sampling so island/sandbar/shore blockers no longer leave dark animated water fragments under land. Phase 54 removed transparent shallow overlay cards around island/sandbar so underwater color now comes from the single water shader.
 - Future Blender role: none for water surface; Blender may provide shoreline rocks, docks, or reflected silhouettes only as real geometry above land.
 - Keep native: water shader, weather mapping, ripples, wakes, splashes, rings, and all runtime motion.
 - Risk: any transparent fake reflection strip can recreate the old UFO artifact; avoid large water-plane overlays.
 
 ## Main shoreline
 
-- Current native state: smoothed polygon outline with raised bank, wet edge, shallow strip, and drive/collision boundaries derived from the same map.
+- Current native state: smoother shared polygon outline with shallow water, wet edge, raised bank, forest shelf, mid-forest shelf, and drive/collision boundaries derived from the same map.
 - Current weaknesses: some full-perimeter silhouette sections still feel procedural and faceted at close angles.
-- Topology readiness: ready for lightweight accent placement, but not for replacing collision. Phase 48 changed shoreline expansion from radial-from-origin offsets to averaged shoreline-normal offsets so wet/shallow/land bands agree better with the actual coast.
+- Topology readiness: ready for lightweight accent placement, but not for replacing collision. Phase 54 strengthened the vertical terrain steps so future shore props can sit on raised green/earth bands instead of a flat gray perimeter.
 - Future Blender role: modular low-poly shoreline shelves, rocky caps, and terrain transition pieces that sit above the existing outline.
 - Keep native: collision, minimap, ripple blocking, drive boundaries, lake outline, and shoreline masks.
 - Risk: imported shore pieces must not disagree with `lakeMap.ts` or visible boat collision will feel wrong.
 
 ## Sandy shoreline / beach ramps
 
-- Current native state: pale sand and wet-edge feathers around the island/sandbar plus shallow shader zoning.
-- Current weaknesses: needs better micro-shape and rock/reed accents in future art passes, but Phase 52 replaced flat sand disks with native mounded/ramped landforms.
+- Current native state: pale raised sand cores and opaque wet-edge feathers around the island/sandbar plus single-shader shallow water zoning.
+- Current weaknesses: needs better micro-shape and rock/reed accents in future art passes, but Phase 54 reduced the broad dry footprint and removed the old transparent halo geometry that produced light gray triangle artifacts.
 - Topology readiness: feature footprints now align visible sand, blocker/collision, water validity, and shallow masks.
 - Future Blender role: gentle beach ramps, shell/stone clusters, and organic sand shelves as reusable pieces.
 - Keep native: broad sand fade, water zoning, and collision footprints.
@@ -31,7 +31,7 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Island
 
-- Current native state: enlarged coherent island footprint with white sand beach, wet feather, submerged sand, rock shelf, rocks, and small pines.
+- Current native state: coherent island footprint with smaller white sand beach, opaque wet feather, shader-driven submerged shallows, rock shelf, rocks, and small pines.
 - Current weaknesses: rock/tree detail remains toy-like and low density.
 - Topology readiness: ready for a small grounded island kit once Blender begins.
 - Future Blender role: low-poly island base, grounded rocks, roots, reed clumps, and an art-directed silhouette.
@@ -40,7 +40,7 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Sandbar
 
-- Current native state: long pale sandbar with coherent blocker/dry/wet/shallow footprints and subtle sand variation.
+- Current native state: long pale sandbar with smaller raised dry core, opaque wet feather, shader-driven shallow footprint, and subtle sand variation.
 - Current weaknesses: shape is still ellipse-derived, though less graphic than earlier ring/yolk versions.
 - Topology readiness: ready for a Blender sandbar silhouette that follows the current footprint.
 - Future Blender role: a low raised sand ridge with uneven edges and shallow wet shelves.
@@ -58,9 +58,9 @@ Phase 48 uses Blender only for a corrected three-tree alpha test. This note defi
 
 ## Foreground shore
 
-- Current native state: native sloped terrain bands, reeds, rocks, shoreline materials, and darker raised terrain shelves/patches behind the wet/sand edge.
-- Current weaknesses: foreground close-ups can reveal repeated primitive shapes and the shelf still needs handcrafted vertical variation.
-- Topology readiness: good for sparse accent kits, not full terrain replacement yet. The foreground shelf is intended for future shoreline trees and reeds without crowding the lake edge.
+- Current native state: native sloped terrain bands, reeds, rocks, shoreline materials, and darker raised terrain shelves/patches behind the wet/sand edge. Phase 54 widened and lifted the green/earth forest shelf for a clearer recessed-basin read.
+- Current weaknesses: foreground close-ups can reveal repeated primitive shapes and the shelf still needs handcrafted vertical variation and asset dressing.
+- Topology readiness: good for sparse accent kits, not full terrain replacement yet. The foreground shelf is now visibly ready for future shoreline trees, rocks, reeds, and small bank caps without crowding the lake edge.
 - Future Blender role: reusable reed beds, rock clusters, grass shelf pieces, and small wet-edge transitions.
 - Keep native: broad land mass and collision.
 - Risk: dense individual props can hurt mobile and low-end Drive Mode.

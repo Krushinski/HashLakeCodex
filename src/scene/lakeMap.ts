@@ -229,7 +229,7 @@ const smoothClosedPolygon = (points: readonly LakePoint[], subdivisions = 4) => 
   return smoothed;
 };
 
-export const LAKE_OUTLINE = smoothClosedPolygon(LAKE_MAP.outline, 6);
+export const LAKE_OUTLINE = smoothClosedPolygon(LAKE_MAP.outline, 8);
 
 export const getDistance = (a: LakePoint, b: LakePoint) =>
   Math.hypot(a.x - b.x, a.z - b.z);
