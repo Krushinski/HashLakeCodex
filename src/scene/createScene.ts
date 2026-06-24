@@ -290,6 +290,13 @@ const CAMERA_PRESETS: CameraPreset[] = [
     lookAhead: 118,
     lookHeight: 34,
   },
+  {
+    name: "Vice City",
+    distance: 218,
+    height: 142,
+    lookAhead: 166,
+    lookHeight: 54,
+  },
 ];
 
 const SCENIC_CAMERA_PRESETS: ScenicCameraPreset[] = [
