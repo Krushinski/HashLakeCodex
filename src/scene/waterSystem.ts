@@ -64,8 +64,8 @@ const createOrganicWaterGeometry = () => {
   const coveColor = new THREE.Color(0x041f30);
   const samplePoint = (point: { x: number; z: number }) => {
     const shoreDistance = Math.max(0, distanceToShore(point));
-    const shoreDepth = clamp(shoreDistance / 112, 0, 1);
-    const shoreFactor = 1 - clamp(shoreDistance / 72, 0, 1);
+    const shoreDepth = clamp(shoreDistance / 92, 0, 1);
+    const shoreFactor = 1 - clamp(shoreDistance / 58, 0, 1);
     const nearSandbar = ellipseInfluence(
       point,
       LAKE_FEATURE_FOOTPRINTS.sandbar,
@@ -100,7 +100,7 @@ const createOrganicWaterGeometry = () => {
     tint.lerp(coveColor, nearCove * 0.20);
 
     return {
-      depth: clamp(smoothstep(0, 1, shoreDepth) + nearCove * 0.06, 0.16, 1),
+      depth: clamp(smoothstep(0, 1, shoreDepth) + nearCove * 0.08, 0.18, 1),
       sand: clamp(nearSandbar + nearIsland * 0.64, 0, 1),
       shore: shoreFactor,
       tint,

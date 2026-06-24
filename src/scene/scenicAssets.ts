@@ -1,8 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { LAKE_FEATURE_FOOTPRINTS } from "./lakeMap";
 
-export type ScenicAssetKey = "mountain" | "treeline" | "shoreline" | "sandbarAlpha" | "islandSandAlpha";
+export type ScenicAssetKey = "mountain" | "treeline" | "shoreline";
 export type ScenicAssetLoadState = "fallback" | "loading" | "loaded" | "error";
 export type ScenicAssetStatuses = Record<ScenicAssetKey, ScenicAssetLoadState>;
 export type ScenicAssetQualityPreset = "Performance" | "Balanced" | "Scenic";
@@ -17,8 +16,6 @@ const ASSET_PATHS: Record<ScenicAssetKey, string> = {
   mountain: "assets/models/hl-mountain-backdrop-v1.glb",
   treeline: "assets/models/hl-far-treeline-v1.glb",
   shoreline: "assets/models/hl-shoreline-kit-v1.glb",
-  sandbarAlpha: "assets/models/hl-sandbar-alpha-v1.glb",
-  islandSandAlpha: "assets/models/hl-island-sand-alpha-v1.glb",
 };
 
 const scenicMaterials = {
@@ -27,21 +24,6 @@ const scenicMaterials = {
   mountainNear: new THREE.MeshBasicMaterial({ color: 0x0a1c1d, toneMapped: false }),
   mountainCap: new THREE.MeshBasicMaterial({ color: 0xd9ded6, toneMapped: false }),
   treeline: new THREE.MeshBasicMaterial({ color: 0x020b09, toneMapped: false }),
-  sandCore: new THREE.MeshStandardMaterial({ color: 0xd7cb9d, roughness: 0.92 }),
-  sandDamp: new THREE.MeshStandardMaterial({
-    color: 0xa99f7a,
-    roughness: 0.96,
-    transparent: true,
-    opacity: 0.82,
-    depthWrite: false,
-  }),
-  sandFeather: new THREE.MeshStandardMaterial({
-    color: 0x9ecfc0,
-    roughness: 0.98,
-    transparent: true,
-    opacity: 0.34,
-    depthWrite: false,
-  }),
 };
 
 const normalizeLoadedScene = (scene: THREE.Group, key: ScenicAssetKey) => {
@@ -61,13 +43,6 @@ const normalizeLoadedScene = (scene: THREE.Group, key: ScenicAssetKey) => {
               : scenicMaterials.mountainNear;
       } else if (key === "treeline") {
         child.material = scenicMaterials.treeline;
-      } else if (key === "sandbarAlpha" || key === "islandSandAlpha") {
-        child.material = [
-          scenicMaterials.sandCore,
-          scenicMaterials.sandDamp,
-          scenicMaterials.sandFeather,
-        ];
-        child.renderOrder = 7;
       }
     }
   });
@@ -82,8 +57,6 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
     mountain: "fallback",
     treeline: "fallback",
     shoreline: "fallback",
-    sandbarAlpha: "fallback",
-    islandSandAlpha: "fallback",
   };
 
   const loaded: Partial<Record<ScenicAssetKey, THREE.Group>> = {};
@@ -100,12 +73,6 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
     });
     loaded.shoreline?.traverse((child) => {
       child.visible = false;
-    });
-    loaded.sandbarAlpha?.traverse((child) => {
-      child.visible = useAssets;
-    });
-    loaded.islandSandAlpha?.traverse((child) => {
-      child.visible = useAssets;
     });
     if (loaded.mountain) {
       loaded.mountain.scale.set(scenic ? 1.08 : 1.02, scenic ? 1.56 : 1.34, 1);
@@ -133,26 +100,6 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
           gltf.scene.position.set(0, 0, 0);
           loaded.treeline = gltf.scene;
           group.add(gltf.scene);
-        } else if (key === "sandbarAlpha") {
-          gltf.scene.name = "Loaded Blender sandbar alpha v1";
-          gltf.scene.position.set(
-            LAKE_FEATURE_FOOTPRINTS.sandbar.center.x,
-            0.335,
-            LAKE_FEATURE_FOOTPRINTS.sandbar.center.z,
-          );
-          gltf.scene.rotation.y = -LAKE_FEATURE_FOOTPRINTS.sandbar.rotation;
-          loaded.sandbarAlpha = gltf.scene;
-          group.add(gltf.scene);
-        } else if (key === "islandSandAlpha") {
-          gltf.scene.name = "Loaded Blender island sand alpha v1";
-          gltf.scene.position.set(
-            LAKE_FEATURE_FOOTPRINTS.island.center.x,
-            0.355,
-            LAKE_FEATURE_FOOTPRINTS.island.center.z,
-          );
-          gltf.scene.rotation.y = -LAKE_FEATURE_FOOTPRINTS.island.rotation;
-          loaded.islandSandAlpha = gltf.scene;
-          group.add(gltf.scene);
         }
         applyVisibility();
       },
@@ -164,7 +111,7 @@ export const createScenicAssetSystem = (): ScenicAssetSystem => {
     );
   };
 
-  (["treeline", "sandbarAlpha", "islandSandAlpha"] as ScenicAssetKey[]).forEach(loadAsset);
+  (["treeline"] as ScenicAssetKey[]).forEach(loadAsset);
 
   return {
     group,

@@ -35,3 +35,25 @@ Phase 50 audit after the Phase 49 storm-reactive blob fix.
 ## Current Rule
 
 Keep one main shader water surface, no full hidden land disk under the lake, no fake reflection planes, and no cloud-shadow darkening on water.
+
+## Phase 51 Follow-Up
+
+The Phase 50 Blender sand alpha pair was removed from runtime and from the repository because it read as low-poly pasted geometry instead of natural shore treatment. The current sand/island treatment is back to the safer procedural geometry, with one bounded Poly Haven test texture: `coast_sand_01_diffuse_512.jpg`, a local 512px diffuse-only sand map used on sandbar/island materials with color fallback if it fails to load. There is no runtime external request for that texture.
+
+Visible and useful after inspection:
+
+- The single water shader mesh remains the only lake surface.
+- The generated normal maps, Fresnel/specular terms, basin depth blend, shallow/sandbar masks, boat contact sheen, wake blocks, BTC rings, and New Block rings are the meaningful water systems.
+- The deep/shallow mask is useful, but the perimeter shallow falloff was too wide; Phase 51 tightens it so deeper water occupies more of the lake center.
+- Stale/fog and lightning remain subtle but useful scene-level cues.
+
+Low-value or removed:
+
+- Blender sand alpha GLBs are removed.
+- The shoreline GLB remains a known fallback/status entry but is not loaded or visible.
+- Old fake reflection/cloud-shadow planes remain intentionally absent.
+
+Risky terms:
+
+- Any future hidden under-lake land, wide dark cloud mask, or fake reflection plane can recreate the Phase 49 black-blob failure.
+- Very broad shallow overlays can make the whole lake edge read as beach; keep sand concentrated at the island, sandbar, and a few selected pockets.

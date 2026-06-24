@@ -1983,28 +1983,32 @@ const createShoreline = () => {
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0x65705e,
+    color: 0x4d594d,
     roughness: 0.96,
   });
   const bankToeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x263729,
+    color: 0x203326,
     roughness: 0.98,
   });
   const bankMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2f4b34,
+    color: 0x34543a,
     roughness: 0.94,
+  });
+  const forestShelfMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1d3323,
+    roughness: 0.96,
   });
   const shallowMaterial = new THREE.MeshBasicMaterial({
     color: 0x93d8cb,
     transparent: true,
-    opacity: 0.038,
+    opacity: 0.032,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const shallowFadeMaterial = new THREE.MeshBasicMaterial({
     color: 0x6eb8b8,
     transparent: true,
-    opacity: 0.016,
+    opacity: 0.012,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -2012,24 +2016,24 @@ const createShoreline = () => {
     color: 0x1b3022,
     roughness: 0.92,
   });
-  const landInner = getExpandedOutline(LAKE_MAP.shorelineWidth + 26);
+  const landInner = getExpandedOutline(LAKE_MAP.shorelineWidth + 10);
   const land = new THREE.Mesh(
     createStripGeometry(landInner, createRadialBoundary(landInner, LAKE_MAP.worldRadius)),
     landMaterial,
   );
-  land.position.y = 0.56;
+  land.position.y = 0.70;
   land.receiveShadow = true;
   group.add(land);
 
   const shallowFade = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(-34), getExpandedOutline(-8)),
+    createStripGeometry(getExpandedOutline(-42), getExpandedOutline(-4)),
     shallowFadeMaterial,
   );
   shallowFade.position.y = 0.025;
   group.add(shallowFade);
 
   const wetSand = new THREE.Mesh(
-    createStripGeometry(LAKE_OUTLINE, getExpandedOutline(5)),
+    createStripGeometry(LAKE_OUTLINE, getExpandedOutline(4)),
     wetSandMaterial,
   );
   wetSand.position.y = 0.18;
@@ -2037,34 +2041,42 @@ const createShoreline = () => {
   group.add(wetSand);
 
   const shoreline = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(5), getExpandedOutline(18)),
+    createStripGeometry(getExpandedOutline(4), getExpandedOutline(15)),
     bankToeMaterial,
   );
-  shoreline.position.y = 0.34;
+  shoreline.position.y = 0.38;
   shoreline.receiveShadow = true;
   group.add(shoreline);
 
   const grassTransition = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(18), getExpandedOutline(54)),
+    createStripGeometry(getExpandedOutline(15), getExpandedOutline(62)),
     new THREE.MeshStandardMaterial({
-      color: 0x1b3321,
+      color: 0x213b27,
       roughness: 0.96,
     }),
   );
-  grassTransition.position.y = 0.58;
+  grassTransition.position.y = 0.64;
   grassTransition.receiveShadow = true;
   group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(12), getExpandedOutline(36)),
+    createStripGeometry(getExpandedOutline(8), getExpandedOutline(42)),
     bankMaterial,
   );
-  raisedBank.position.y = 0.74;
+  raisedBank.position.y = 0.86;
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
+  const forestShelf = new THREE.Mesh(
+    createStripGeometry(getExpandedOutline(42), getExpandedOutline(118)),
+    forestShelfMaterial,
+  );
+  forestShelf.position.y = 0.82;
+  forestShelf.receiveShadow = true;
+  group.add(forestShelf);
+
   const shallow = new THREE.Mesh(
-    createStripGeometry(getExpandedOutline(-18), LAKE_OUTLINE),
+    createStripGeometry(getExpandedOutline(-26), LAKE_OUTLINE),
     shallowMaterial,
   );
   shallow.position.y = 0.045;
@@ -2087,9 +2099,9 @@ const createShoreline = () => {
     group.add(pocket);
   };
 
-  addBeachPocket("dock", 34, 10, 0.42, 18, -10);
-  addBeachPocket("cove", 28, 8, -0.22, -32, 24);
-  addBeachPocket("reeds", 24, 6, 0.18, 18, -12);
+  addBeachPocket("dock", 28, 8, 0.42, 18, -10);
+  addBeachPocket("cove", 22, 6, -0.22, -32, 24);
+  addBeachPocket("reeds", 18, 5, 0.18, 18, -12);
 
   return group;
 };
@@ -2116,47 +2128,65 @@ const createDestinationMarkers = () => {
   group.name = "Phase 12 destination landmarks";
   const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
   const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe7dfc6,
-    emissive: 0x241e12,
-    emissiveIntensity: 0.035,
+    color: 0xffffff,
+    emissive: 0x7a6c42,
+    emissiveIntensity: 0.115,
     roughness: 0.88,
   });
   const wetSandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xbcb08d,
+    color: 0xb8ad8c,
     emissive: 0x1d1810,
-    emissiveIntensity: 0.025,
+    emissiveIntensity: 0.018,
     roughness: 0.94,
     transparent: true,
-    opacity: 0.36,
+    opacity: 0.24,
     depthWrite: false,
   });
   const sandPatchMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf0e8cf,
-    emissive: 0x211b10,
-    emissiveIntensity: 0.020,
+    color: 0xfff7dc,
+    emissive: 0x6f633c,
+    emissiveIntensity: 0.070,
     roughness: 0.92,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.22,
     depthWrite: false,
   });
+  new THREE.TextureLoader().load(
+    `${import.meta.env.BASE_URL}assets/textures/coast_sand_01_diffuse_512.jpg`,
+    (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2.8, 1.45);
+      texture.anisotropy = 4;
+      [sandMaterial, wetSandMaterial, sandPatchMaterial].forEach((material) => {
+        material.map = texture;
+        material.needsUpdate = true;
+      });
+    },
+    undefined,
+    () => {
+      // Color fallback keeps the scene booting if the optional Poly Haven test texture is unavailable.
+    },
+  );
   const submergedSandMaterial = new THREE.MeshBasicMaterial({
-    color: 0xb9e8d7,
+    color: 0xa8dccd,
     transparent: true,
-    opacity: 0.034,
+    opacity: 0.018,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const sandShallowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x9be1d4,
+    color: 0x8ed1c8,
     transparent: true,
-    opacity: 0.034,
+    opacity: 0.020,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const sandShallowFadeMaterial = new THREE.MeshBasicMaterial({
     color: 0x74beb8,
     transparent: true,
-    opacity: 0.014,
+    opacity: 0.007,
     depthWrite: false,
     side: THREE.DoubleSide,
   });

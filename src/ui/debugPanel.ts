@@ -130,8 +130,6 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Mountain asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Treeline asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Shoreline asset", value: "fallback", tone: "muted" },
-  { group: "weather", label: "Sandbar alpha", value: "fallback", tone: "muted" },
-  { group: "weather", label: "Island alpha", value: "fallback", tone: "muted" },
   { group: "weather", label: "Debug UI", value: "hidden", tone: "muted" },
   { group: "weather", label: "DOM cadence", value: "hidden idle", tone: "muted" },
   { group: "bitcoin", label: "Price", value: "$62,989" },
@@ -1089,8 +1087,6 @@ export const createDebugPanel = (
     setMetric("Mountain asset", telemetry.scenicAssets.mountain, getAssetTone(telemetry.scenicAssets.mountain));
     setMetric("Treeline asset", telemetry.scenicAssets.treeline, getAssetTone(telemetry.scenicAssets.treeline));
     setMetric("Shoreline asset", telemetry.scenicAssets.shoreline, getAssetTone(telemetry.scenicAssets.shoreline));
-    setMetric("Sandbar alpha", telemetry.scenicAssets.sandbarAlpha, getAssetTone(telemetry.scenicAssets.sandbarAlpha));
-    setMetric("Island alpha", telemetry.scenicAssets.islandSandAlpha, getAssetTone(telemetry.scenicAssets.islandSandAlpha));
     setMetric("Debug UI", "visible", "good");
     setMetric("DOM cadence", "250ms visible / hidden idle", "muted");
     setMetric("Boost", telemetry.boostActive ? "on" : "off", telemetry.boostActive ? "good" : "muted");
