@@ -16,6 +16,7 @@ import {
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { LAKE_MAP, LAKE_OUTLINE } from "../scene/lakeMap";
 import type { ScenicAssetStatuses } from "../scene/scenicAssets";
+import type { ScenicExperimentalStats } from "../scene/realismSpike";
 import type {
   NativeTreeTypeCounts,
   TreeAlphaAssetStatuses,
@@ -80,8 +81,11 @@ export type SceneTelemetry = {
   nearestLocation: string;
   savedTableau: boolean;
   fps: number;
+  frameTimeMs: number;
+  qualityPreset: "Performance" | "Balanced" | "Scenic";
   pixelRatio: number;
   renderScale: number;
+  scenicExperimental: ScenicExperimentalStats;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
   activeRings: number;
@@ -118,8 +122,18 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Data mode", value: "LIVE", tone: "good" },
   { group: "global", label: "Polling", value: "active", tone: "good" },
   { group: "global", label: "Staleness", value: "0%", tone: "good" },
+  { group: "global", label: "Three.js", value: "--", tone: "muted" },
+  { group: "global", label: "Renderer", value: "WebGLRenderer", tone: "muted" },
+  { group: "global", label: "WebGL2", value: "--", tone: "muted" },
+  { group: "global", label: "WebGPU", value: "--", tone: "muted" },
+  { group: "global", label: "Quality", value: "Balanced", tone: "muted" },
+  { group: "global", label: "Frame ms", value: "--" },
   { group: "global", label: "Pixel ratio", value: "1.00" },
   { group: "global", label: "Render scale", value: "1.00" },
+  { group: "global", label: "Scenic exp", value: "off", tone: "muted" },
+  { group: "global", label: "Spike verts", value: "0", tone: "muted" },
+  { group: "global", label: "Spike forest", value: "0", tone: "muted" },
+  { group: "global", label: "Height fog", value: "0", tone: "muted" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
   { group: "weather", label: "Wake blocks", value: "0" },
   { group: "weather", label: "Splash blocks", value: "0" },
@@ -1087,8 +1101,34 @@ export const createDebugPanel = (
       worldLockMetric.classList.toggle("debug-tone-bad", !telemetry.worldRotationLocked);
     }
 
+    setMetric("Three.js", `r${telemetry.scenicExperimental.threeRevision}`, "muted");
+    setMetric("Renderer", telemetry.scenicExperimental.rendererPath, "muted");
+    setMetric("WebGL2", telemetry.scenicExperimental.webgl2 ? "supported" : "no", telemetry.scenicExperimental.webgl2 ? "good" : "warn");
+    setMetric("WebGPU", telemetry.scenicExperimental.webgpu ? "available" : "deferred", telemetry.scenicExperimental.webgpu ? "good" : "muted");
+    setMetric("Quality", telemetry.qualityPreset, telemetry.qualityPreset === "Performance" ? "warn" : telemetry.qualityPreset === "Scenic" ? "good" : "muted");
+    setMetric("Frame ms", `${telemetry.frameTimeMs.toFixed(1)} ms`);
     setMetric("Pixel ratio", telemetry.pixelRatio.toFixed(2));
     setMetric("Render scale", telemetry.renderScale.toFixed(2));
+    setMetric(
+      "Scenic exp",
+      `${telemetry.scenicExperimental.active ? "on" : "off"} - ${telemetry.scenicExperimental.reason}`,
+      telemetry.scenicExperimental.active ? "good" : telemetry.scenicExperimental.requested ? "warn" : "muted",
+    );
+    setMetric(
+      "Spike verts",
+      String(telemetry.scenicExperimental.mountainVertices),
+      telemetry.scenicExperimental.active ? "good" : "muted",
+    );
+    setMetric(
+      "Spike forest",
+      String(telemetry.scenicExperimental.forestInstances),
+      telemetry.scenicExperimental.active ? "good" : "muted",
+    );
+    setMetric(
+      "Height fog",
+      `${telemetry.scenicExperimental.fogLayers} layers`,
+      telemetry.scenicExperimental.active ? "good" : "muted",
+    );
     setMetric("Wake blocks", String(telemetry.activeWakeBlocks));
     setMetric("Splash blocks", String(telemetry.activeEffectBlocks));
     setMetric("Rings", String(telemetry.activeRings));

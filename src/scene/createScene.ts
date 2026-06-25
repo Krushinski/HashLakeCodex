@@ -20,6 +20,12 @@ import {
 } from "./lakeMap";
 import { createPostSystem } from "./postSystem";
 import { createScenicAssetSystem, type ScenicAssetStatuses } from "./scenicAssets";
+import {
+  createRealismSpikeSystem,
+  detectRendererCapabilities,
+  isScenicExperimentalRequested,
+  type ScenicExperimentalStats,
+} from "./realismSpike";
 import { createTerrainSystem } from "./terrainSystem";
 import {
   type WaterSurface,
@@ -158,8 +164,11 @@ type SceneTelemetry = {
   nearestLocation: string;
   savedTableau: boolean;
   fps: number;
+  frameTimeMs: number;
+  qualityPreset: QualityPreset;
   pixelRatio: number;
   renderScale: number;
+  scenicExperimental: ScenicExperimentalStats;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
   activeRings: number;
@@ -557,6 +566,8 @@ export const createHashlakeScene = ({
   renderer.domElement.className = "hashlake-canvas";
   renderer.domElement.setAttribute("aria-label", "Realtime Hashlake scene");
   container.append(renderer.domElement);
+  const rendererCapabilities = detectRendererCapabilities(renderer);
+  const scenicExperimentalRequested = isScenicExperimentalRequested();
 
   const sunlight = new THREE.DirectionalLight(SCENARIO_PALETTES.Serene.directionalLight, 3.6);
   sunlight.position.set(-36, 72, 45);
@@ -580,6 +591,8 @@ export const createHashlakeScene = ({
   scene.add(terrainSystem.group);
   const forestSystem = createForestSystem();
   scene.add(forestSystem.group);
+  const realismSpikeSystem = createRealismSpikeSystem(rendererCapabilities);
+  scene.add(realismSpikeSystem.group);
   const scenicAssetSystem = createScenicAssetSystem();
   scene.add(scenicAssetSystem.group);
   const horizonHaze = createHorizonHaze();
@@ -745,6 +758,35 @@ export const createHashlakeScene = ({
     water.setQualityPreset(preset);
   };
 
+  const getScenicExperimentalGate = () => {
+    const eligible = rendererCapabilities.webgl2 && !isMobileViewport;
+    const autoRequested = qualityState.preset === "Scenic";
+    const requested = scenicExperimentalRequested || autoRequested;
+    const active =
+      requested &&
+      eligible &&
+      (scenicExperimentalRequested || qualityState.preset !== "Performance");
+    const reason = active
+      ? scenicExperimentalRequested
+        ? "local debug flag"
+        : "Scenic preset eligible"
+      : !requested
+        ? "not requested"
+        : !rendererCapabilities.webgl2
+            ? "requires WebGL2"
+            : isMobileViewport
+              ? "disabled on mobile viewport"
+              : qualityState.preset === "Performance"
+                ? "Performance fallback"
+                : "capability gate closed";
+    return {
+      requested,
+      eligible,
+      active,
+      reason,
+    };
+  };
+
   const governQuality = (delta: number, now: number) => {
     qualityState.frameAccumulator += delta;
     qualityState.frameCount += 1;
@@ -823,6 +865,8 @@ export const createHashlakeScene = ({
     const weather = weatherStore.getSnapshot();
     const scenicAssetStatuses = scenicAssetSystem.getStatuses();
     const scenicAssetsActive = qualityState.preset !== "Performance";
+    const scenicExperimentalGate = getScenicExperimentalGate();
+    realismSpikeSystem.setGate(scenicExperimentalGate);
     terrainSystem.setScenicBackdropActive(
       scenicAssetsActive &&
         (scenicAssetStatuses.mountain === "loaded" ||
@@ -835,6 +879,7 @@ export const createHashlakeScene = ({
     animateWater(water, elapsed, weather, driveState, camera);
     animateShoreline(shoreline, elapsed, weather);
     terrainSystem.update(weather, camera);
+    realismSpikeSystem.update(weather, camera, elapsed);
     if (elapsed - lastForestUpdateAt >= qualityState.forestUpdateInterval) {
       forestSystem.update(elapsed, weather);
       lastForestUpdateAt = elapsed;
@@ -1274,8 +1319,11 @@ export const createHashlakeScene = ({
           }).destination.label,
           savedTableau: driveState.hasSavedTableau,
           fps: qualityState.fps,
+          frameTimeMs: 1000 / Math.max(qualityState.fps, 0.001),
+          qualityPreset: qualityState.preset,
           pixelRatio: qualityState.pixelRatio,
           renderScale: qualityState.effectScale,
+          scenicExperimental: realismSpikeSystem.getStats(),
           activeWakeBlocks: getActiveWakeBlocks(),
           activeEffectBlocks: effectStats.splashBlocks,
           activeRings: effectStats.rings,
