@@ -131,7 +131,7 @@ export const createProceduralTexture = ({
           : kind === "wetSand"
             ? 0.40
             : kind === "forestFloor"
-              ? 0.48
+              ? 0.54
             : kind === "grass"
                 ? 0.48
                 : kind === "rock"

@@ -1984,19 +1984,19 @@ type MoundToneProfile = {
 };
 
 const sandMoundTone: MoundToneProfile = {
-  center: [2.70, 2.66, 2.48],
-  dry: [2.42, 2.34, 2.10],
+  center: [2.82, 2.80, 2.62],
+  dry: [2.52, 2.46, 2.20],
   damp: [1.20, 1.02, 0.68],
   edge: [0.78, 0.67, 0.46],
-  ripple: 0.0048,
+  ripple: 0.0038,
 };
 
 const sandbarMoundTone: MoundToneProfile = {
-  center: [2.82, 2.78, 2.58],
-  dry: [2.52, 2.44, 2.18],
+  center: [2.96, 2.94, 2.72],
+  dry: [2.62, 2.54, 2.28],
   damp: [1.22, 1.04, 0.70],
   edge: [0.78, 0.67, 0.46],
-  ripple: 0.0045,
+  ripple: 0.0036,
 };
 
 const rockMoundTone: MoundToneProfile = {
@@ -2135,9 +2135,9 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 905,
     size: 128,
-    base: 0x1f422b,
-    accent: 0x65724a,
-    dark: 0x122419,
+    base: 0x1b3c27,
+    accent: 0x63764a,
+    dark: 0x0f2318,
     color: 0xd4dec9,
     roughness: 0.98,
     side: THREE.DoubleSide,
@@ -2146,9 +2146,9 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 906,
     size: 128,
-    base: 0x15351f,
-    accent: 0x506141,
-    dark: 0x0d1a12,
+    base: 0x12311d,
+    accent: 0x516442,
+    dark: 0x09170f,
     color: 0xd0dcc7,
     roughness: 1,
     side: THREE.DoubleSide,
@@ -2157,9 +2157,9 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 907,
     size: 128,
-    base: 0x1a3d27,
-    accent: 0x5d6e46,
-    dark: 0x0f2016,
+    base: 0x173824,
+    accent: 0x60744a,
+    dark: 0x0b1d13,
     color: 0xd2deca,
     roughness: 0.98,
     side: THREE.DoubleSide,
@@ -2180,8 +2180,8 @@ const createShoreline = () => {
     createSlopedStripGeometry(
       landInner,
       createRadialBoundary(landInner, LAKE_MAP.worldRadius),
-      1.86,
-      2.20,
+      1.92,
+      2.30,
       22,
       0.018,
     ),
@@ -2219,14 +2219,14 @@ const createShoreline = () => {
   group.add(raisedBank);
 
   const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.42, 1.74, 37, 0.012),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.46, 1.82, 37, 0.012),
     forestShelfMaterial,
   );
   forestShelf.receiveShadow = true;
   group.add(forestShelf);
 
   const midForestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.74, 2.02, 43, 0.014),
+    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.82, 2.14, 43, 0.014),
     midForestMaterial,
   );
   midForestShelf.receiveShadow = true;
@@ -2269,9 +2269,9 @@ const createDestinationMarkers = () => {
     kind: "sand",
     seed: 821,
     size: 192,
-    base: 0xfffffb,
+    base: 0xffffff,
     accent: 0xffffff,
-    dark: 0xe8d6a2,
+    dark: 0xead8a4,
     color: 0xffffff,
     emissive: 0x3b3425,
     emissiveIntensity: 0.042,
