@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { WeatherSnapshot } from "../state/weatherEngine";
+import { LAKE_MAP, ZONE_TRUTH } from "./lakeMap";
 import { getWeatherPalette } from "./artDirection";
 import type { RendererCapabilityTelemetry } from "./realismSpike";
 import { GLSL_NOISE, makeNoise2D, makeRng } from "./scenicUtils";
@@ -67,11 +68,23 @@ type TerrainSampler = {
   maxY: number;
 };
 
+const SCENIC_ZONE = {
+  lakeContainerRadius: LAKE_MAP.worldRadius,
+  farForestNearZ: -760,
+  farForestFarZ: -1660,
+  foothillInnerRadius: LAKE_MAP.worldRadius + Math.max(320, ZONE_TRUTH.farForestMaxShoreClearance - 40),
+  foothillOuterRadius: LAKE_MAP.worldRadius + 700,
+  mountainInnerRadius: LAKE_MAP.worldRadius + 900,
+  mountainOuterRadius: LAKE_MAP.worldRadius + 1960,
+  terrainNearZ: -920,
+  terrainFarZ: -2520,
+  mountainHeightScale: 0.66,
+} as const;
 const TERRAIN_SEGMENTS_X = 256;
 const TERRAIN_SEGMENTS_Z = 88;
-const TERRAIN_WIDTH = 3300;
-const TERRAIN_NEAR_Z = -640;
-const TERRAIN_FAR_Z = -2320;
+const TERRAIN_WIDTH = 3600;
+const TERRAIN_NEAR_Z = SCENIC_ZONE.terrainNearZ;
+const TERRAIN_FAR_Z = SCENIC_ZONE.terrainFarZ;
 const FOREST_SPIRE_TARGET = 76000;
 const FOREST_CANOPY_TARGET = 16800;
 
@@ -146,7 +159,7 @@ const createHeightFunction = () => {
   };
 
   return (x: number, z: number) => {
-    const zDepth = THREE.MathUtils.clamp((-z - 600) / 1500, 0, 1);
+    const zDepth = THREE.MathUtils.clamp((-z - 900) / 1580, 0, 1);
     const xNorm = x / (TERRAIN_WIDTH * 0.5);
     const centerPeak = Math.exp(-((xNorm - 0.03) ** 2) / 0.038);
     const leftPeak = Math.exp(-((xNorm + 0.48) ** 2) / 0.024);
@@ -155,25 +168,32 @@ const createHeightFunction = () => {
     const farNeedles = Math.max(0, Math.sin((xNorm + 0.12) * 21.0)) * 0.11;
     const ridgeLine =
       0.18 +
-      centerPeak * 1.64 +
-      leftPeak * 0.92 +
-      rightPeak * 1.08 +
-      shoulder * 0.58 +
+      centerPeak * 1.22 +
+      leftPeak * 0.70 +
+      rightPeak * 0.82 +
+      shoulder * 0.44 +
       farNeedles +
-      eroded(x * 0.66, z * 0.76) * 0.92;
+      eroded(x * 0.66, z * 0.76) * 0.72;
     const valleyFloor = smoothBlend(0.0, 0.38, zDepth);
     const mountainRise = Math.pow(THREE.MathUtils.clamp(zDepth, 0, 1), 1.05);
     const ravines =
       Math.abs(noise.fbm(x * 0.012 + 41.0, z * 0.010 - 17.0, 4)) *
-      126 *
+      86 *
       mountainRise;
     const cliffCuts =
       Math.max(0, noise.fbm(x * 0.020 - 12, z * 0.024 + 8, 3)) *
-      82 *
+      54 *
       mountainRise *
       smoothBlend(0.34, 0.86, zDepth);
-    const highFrequency = noise.fbm(x * 0.035 - 14, z * 0.024 + 33, 4) * 38 * mountainRise;
-    return 12 + valleyFloor * 20 + Math.max(0, ridgeLine) * 360 * mountainRise - ravines - cliffCuts + highFrequency;
+    const highFrequency = noise.fbm(x * 0.035 - 14, z * 0.024 + 33, 4) * 24 * mountainRise;
+    return (
+      10 +
+      valleyFloor * 16 +
+      Math.max(0, ridgeLine) * 238 * mountainRise -
+      ravines -
+      cliffCuts +
+      highFrequency
+    );
   };
 };
 
@@ -369,8 +389,8 @@ const buildAlpineRingGeometry = () => {
   const noise = makeNoise2D(68273);
   const thetaSegments = 256;
   const radialSegments = 24;
-  const rInner = 700;
-  const rOuter = 2520;
+  const rInner = SCENIC_ZONE.mountainInnerRadius;
+  const rOuter = SCENIC_ZONE.mountainOuterRadius;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const flatnesses: number[] = [];
@@ -387,13 +407,13 @@ const buildAlpineRingGeometry = () => {
     const rightPeak = Math.exp(-(angleDelta(theta, heroTheta + 0.92) ** 2) / (0.42 * 0.42));
     let ridge =
       0.42 +
-      centerPeak * 0.76 +
-      leftPeak * 0.48 +
-      rightPeak * 0.54 +
-      noise.fbm(cos * 5.4 + warp * 4.0, sin * 5.4 - warp * 3.0, 5) * 0.48 +
-      Math.max(0, Math.sin(theta * 19.0 + 0.8)) * 0.12;
-    ridge = THREE.MathUtils.clamp(ridge, 0.20, 1.46);
-    const peakHeight = 195 + ridge * 505;
+      centerPeak * 0.54 +
+      leftPeak * 0.34 +
+      rightPeak * 0.38 +
+      noise.fbm(cos * 5.4 + warp * 4.0, sin * 5.4 - warp * 3.0, 5) * 0.38 +
+      Math.max(0, Math.sin(theta * 19.0 + 0.8)) * 0.09;
+    ridge = THREE.MathUtils.clamp(ridge, 0.18, 1.20);
+    const peakHeight = (126 + ridge * 332) * SCENIC_ZONE.mountainHeightScale;
 
     for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
       const radial = radialIndex / radialSegments;
@@ -413,9 +433,9 @@ const buildAlpineRingGeometry = () => {
         0.18 *
         (1 - radial * 0.35) *
         shoulder;
-      const y = Math.max(5, 6 + foothill * (34 + ridge * 28) + peakHeight * shoulder + local - ravine);
+      const y = Math.max(7, 7 + foothill * (24 + ridge * 18) + peakHeight * shoulder + local - ravine);
       vertices.push(cos * radius, y, sin * radius);
-      elevs.push(THREE.MathUtils.clamp(y / 620, 0, 1));
+      elevs.push(THREE.MathUtils.clamp(y / 430, 0, 1));
       flatnesses.push(THREE.MathUtils.clamp(0.18 + (1 - radial) * 0.42 + noise.fbm(cos * 9, sin * 9, 3) * 0.18, 0.04, 0.82));
     }
   }
@@ -446,8 +466,8 @@ const buildFoothillSkirtGeometry = () => {
   const noise = makeNoise2D(69137);
   const thetaSegments = 192;
   const radialSegments = 8;
-  const rInner = 660;
-  const rOuter = 1160;
+  const rInner = SCENIC_ZONE.foothillInnerRadius;
+  const rOuter = SCENIC_ZONE.foothillOuterRadius;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const flatnesses: number[] = [];
@@ -465,10 +485,10 @@ const buildFoothillSkirtGeometry = () => {
         rInner +
         (rOuter - rInner) * radial +
         noise.fbm(cos * 9.0 + radial * 2.0, sin * 9.0 - radial * 2.0, 3) * 18;
-      const mound = Math.sin(radial * Math.PI) * (34 + hummock * 44);
-      const y = 7 + mound + radial * 26 + noise.fbm(cos * radius * 0.009, sin * radius * 0.009, 4) * 8;
+      const mound = Math.sin(radial * Math.PI) * (20 + hummock * 26);
+      const y = 8 + mound + radial * 18 + noise.fbm(cos * radius * 0.009, sin * radius * 0.009, 4) * 6;
       vertices.push(cos * radius, y, sin * radius);
-      elevs.push(THREE.MathUtils.clamp(y / 130, 0, 0.34));
+      elevs.push(THREE.MathUtils.clamp(y / 96, 0, 0.30));
       flatnesses.push(THREE.MathUtils.clamp(0.52 + radial * 0.26 + ridgeNoise * 0.12, 0.28, 0.86));
     }
   }
@@ -479,6 +499,65 @@ const buildFoothillSkirtGeometry = () => {
       const a = thetaIndex * columns + radialIndex;
       const b = a + columns;
       indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
+  geometry.setAttribute("flatness", new THREE.Float32BufferAttribute(flatnesses, 1));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+const buildValleyApronGeometry = () => {
+  const noise = makeNoise2D(70319);
+  const xSegments = 192;
+  const zSegments = 14;
+  const width = 3860;
+  const nearZ = -820;
+  const farZ = -1540;
+  const vertices: number[] = [];
+  const elevs: number[] = [];
+  const flatnesses: number[] = [];
+  const indices: number[] = [];
+
+  for (let zIndex = 0; zIndex <= zSegments; zIndex += 1) {
+    const zT = zIndex / zSegments;
+    const z = nearZ + (farZ - nearZ) * zT;
+    const zRise = Math.pow(zT, 1.18);
+    for (let xIndex = 0; xIndex <= xSegments; xIndex += 1) {
+      const xT = xIndex / xSegments;
+      const xNorm = xT * 2 - 1;
+      const shoulder = Math.abs(xNorm);
+      const cut = noise.fbm(xNorm * 4.8 + 17, zT * 5.2 - 9, 4);
+      const mound = noise.fbm(xNorm * 9.0 - 21, zT * 8.0 + 13, 3);
+      const valleyDip = Math.exp(-(xNorm * xNorm) / 0.78) * (1 - zT) * 8;
+      const y =
+        10 +
+        zRise * 58 +
+        shoulder * (8 + zT * 12) +
+        cut * 16 +
+        mound * 6 -
+        valleyDip;
+      const x = xNorm * width * 0.5 + noise.fbm(xNorm * 13, zT * 6 + 4, 3) * 10 * (0.35 + zT);
+      vertices.push(x, Math.max(7, y), z + noise.fbm(xNorm * 5 - 2, zT * 7 + 29, 3) * 8);
+      elevs.push(THREE.MathUtils.clamp(y / 135, 0.02, 0.46));
+      flatnesses.push(THREE.MathUtils.clamp(0.58 + zT * 0.22 + cut * 0.08, 0.36, 0.86));
+    }
+  }
+
+  const columns = xSegments + 1;
+  for (let zIndex = 0; zIndex < zSegments; zIndex += 1) {
+    for (let xIndex = 0; xIndex < xSegments; xIndex += 1) {
+      const a = zIndex * columns + xIndex;
+      const b = a + columns;
+      if ((xIndex + zIndex) % 2 === 0) {
+        indices.push(a, a + 1, b, b, a + 1, b + 1);
+      } else {
+        indices.push(a, a + 1, b + 1, a, b + 1, b);
+      }
     }
   }
 
@@ -536,6 +615,7 @@ const createTerrainMaterial = () =>
         float steep = 1.0 - clamp(vFlatness, 0.0, 1.0);
         float grain = bl_fbm(vWorldPos.xz * 0.018 + vec2(9.0, -31.0));
         float macro = bl_fbm(vWorldPos.xz * 0.0045 + vec2(-17.0, 22.0));
+        float ridgeDetail = bl_fbm(vec2(vWorldPos.x * 0.012 + vWorldPos.y * 0.018, vWorldPos.z * 0.008));
         float strata = sin(vWorldPos.y * 0.075 + grain * 3.5 + macro * 2.0) * 0.5 + 0.5;
 
         vec3 forest = vec3(0.022, 0.074, 0.040);
@@ -553,7 +633,7 @@ const createTerrainMaterial = () =>
         albedo = mix(albedo, forest, forestBand * 0.88);
         albedo = mix(albedo, scree, clamp(rockBand * steep * 0.52, 0.0, 0.62));
         albedo = mix(albedo, snow, snowBand * 0.58);
-        albedo *= 0.78 + macro * 0.36 + grain * 0.12;
+        albedo *= 0.76 + macro * 0.30 + grain * 0.10 + ridgeDetail * 0.16;
 
         vec3 sunDir = normalize(vec3(-0.38, 0.66, -0.55));
         float diffuse = max(dot(normal, sunDir), 0.0);
@@ -565,8 +645,8 @@ const createTerrainMaterial = () =>
 
         float dist = distance(vWorldPos, uCamera);
         float aerial = 1.0 - exp(-pow(dist * 0.00056, 1.42));
-        float lowFog = smoothstep(160.0, 18.0, vWorldPos.y) * smoothstep(690.0, 1180.0, -vWorldPos.z) * 0.34;
-        color = mix(color, uFogColor, clamp(aerial * 0.50 + lowFog, 0.0, 0.72));
+        float lowFog = smoothstep(150.0, 16.0, vWorldPos.y) * smoothstep(820.0, 1320.0, -vWorldPos.z) * 0.28;
+        color = mix(color, uFogColor, clamp(aerial * 0.46 + lowFog, 0.0, 0.68));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -602,11 +682,16 @@ const buildForest = (sampler: TerrainSampler) => {
   while (placed < FOREST_SPIRE_TARGET && attempts < maxAttempts) {
     attempts += 1;
     const x = (rng() - 0.5) * TERRAIN_WIDTH * 0.98;
-    const z = TERRAIN_NEAR_Z - 38 - rng() * 1260;
-    const y = sampler.sampleHeight(x, z);
+    const z = SCENIC_ZONE.farForestNearZ - rng() * (SCENIC_ZONE.farForestNearZ - SCENIC_ZONE.farForestFarZ);
+    const far = THREE.MathUtils.clamp(
+      (SCENIC_ZONE.farForestNearZ - z) / (SCENIC_ZONE.farForestNearZ - SCENIC_ZONE.farForestFarZ),
+      0,
+      1,
+    );
+    const y = Math.min(sampler.sampleHeight(x, z), 10 + far * 76);
     const altitude = (y - low) / span;
     const slope = sampler.sampleSlope(x, z);
-    if (z > -690) {
+    if (z > SCENIC_ZONE.farForestNearZ) {
       continue;
     }
     if (altitude < 0.035 || altitude > 0.55) {
@@ -624,7 +709,6 @@ const buildForest = (sampler: TerrainSampler) => {
       continue;
     }
 
-    const far = THREE.MathUtils.clamp((-z - 700) / 1260, 0, 1);
     const scale = 4.4 + rng() * 8.4 + far * 12.8;
     dummy.position.set(x + (rng() - 0.5) * 8.5, y + scale * 0.38, z + (rng() - 0.5) * 8.5);
     dummy.rotation.set((rng() - 0.5) * 0.10, rng() * Math.PI * 2, (rng() - 0.5) * 0.10);
@@ -642,14 +726,18 @@ const buildForest = (sampler: TerrainSampler) => {
   while (canopyPlaced < FOREST_CANOPY_TARGET && canopyAttempts < maxCanopyAttempts) {
     canopyAttempts += 1;
     const x = (rng() - 0.5) * TERRAIN_WIDTH * 0.98;
-    const z = TERRAIN_NEAR_Z - 64 - rng() * 1180;
-    const y = sampler.sampleHeight(x, z);
+    const z = SCENIC_ZONE.farForestNearZ - 28 - rng() * (SCENIC_ZONE.farForestNearZ - SCENIC_ZONE.farForestFarZ);
+    const far = THREE.MathUtils.clamp(
+      (SCENIC_ZONE.farForestNearZ - z) / (SCENIC_ZONE.farForestNearZ - SCENIC_ZONE.farForestFarZ),
+      0,
+      1,
+    );
+    const y = Math.min(sampler.sampleHeight(x, z), 9 + far * 62);
     const altitude = (y - low) / span;
     const slope = sampler.sampleSlope(x, z);
-    if (z > -710 || altitude < 0.03 || altitude > 0.46 || slope < 0.30) {
+    if (z > SCENIC_ZONE.farForestNearZ - 24 || altitude < 0.03 || altitude > 0.46 || slope < 0.30) {
       continue;
     }
-    const far = THREE.MathUtils.clamp((-z - 710) / 1180, 0, 1);
     const scale = 12 + rng() * 28 + far * 26;
     dummy.position.set(x + (rng() - 0.5) * 15, y + scale * 0.18, z + (rng() - 0.5) * 15);
     dummy.rotation.set((rng() - 0.5) * 0.08, rng() * Math.PI * 2, (rng() - 0.5) * 0.08);
@@ -676,7 +764,7 @@ const buildForest = (sampler: TerrainSampler) => {
   canopy.frustumCulled = false;
 
   const group = new THREE.Group();
-  group.name = "Phase 70 dense ecological forest wall";
+  group.name = "Phase 71 seated ecological forest wall";
   group.add(canopy, spires);
   return { group, count: placed + canopyPlaced, attempts: attempts + canopyAttempts };
 };
@@ -757,8 +845,8 @@ const createHeightFogMaterial = () =>
         float fine = bl_fbm(vWorldPos.xz * 0.014 + vec2(-uTime * 0.018, uTime * 0.011));
         float breakup = smoothstep(0.15, 0.82, slow * 0.78 + fine * 0.32);
         float heightFade = smoothstep(160.0, 20.0, vWorldPos.y);
-        float basin = smoothstep(560.0, 1020.0, -vWorldPos.z) * smoothstep(2300.0, 1500.0, -vWorldPos.z);
-        float alpha = vFogAlpha * uOpacity * heightFade * basin * (0.52 + breakup * 0.94) * (1.0 - uDark * 0.16);
+        float basin = smoothstep(760.0, 1180.0, -vWorldPos.z) * smoothstep(2380.0, 1660.0, -vWorldPos.z);
+        float alpha = vFogAlpha * uOpacity * heightFade * basin * (0.48 + breakup * 0.84) * (1.0 - uDark * 0.16);
         if (alpha < 0.010) {
           discard;
         }
@@ -804,7 +892,7 @@ export const createWebGpuScenicBackdropSystem = (
   capabilities: RendererCapabilityTelemetry,
 ): WebGpuScenicBackdropSystem => {
   const group = new THREE.Group();
-  group.name = "Phase 70 WebGPU alpine scenic layer v3";
+  group.name = "Phase 71 WebGPU alpine scenic layer seated v4";
   group.visible = false;
 
   const stats: WebGpuScenicStats = {
@@ -844,18 +932,23 @@ export const createWebGpuScenicBackdropSystem = (
     const terrain = buildTerrain();
     terrainMaterial = createTerrainMaterial();
     const terrainMesh = new THREE.Mesh(terrain.geometry, terrainMaterial);
-    terrainMesh.name = "Phase 70 eroded alpine terrain v3";
+    terrainMesh.name = "Phase 71 recessed alpine terrain v4";
     terrainMesh.frustumCulled = false;
     group.add(terrainMesh);
 
     peakMaterial = createTerrainMaterial();
     const foothillMesh = new THREE.Mesh(buildFoothillSkirtGeometry(), peakMaterial.clone());
-    foothillMesh.name = "Phase 70 grounded mountain-foot skirt";
+    foothillMesh.name = "Phase 71 seated mountain-foot skirt";
     foothillMesh.frustumCulled = false;
     group.add(foothillMesh);
 
+    const valleyApronMesh = new THREE.Mesh(buildValleyApronGeometry(), peakMaterial.clone());
+    valleyApronMesh.name = "Phase 71 seated forest-to-mountain valley apron";
+    valleyApronMesh.frustumCulled = false;
+    group.add(valleyApronMesh);
+
     const ringMesh = new THREE.Mesh(buildAlpineRingGeometry(), peakMaterial);
-    ringMesh.name = "Phase 70 visible alpine ring backdrop";
+    ringMesh.name = "Phase 71 distant alpine ring backdrop";
     ringMesh.frustumCulled = false;
     group.add(ringMesh);
 
@@ -863,11 +956,11 @@ export const createWebGpuScenicBackdropSystem = (
       new THREE.Mesh(
         buildPeakWallGeometry({
           seed: 68101,
-          z: -1220,
-          depth: 290,
-          width: 3300,
-          baseY: 18,
-          peakY: 470,
+          z: -1580,
+          depth: 260,
+          width: 3600,
+          baseY: 22,
+          peakY: 305,
           xSegments: 220,
           ySegments: 20,
         }),
@@ -876,11 +969,11 @@ export const createWebGpuScenicBackdropSystem = (
       new THREE.Mesh(
         buildPeakWallGeometry({
           seed: 68141,
-          z: -1680,
-          depth: 360,
-          width: 3700,
-          baseY: 62,
-          peakY: 560,
+          z: -2040,
+          depth: 330,
+          width: 4200,
+          baseY: 52,
+          peakY: 370,
           xSegments: 240,
           ySegments: 22,
         }),
@@ -889,11 +982,11 @@ export const createWebGpuScenicBackdropSystem = (
       new THREE.Mesh(
         buildPeakWallGeometry({
           seed: 68187,
-          z: -2060,
-          depth: 450,
-          width: 4300,
-          baseY: 112,
-          peakY: 700,
+          z: -2500,
+          depth: 410,
+          width: 5000,
+          baseY: 82,
+          peakY: 465,
           xSegments: 272,
           ySegments: 24,
         }),
@@ -901,27 +994,26 @@ export const createWebGpuScenicBackdropSystem = (
       ),
     ];
     peakWalls.forEach((wall, index) => {
-      wall.name = `Phase 70 craggy alpine peak wall ${index + 1}`;
+      wall.name = `Phase 71 seated craggy alpine peak wall ${index + 1}`;
       wall.frustumCulled = false;
       group.add(wall);
     });
 
     const forest = buildForest(terrain.sampler);
-    forest.group.name = "Phase 70 ecological instanced mountain-base forest";
+    forest.group.name = "Phase 71 ecological instanced mountain-base forest";
     group.add(forest.group);
 
     const fogGeometries = [
-      buildHeightFogGeometry(-640, -1040, 22, 3180),
-      buildHeightFogGeometry(-700, -1220, 42, 3260),
-      buildHeightFogGeometry(-800, -1460, 70, 3180),
-      buildHeightFogGeometry(-920, -1700, 104, 2920),
-      buildHeightFogGeometry(-1080, -1960, 142, 2600),
-      buildHeightFogGeometry(-1260, -2260, 186, 2220),
+      buildHeightFogGeometry(-780, -1160, 20, 3300),
+      buildHeightFogGeometry(-880, -1360, 34, 3380),
+      buildHeightFogGeometry(-1020, -1600, 52, 3260),
+      buildHeightFogGeometry(-1200, -1860, 76, 3000),
+      buildHeightFogGeometry(-1440, -2240, 112, 2580),
     ];
     fogMaterials = fogGeometries.map(() => createHeightFogMaterial());
     fogGeometries.forEach((geometry, index) => {
       const fog = new THREE.Mesh(geometry, fogMaterials[index]);
-      fog.name = `Phase 70 pooled height fog layer ${index + 1}`;
+      fog.name = `Phase 71 valley height fog layer ${index + 1}`;
       fog.renderOrder = 4 + index;
       fog.frustumCulled = false;
       group.add(fog);
@@ -930,11 +1022,12 @@ export const createWebGpuScenicBackdropSystem = (
     stats.terrainVertices =
       terrain.geometry.attributes.position.count +
       foothillMesh.geometry.attributes.position.count +
+      valleyApronMesh.geometry.attributes.position.count +
       ringMesh.geometry.attributes.position.count +
       peakWalls.reduce((count, wall) => count + wall.geometry.attributes.position.count, 0);
     stats.forestInstances = forest.count;
     stats.fogLayers = fogGeometries.length;
-    stats.fogMode = "WebGL pooled alpine height fog v3";
+    stats.fogMode = "WebGL valley alpine height fog v4";
   };
 
   return {
@@ -955,9 +1048,10 @@ export const createWebGpuScenicBackdropSystem = (
       }
       group.children.forEach((child) => {
         if (
-          !child.name.startsWith("Phase 70 craggy alpine peak wall") &&
-          child.name !== "Phase 70 grounded mountain-foot skirt" &&
-          child.name !== "Phase 70 visible alpine ring backdrop"
+          !child.name.startsWith("Phase 71 seated craggy alpine peak wall") &&
+          child.name !== "Phase 71 seated mountain-foot skirt" &&
+          child.name !== "Phase 71 seated forest-to-mountain valley apron" &&
+          child.name !== "Phase 71 distant alpine ring backdrop"
         ) {
           return;
         }
@@ -973,7 +1067,7 @@ export const createWebGpuScenicBackdropSystem = (
         material.uniforms.uColor.value.setHex(palette.fogColor);
         material.uniforms.uTime.value = elapsed;
         material.uniforms.uDark.value = dark;
-        material.uniforms.uOpacity.value = 0.132 + weather.dials.fog * 0.18 + index * 0.028;
+        material.uniforms.uOpacity.value = 0.108 + weather.dials.fog * 0.15 + index * 0.020;
       });
     },
     setGate: (gate) => {
