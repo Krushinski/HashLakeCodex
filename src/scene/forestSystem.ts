@@ -168,15 +168,15 @@ const groundHeightAt = (point: LakePoint) => {
     return THREE.MathUtils.lerp(1.02, 1.16, (clearance - 42) / (ZONE_TRUTH.shorelineGrassOuter - 42));
   }
   if (clearance < ZONE_TRUTH.raisedBankOuter) {
-    return THREE.MathUtils.lerp(1.16, 1.28, (clearance - ZONE_TRUTH.shorelineGrassOuter) / (ZONE_TRUTH.raisedBankOuter - ZONE_TRUTH.shorelineGrassOuter));
+    return THREE.MathUtils.lerp(1.16, 1.34, (clearance - ZONE_TRUTH.shorelineGrassOuter) / (ZONE_TRUTH.raisedBankOuter - ZONE_TRUTH.shorelineGrassOuter));
   }
   if (clearance < 214) {
-    return THREE.MathUtils.lerp(1.28, 1.40, (clearance - ZONE_TRUTH.forestShelfInner) / (214 - ZONE_TRUTH.forestShelfInner));
+    return THREE.MathUtils.lerp(1.34, 1.54, (clearance - ZONE_TRUTH.forestShelfInner) / (214 - ZONE_TRUTH.forestShelfInner));
   }
   if (clearance < ZONE_TRUTH.forestShelfOuter) {
-    return THREE.MathUtils.lerp(1.40, 1.48, (clearance - 214) / (ZONE_TRUTH.forestShelfOuter - 214));
+    return THREE.MathUtils.lerp(1.54, 1.72, (clearance - 214) / (ZONE_TRUTH.forestShelfOuter - 214));
   }
-  return 1.5;
+  return 1.78;
 };
 
 const getBandRange = (band: PlacementBand) => {
@@ -187,7 +187,7 @@ const getBandRange = (band: PlacementBand) => {
     return { min: 92, max: 226, jitter: 54 };
   }
   if (band === "far") {
-    return { min: 174, max: ZONE_TRUTH.farForestMaxShoreClearance, jitter: 78 };
+    return { min: 166, max: ZONE_TRUTH.farForestMaxShoreClearance, jitter: 92 };
   }
   if (band === "cove") {
     return { min: 86, max: 230, jitter: 48 };
@@ -477,12 +477,12 @@ export const createForestSystem = (): ForestSystem => {
     treeBuilds.push({ key, meshes: [canopy, trunks], baseCount: instances.length });
   };
 
-  addSimpleTreeType("tallNarrowPine", 82, ["mid", "far", "cove"], tallCanopy, foliageMaterial, 5.2, 1.0, 13.1, 0.92, 1.02, 0.35, 0.17);
+  addSimpleTreeType("tallNarrowPine", 104, ["mid", "far", "far", "cove"], tallCanopy, foliageMaterial, 5.2, 1.0, 13.1, 0.92, 1.02, 0.35, 0.17);
   addSimpleTreeType("shortPine", 54, ["near", "dock", "mid"], shortCanopy, foliageMaterial, 3.0, 0.86, 7.4, 0.94, 0.95, 0.34, 0.19);
-  addSimpleTreeType("mediumConifer", 76, ["mid", "near", "far"], mediumCanopy, foliageMaterial, 4.0, 0.96, 10.0, 1.0, 1.0, 0.35, 0.18);
+  addSimpleTreeType("mediumConifer", 98, ["mid", "far", "near", "far"], mediumCanopy, foliageMaterial, 4.0, 0.96, 10.0, 1.0, 1.0, 0.35, 0.18);
   addSimpleTreeType("youngPine", 48, ["near", "dock"], youngCanopy, foliageMaterial, 1.7, 0.58, 4.2, 0.84, 0.92, 0.34, 0.21);
 
-  const layeredInstances = makeInstances(64, "layeredConifer", ["mid", "far", "cove"], 0.35, 0.165);
+  const layeredInstances = makeInstances(90, "layeredConifer", ["mid", "far", "far", "cove"], 0.35, 0.165);
   const layeredTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, layeredInstances.length, "Native tree type - layeredConifer trunks");
   const layeredLow = makeInstancedMesh(layerLow, darkFoliageMaterial, layeredInstances.length, "Native tree type - layeredConifer low skirt");
   const layeredMid = makeInstancedMesh(layerMid, darkFoliageMaterial, layeredInstances.length, "Native tree type - layeredConifer middle skirt");
@@ -502,7 +502,7 @@ export const createForestSystem = (): ForestSystem => {
     baseCount: layeredInstances.length,
   });
 
-  const broadInstances = makeInstances(46, "broadEvergreenCluster", ["far", "mid", "cove"], 0.34, 0.145);
+  const broadInstances = makeInstances(66, "broadEvergreenCluster", ["far", "far", "mid", "cove"], 0.34, 0.145);
   const broad = makeInstancedMesh(broadCanopy, clusterMaterial, broadInstances.length, "Native tree type - broadEvergreenCluster crowns");
   const broadTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, broadInstances.length, "Native tree type - broadEvergreenCluster trunks");
   broadInstances.forEach((instance, index) => {
@@ -524,7 +524,7 @@ export const createForestSystem = (): ForestSystem => {
     baseCount: broadInstances.length,
   });
 
-  const distantInstances = makeInstances(254, "distantSilhouetteTree", ["far", "far", "mid"], 0.36, 0.105);
+  const distantInstances = makeInstances(380, "distantSilhouetteTree", ["far", "far", "far", "mid"], 0.36, 0.105);
   const distant = makeInstancedMesh(silhouetteCanopy, silhouetteMaterial, distantInstances.length, "Native tree type - distantSilhouetteTree band");
   distantInstances.forEach((instance, index) => {
     const height = 0.72 + rng() * 1.05 + (instance.band === "far" ? 0.25 : 0);

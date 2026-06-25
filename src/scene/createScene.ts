@@ -1975,6 +1975,41 @@ const createRadialBoundary = (
     };
   });
 
+type MoundToneProfile = {
+  center: [number, number, number];
+  dry: [number, number, number];
+  damp: [number, number, number];
+  edge: [number, number, number];
+  ripple: number;
+};
+
+const sandMoundTone: MoundToneProfile = {
+  center: [1.72, 1.66, 1.48],
+  dry: [1.50, 1.42, 1.24],
+  damp: [1.00, 0.82, 0.54],
+  edge: [0.78, 0.64, 0.42],
+  ripple: 0.016,
+};
+
+const rockMoundTone: MoundToneProfile = {
+  center: [0.86, 0.90, 0.82],
+  dry: [0.78, 0.84, 0.76],
+  damp: [0.62, 0.69, 0.63],
+  edge: [0.48, 0.55, 0.52],
+  ripple: 0.012,
+};
+
+const mixTone = (
+  from: readonly [number, number, number],
+  to: readonly [number, number, number],
+  amount: number,
+) =>
+  [
+    THREE.MathUtils.lerp(from[0], to[0], amount),
+    THREE.MathUtils.lerp(from[1], to[1], amount),
+    THREE.MathUtils.lerp(from[2], to[2], amount),
+  ] as [number, number, number];
+
 const createOrganicMoundedEllipseGeometry = (
   radiusX: number,
   radiusZ: number,
@@ -1984,16 +2019,17 @@ const createOrganicMoundedEllipseGeometry = (
   edgeY = 0.32,
   count = 128,
   rings = 5,
+  tone: MoundToneProfile = sandMoundTone,
 ) => {
   const positions: number[] = [0, centerY, 0];
-  const colors: number[] = [1.28, 1.20, 1.02];
+  const colors: number[] = [...tone.center];
   const indices: number[] = [];
 
   for (let ring = 1; ring <= rings; ring += 1) {
     const t = ring / rings;
     const height = edgeY + (centerY - edgeY) * Math.pow(1 - smoothstepNumber(0, 1, t), 0.74);
-    const dryCenter = 1 - smoothstepNumber(0.18, 0.92, t);
-    const wetEdge = smoothstepNumber(0.58, 1, t);
+    const dryBlend = smoothstepNumber(0.12, 0.86, t);
+    const wetEdge = smoothstepNumber(0.62, 1, t);
     for (let index = 0; index < count; index += 1) {
       const angle = (index / count) * Math.PI * 2;
       const noise =
@@ -2001,17 +2037,15 @@ const createOrganicMoundedEllipseGeometry = (
         Math.cos(angle * 5.1 + seed * 0.31 + ring * 0.24) * wobble * 0.42 +
         Math.sin(angle * 8.6 + seed * 0.11) * wobble * 0.18;
       const rimBreakup = ring === rings ? 1.12 : 0.72;
-      const rippleTone = Math.sin(angle * 7.0 + seed * 0.07 + ring * 0.9) * 0.025;
+      const rippleTone = Math.sin(angle * 7.0 + seed * 0.07 + ring * 0.9) * tone.ripple;
       positions.push(
         Math.cos(angle) * radiusX * t * (1 + noise * rimBreakup),
         height + noise * 0.08,
         Math.sin(angle) * radiusZ * t * (1 + noise * 0.72 * rimBreakup),
       );
-      colors.push(
-        0.94 + dryCenter * 0.20 - wetEdge * 0.08 + rippleTone,
-        0.90 + dryCenter * 0.18 - wetEdge * 0.06 + rippleTone,
-        0.72 + dryCenter * 0.12 - wetEdge * 0.035,
-      );
+      const dryToDamp = mixTone(tone.dry, tone.damp, dryBlend);
+      const finalTone = mixTone(dryToDamp, tone.edge, wetEdge);
+      colors.push(finalTone[0] + rippleTone, finalTone[1] + rippleTone * 0.82, finalTone[2] + rippleTone * 0.44);
     }
   }
 
@@ -2170,21 +2204,21 @@ const createShoreline = () => {
   group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.24, 29, 0.014),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.31, 29, 0.014),
     bankMaterial,
   );
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
   const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.24, 1.38, 37, 0.012),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.31, 1.50, 37, 0.012),
     forestShelfMaterial,
   );
   forestShelf.receiveShadow = true;
   group.add(forestShelf);
 
   const midForestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.38, 1.44, 43, 0.014),
+    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.50, 1.62, 43, 0.014),
     midForestMaterial,
   );
   midForestShelf.receiveShadow = true;
@@ -2227,12 +2261,12 @@ const createDestinationMarkers = () => {
     kind: "sand",
     seed: 821,
     size: 192,
-    base: 0xecd59a,
-    accent: 0xffefc5,
-    dark: 0xc4a66e,
+    base: 0xf7edcf,
+    accent: 0xffffef,
+    dark: 0xc49c5f,
     color: 0xffffff,
-    emissive: 0x21170b,
-    emissiveIntensity: 0.012,
+    emissive: 0x302b20,
+    emissiveIntensity: 0.026,
     roughness: 0.96,
   });
   const rockMaterial = makeTexturedStandardMaterial({
@@ -2432,6 +2466,7 @@ const createDestinationMarkers = () => {
       0.56,
       72,
       4,
+      rockMoundTone,
     ),
     islandShelfMaterial,
   );

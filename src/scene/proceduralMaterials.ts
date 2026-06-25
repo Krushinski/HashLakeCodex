@@ -127,7 +127,7 @@ export const createProceduralTexture = ({
       const mid = mixRgb(darkRgb, accentRgb, amount);
       const influence =
         kind === "sand"
-          ? 0.46
+          ? 0.34
           : kind === "wetSand"
             ? 0.40
             : kind === "forestFloor"

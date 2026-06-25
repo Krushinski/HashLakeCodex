@@ -60,7 +60,7 @@ const createOrganicWaterGeometry = () => {
   const deepColor = new THREE.Color(0x011d33);
   const midColor = new THREE.Color(0x053e52);
   const shallowColor = new THREE.Color(0x2a857c);
-  const sandbarColor = new THREE.Color(0x9fd8c8);
+  const sandbarColor = new THREE.Color(0xb6ded0);
   const coveColor = new THREE.Color(0x041f30);
   const samplePoint = (point: { x: number; z: number }) => {
     const shoreDistance = Math.max(0, distanceToShore(point));
@@ -92,14 +92,14 @@ const createOrganicWaterGeometry = () => {
     };
     const nearCove = clamp(1 - Math.hypot(point.x - cove.x, point.z - cove.z) / 190, 0, 1);
     const sandFeature = clamp(
-      Math.max(nearSandbar * 0.82, nearIsland * 0.72) +
-        Math.max(nearSandbarBroad * 0.30, nearIslandBroad * 0.26),
+      Math.max(nearSandbar * 0.70, nearIsland * 0.64) +
+        Math.max(nearSandbarBroad * 0.38, nearIslandBroad * 0.34),
       0,
       1,
     );
     const shallowShelf = clamp(
-      Math.max(nearSandbarBroad * 0.62, nearIslandBroad * 0.54) +
-        Math.max(nearSandbar * 0.18, nearIsland * 0.14),
+      Math.max(nearSandbarBroad * 0.72, nearIslandBroad * 0.64) +
+        Math.max(nearSandbar * 0.14, nearIsland * 0.12),
       0,
       1,
     );
@@ -109,7 +109,7 @@ const createOrganicWaterGeometry = () => {
       .clone()
       .lerp(midColor, smoothstep(0.08, 0.76, shoreDepth))
       .lerp(deepColor, smoothstep(0.42, 1, shoreDepth) * 0.72);
-    tint.lerp(sandbarColor, sandFeature * 0.22 + shallowShelf * 0.055);
+    tint.lerp(sandbarColor, sandFeature * 0.18 + shallowShelf * 0.090);
     tint.lerp(coveColor, nearCove * 0.20);
 
     return {
