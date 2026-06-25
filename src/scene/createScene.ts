@@ -574,7 +574,7 @@ export const createHashlakeScene = ({
   container.append(renderer.domElement);
   const rendererCapabilities = detectRendererCapabilities(renderer);
   const scenicExperimentalRequested = isScenicExperimentalRequested();
-  const webGpuScenicRequested = isWebGpuScenicRequested();
+  let webGpuScenicRequested = isWebGpuScenicRequested();
 
   const sunlight = new THREE.DirectionalLight(SCENARIO_PALETTES.Serene.directionalLight, 3.6);
   sunlight.position.set(-36, 72, 45);
@@ -798,7 +798,7 @@ export const createHashlakeScene = ({
 
   const getWebGpuScenicGate = () => {
     const webglEligible = rendererCapabilities.webgl2 && !isMobileViewport;
-    const eligible = webglEligible && rendererCapabilities.webgpu;
+    const eligible = webglEligible;
     const requested = webGpuScenicRequested;
     const active = requested && webglEligible;
     const fallbackActive = !active;
@@ -820,6 +820,27 @@ export const createHashlakeScene = ({
       fallbackActive,
       reason,
     };
+  };
+
+  const setWebGpuScenicRequested = (requested: boolean, source: "keyboard" | "debug" | "event" = "event") => {
+    webGpuScenicRequested = requested;
+    try {
+      window.localStorage.setItem("hashlake.webgpuScenic", String(requested));
+    } catch {
+      // Non-critical: URL flag and in-memory state still work if storage is unavailable.
+    }
+    showDriveHudMessage(driveHud, requested ? "SCENIC BACKDROP ON" : "SCENIC BACKDROP OFF");
+    if (source !== "event") {
+      window.dispatchEvent(
+        new CustomEvent("hashlake:scenic-mode-changed", {
+          detail: { requested },
+        }),
+      );
+    }
+  };
+
+  const toggleWebGpuScenicRequested = (source: "keyboard" | "debug" | "event" = "event") => {
+    setWebGpuScenicRequested(!webGpuScenicRequested, source);
   };
 
   const governQuality = (delta: number, now: number) => {
@@ -1117,6 +1138,12 @@ export const createHashlakeScene = ({
       return;
     }
 
+    if (isDown && key === "v") {
+      event.preventDefault();
+      toggleWebGpuScenicRequested("keyboard");
+      return;
+    }
+
     if (isDown && key === "enter" && driveState.mode === "Drive") {
       event.preventDefault();
       saveCurrentTableau();
@@ -1182,6 +1209,11 @@ export const createHashlakeScene = ({
   };
   const handleKeydown = (event: KeyboardEvent) => handleKey(event, true);
   const handleKeyup = (event: KeyboardEvent) => handleKey(event, false);
+  const handleScenicToggleEvent = () => toggleWebGpuScenicRequested("debug");
+  const handleScenicSetEvent = (event: Event) => {
+    const requested = Boolean((event as CustomEvent<{ requested?: boolean }>).detail?.requested);
+    setWebGpuScenicRequested(requested, "debug");
+  };
 
   const clearMobileDriveTouch = () => {
     driveState.mobilePointerId = null;
@@ -1277,6 +1309,8 @@ export const createHashlakeScene = ({
   renderer.domElement.addEventListener("pointercancel", handlePointerUp);
   window.addEventListener("keydown", handleKeydown);
   window.addEventListener("keyup", handleKeyup);
+  window.addEventListener("hashlake:toggle-webgpu-scenic", handleScenicToggleEvent);
+  window.addEventListener("hashlake:set-webgpu-scenic", handleScenicSetEvent);
   window.addEventListener("resize", scheduleResize);
   window.addEventListener("orientationchange", scheduleResize);
   window.addEventListener("pageshow", scheduleResize);
@@ -1301,6 +1335,8 @@ export const createHashlakeScene = ({
       window.visualViewport?.removeEventListener("resize", scheduleResize);
       window.removeEventListener("keydown", handleKeydown);
       window.removeEventListener("keyup", handleKeyup);
+      window.removeEventListener("hashlake:toggle-webgpu-scenic", handleScenicToggleEvent);
+      window.removeEventListener("hashlake:set-webgpu-scenic", handleScenicSetEvent);
       renderer.domElement.removeEventListener("webglcontextlost", handleContextLost);
       renderer.domElement.removeEventListener("webglcontextrestored", handleContextRestored);
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
@@ -3336,6 +3372,12 @@ const showDriveHud = (hud: HTMLDivElement, mode: "Frame" | "Drive") => {
     mode === "Drive"
       ? "DRIVE - Speed 0 - Camera locked"
       : "FRAME MODE - Living art view";
+  hud.classList.add("drive-hud--visible");
+};
+
+const showDriveHudMessage = (hud: HTMLDivElement, message: string) => {
+  hud.dataset.visibleUntil = String(window.performance.now() + 2400);
+  hud.textContent = message;
   hud.classList.add("drive-hud--visible");
 };
 

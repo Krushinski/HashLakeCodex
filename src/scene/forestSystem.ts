@@ -585,12 +585,12 @@ export const createForestSystem = (): ForestSystem => {
   const backgroundMass = makeInstancedMesh(backgroundCanopyGeometry, clusterMaterial, backgroundMassInstances.length, "Native tree type - backgroundCanopyMass crowns");
   backgroundMassInstances.forEach((instance, index) => {
     const inland = THREE.MathUtils.clamp((-distanceToShore(instance.point) - 150) / 300, 0, 1);
-    position.set(instance.point.x, instance.groundY + 4.2 * instance.heightScale, instance.point.z);
+    position.set(instance.point.x, instance.groundY + 5.4 * instance.heightScale, instance.point.z);
     quaternion.setFromAxisAngle(up, instance.yaw);
     scale.set(
-      (1.55 + inland * 0.58) * instance.widthScale,
-      (0.34 + inland * 0.16) * instance.heightScale,
-      (1.08 + rng() * 0.46) * instance.widthScale,
+      (1.28 + inland * 0.46) * instance.widthScale,
+      (0.62 + inland * 0.20) * instance.heightScale,
+      (0.92 + rng() * 0.32) * instance.widthScale,
     );
     matrix.compose(position, quaternion, scale);
     backgroundMass.setMatrixAt(index, matrix);
@@ -631,12 +631,12 @@ export const createForestSystem = (): ForestSystem => {
   const irregularMounds = makeInstancedMesh(irregularCanopyGeometry, clusterMaterial, irregularInstances.length, "Native tree type - irregularCanopyMound crowns");
   irregularInstances.forEach((instance, index) => {
     const inland = THREE.MathUtils.clamp((-distanceToShore(instance.point) - 112) / 280, 0, 1);
-    position.set(instance.point.x, instance.groundY + 4.7 * instance.heightScale, instance.point.z);
+    position.set(instance.point.x, instance.groundY + 5.3 * instance.heightScale, instance.point.z);
     quaternion.setFromAxisAngle(up, instance.yaw);
     scale.set(
-      (0.96 + inland * 0.48) * instance.widthScale,
-      (0.46 + inland * 0.22) * instance.heightScale,
-      (0.84 + rng() * 0.58) * instance.widthScale,
+      (0.90 + inland * 0.38) * instance.widthScale,
+      (0.58 + inland * 0.22) * instance.heightScale,
+      (0.78 + rng() * 0.42) * instance.widthScale,
     );
     matrix.compose(position, quaternion, scale);
     irregularMounds.setMatrixAt(index, matrix);
@@ -654,12 +654,12 @@ export const createForestSystem = (): ForestSystem => {
   const understory = makeInstancedMesh(understoryGeometry, clusterMaterial, understoryInstances.length, "Native tree type - understoryShrubMass low crowns");
   understoryInstances.forEach((instance, index) => {
     const inland = THREE.MathUtils.clamp((-distanceToShore(instance.point) - 96) / 300, 0, 1);
-    position.set(instance.point.x, instance.groundY + 1.8 * instance.heightScale, instance.point.z);
+    position.set(instance.point.x, instance.groundY + 2.2 * instance.heightScale, instance.point.z);
     quaternion.setFromAxisAngle(up, instance.yaw);
     scale.set(
-      (0.70 + inland * 0.42) * instance.widthScale,
-      (0.22 + inland * 0.11) * instance.heightScale,
-      (0.60 + rng() * 0.48) * instance.widthScale,
+      (0.62 + inland * 0.30) * instance.widthScale,
+      (0.34 + inland * 0.14) * instance.heightScale,
+      (0.54 + rng() * 0.32) * instance.widthScale,
     );
     matrix.compose(position, quaternion, scale);
     understory.setMatrixAt(index, matrix);
@@ -714,12 +714,12 @@ export const createForestSystem = (): ForestSystem => {
   const forestWall = makeInstancedMesh(forestWallGeometry, clusterMaterial, wallInstances.length, "Native tree type - forestWallCanopy living wall");
   wallInstances.forEach((instance, index) => {
     const inland = THREE.MathUtils.clamp((-distanceToShore(instance.point) - 168) / 340, 0, 1);
-    position.set(instance.point.x, instance.groundY + 3.2 * instance.heightScale, instance.point.z);
+    position.set(instance.point.x, instance.groundY + 5.8 * instance.heightScale, instance.point.z);
     quaternion.setFromAxisAngle(up, instance.yaw + (rng() - 0.5) * 0.48);
     scale.set(
-      (1.74 + inland * 0.82) * instance.widthScale,
-      (0.28 + inland * 0.11) * instance.heightScale,
-      (1.02 + rng() * 0.58) * instance.widthScale,
+      (1.32 + inland * 0.52) * instance.widthScale,
+      (0.66 + inland * 0.22) * instance.heightScale,
+      (0.92 + rng() * 0.36) * instance.widthScale,
     );
     matrix.compose(position, quaternion, scale);
     forestWall.setMatrixAt(index, matrix);

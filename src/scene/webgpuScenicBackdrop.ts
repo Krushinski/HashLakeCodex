@@ -349,9 +349,9 @@ const angleDelta = (a: number, b: number) => {
 const buildAlpineRingGeometry = () => {
   const noise = makeNoise2D(68273);
   const thetaSegments = 256;
-  const radialSegments = 18;
-  const rInner = 820;
-  const rOuter = 2320;
+  const radialSegments = 22;
+  const rInner = 620;
+  const rOuter = 2380;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const flatnesses: number[] = [];
@@ -382,6 +382,7 @@ const buildAlpineRingGeometry = () => {
       const rise = Math.sin(Math.min(radial / 0.78, 1) * Math.PI * 0.5);
       const farDrop = radial < 0.82 ? 1 : 1 - (radial - 0.82) / 0.22;
       const shoulder = Math.pow(Math.max(0, rise), 0.96) * Math.max(0, farDrop);
+      const foothill = smoothBlend(0.0, 0.22, radial) * smoothBlend(0.52, 0.18, radial);
       const local =
         noise.fbm(cos * radius * 0.006 + 31, sin * radius * 0.006 - 11, 5) *
         peakHeight *
@@ -393,7 +394,7 @@ const buildAlpineRingGeometry = () => {
         0.18 *
         (1 - radial * 0.35) *
         shoulder;
-      const y = Math.max(8, 18 + peakHeight * shoulder + local - ravine);
+      const y = Math.max(5, 6 + foothill * (34 + ridge * 28) + peakHeight * shoulder + local - ravine);
       vertices.push(cos * radius, y, sin * radius);
       elevs.push(THREE.MathUtils.clamp(y / 620, 0, 1));
       flatnesses.push(THREE.MathUtils.clamp(0.18 + (1 - radial) * 0.42 + noise.fbm(cos * 9, sin * 9, 3) * 0.18, 0.04, 0.82));
@@ -410,6 +411,55 @@ const buildAlpineRingGeometry = () => {
       } else {
         indices.push(a, b, b + 1, a, b + 1, a + 1);
       }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
+  geometry.setAttribute("flatness", new THREE.Float32BufferAttribute(flatnesses, 1));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+const buildFoothillSkirtGeometry = () => {
+  const noise = makeNoise2D(69137);
+  const thetaSegments = 192;
+  const radialSegments = 8;
+  const rInner = 540;
+  const rOuter = 960;
+  const vertices: number[] = [];
+  const elevs: number[] = [];
+  const flatnesses: number[] = [];
+  const indices: number[] = [];
+
+  for (let thetaIndex = 0; thetaIndex <= thetaSegments; thetaIndex += 1) {
+    const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const ridgeNoise = noise.fbm(cos * 4.2 + 8, sin * 4.2 - 12, 4);
+    const hummock = 0.55 + ridgeNoise * 0.34 + Math.max(0, Math.sin(theta * 13.0 - 0.7)) * 0.18;
+    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
+      const radial = radialIndex / radialSegments;
+      const radius =
+        rInner +
+        (rOuter - rInner) * radial +
+        noise.fbm(cos * 9.0 + radial * 2.0, sin * 9.0 - radial * 2.0, 3) * 18;
+      const mound = Math.sin(radial * Math.PI) * (28 + hummock * 34);
+      const y = 3.5 + mound + radial * 20 + noise.fbm(cos * radius * 0.009, sin * radius * 0.009, 4) * 7;
+      vertices.push(cos * radius, y, sin * radius);
+      elevs.push(THREE.MathUtils.clamp(y / 130, 0, 0.34));
+      flatnesses.push(THREE.MathUtils.clamp(0.52 + radial * 0.26 + ridgeNoise * 0.12, 0.28, 0.86));
+    }
+  }
+
+  const columns = radialSegments + 1;
+  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      const a = thetaIndex * columns + radialIndex;
+      const b = a + columns;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
     }
   }
 
@@ -607,7 +657,7 @@ const buildForest = (sampler: TerrainSampler) => {
   canopy.frustumCulled = false;
 
   const group = new THREE.Group();
-  group.name = "Phase 68 dense ecological forest wall";
+  group.name = "Phase 69 dense ecological forest wall";
   group.add(canopy, spires);
   return { group, count: placed + canopyPlaced, attempts: attempts + canopyAttempts };
 };
@@ -735,7 +785,7 @@ export const createWebGpuScenicBackdropSystem = (
   capabilities: RendererCapabilityTelemetry,
 ): WebGpuScenicBackdropSystem => {
   const group = new THREE.Group();
-  group.name = "Phase 68 WebGPU alpine scenic layer v2";
+  group.name = "Phase 69 WebGPU alpine scenic layer v2";
   group.visible = false;
 
   const stats: WebGpuScenicStats = {
@@ -774,13 +824,18 @@ export const createWebGpuScenicBackdropSystem = (
     const terrain = buildTerrain();
     terrainMaterial = createTerrainMaterial();
     const terrainMesh = new THREE.Mesh(terrain.geometry, terrainMaterial);
-    terrainMesh.name = "Phase 68 eroded alpine terrain v2";
+    terrainMesh.name = "Phase 69 eroded alpine terrain v2";
     terrainMesh.frustumCulled = false;
     group.add(terrainMesh);
 
     peakMaterial = createTerrainMaterial();
+    const foothillMesh = new THREE.Mesh(buildFoothillSkirtGeometry(), peakMaterial.clone());
+    foothillMesh.name = "Phase 69 grounded mountain-foot skirt";
+    foothillMesh.frustumCulled = false;
+    group.add(foothillMesh);
+
     const ringMesh = new THREE.Mesh(buildAlpineRingGeometry(), peakMaterial);
-    ringMesh.name = "Phase 68 visible alpine ring backdrop";
+    ringMesh.name = "Phase 69 visible alpine ring backdrop";
     ringMesh.frustumCulled = false;
     group.add(ringMesh);
 
@@ -813,13 +868,13 @@ export const createWebGpuScenicBackdropSystem = (
       ),
     ];
     peakWalls.forEach((wall, index) => {
-      wall.name = `Phase 68 craggy alpine peak wall ${index + 1}`;
+      wall.name = `Phase 69 craggy alpine peak wall ${index + 1}`;
       wall.frustumCulled = false;
       group.add(wall);
     });
 
     const forest = buildForest(terrain.sampler);
-    forest.group.name = "Phase 68 ecological instanced mountain-base forest";
+    forest.group.name = "Phase 69 ecological instanced mountain-base forest";
     group.add(forest.group);
 
     const fogGeometries = [
@@ -832,7 +887,7 @@ export const createWebGpuScenicBackdropSystem = (
     fogMaterials = fogGeometries.map(() => createHeightFogMaterial());
     fogGeometries.forEach((geometry, index) => {
       const fog = new THREE.Mesh(geometry, fogMaterials[index]);
-      fog.name = `Phase 68 pooled height fog layer ${index + 1}`;
+      fog.name = `Phase 69 pooled height fog layer ${index + 1}`;
       fog.renderOrder = 4 + index;
       fog.frustumCulled = false;
       group.add(fog);
@@ -840,6 +895,7 @@ export const createWebGpuScenicBackdropSystem = (
 
     stats.terrainVertices =
       terrain.geometry.attributes.position.count +
+      foothillMesh.geometry.attributes.position.count +
       ringMesh.geometry.attributes.position.count +
       peakWalls.reduce((count, wall) => count + wall.geometry.attributes.position.count, 0);
     stats.forestInstances = forest.count;
@@ -865,8 +921,9 @@ export const createWebGpuScenicBackdropSystem = (
       }
       group.children.forEach((child) => {
         if (
-          !child.name.startsWith("Phase 68 craggy alpine peak wall") &&
-          child.name !== "Phase 68 visible alpine ring backdrop"
+          !child.name.startsWith("Phase 69 craggy alpine peak wall") &&
+          child.name !== "Phase 69 grounded mountain-foot skirt" &&
+          child.name !== "Phase 69 visible alpine ring backdrop"
         ) {
           return;
         }

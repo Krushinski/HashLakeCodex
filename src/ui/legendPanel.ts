@@ -39,6 +39,7 @@ const driveControls = [
   ["L", "Legend"],
   ["X", "Toggle Drive Mode"],
   ["F", "Fullscreen"],
+  ["V", "Toggle scenic backdrop"],
   ["R", "Reset camera"],
   ["C", "Scenic cameras in Frame, locked chase presets in Drive"],
   ["Arrow keys", "Drive boat"],
