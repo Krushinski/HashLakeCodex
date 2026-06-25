@@ -171,18 +171,18 @@ const createTerrainMaterial = (
         float broadNoise = bl_fbm(vWorldPos.xz * 0.0028 + 7.0);
         float strata = sin(vWorldPos.y * 0.034 + bl_fbm(vWorldPos.xz * 0.006 + 31.0) * 4.2) * 0.5 + 0.5;
         float faceBreakup = bl_fbm(vec2(vWorldPos.x * 0.015 + vWorldPos.y * 0.009, vWorldPos.z * 0.015));
-        vec3 rock = mix(vec3(0.58, 0.59, 0.54), vec3(0.32, 0.36, 0.36), roughNoise)
-          * (0.84 + 0.24 * broadNoise);
-        rock = mix(rock, rock * vec3(1.20, 1.15, 0.98), strata * (1.0 - slope) * 0.15);
-        rock = mix(rock, rock * vec3(0.84, 0.90, 0.96), faceBreakup * (1.0 - slope) * 0.095);
+        vec3 rock = mix(vec3(0.60, 0.60, 0.55), vec3(0.30, 0.35, 0.34), roughNoise)
+          * (0.86 + 0.25 * broadNoise);
+        rock = mix(rock, rock * vec3(1.24, 1.18, 0.98), strata * (1.0 - slope) * 0.17);
+        rock = mix(rock, rock * vec3(0.86, 0.92, 0.98), faceBreakup * (1.0 - slope) * 0.10);
         float forest = smoothstep(0.45, 0.16, vElev) * smoothstep(0.34, 0.62, slope) * uForest;
-        vec3 forestColor = vec3(0.102, 0.182, 0.108)
-          * (0.80 + 0.48 * bl_fbm(vWorldPos.xz * 0.022 + 3.0));
-        forestColor = mix(forestColor, forestColor * vec3(1.20, 1.12, 0.82), broadNoise * 0.14);
+        vec3 forestColor = vec3(0.086, 0.166, 0.096)
+          * (0.86 + 0.46 * bl_fbm(vWorldPos.xz * 0.022 + 3.0));
+        forestColor = mix(forestColor, forestColor * vec3(1.24, 1.15, 0.82), broadNoise * 0.16);
         vec3 albedo = mix(rock, forestColor, forest);
         float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
           * smoothstep(0.18, 0.46, slope);
-        albedo = mix(albedo, vec3(0.76, 0.77, 0.72), snow * 0.26);
+        albedo = mix(albedo, vec3(0.80, 0.80, 0.74), snow * 0.22);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.30 + uAmbient * (0.45 + 0.52 * slope));
@@ -192,7 +192,7 @@ const createTerrainMaterial = (
         color *= 0.84 + slope * 0.27;
         float valleyShade = smoothstep(0.08, 0.52, vElev);
         float shadowBand = smoothstep(0.22, 0.82, bl_fbm(vec2(vWorldPos.x * 0.006, vWorldPos.y * 0.013) + 12.0));
-        color *= (0.78 + valleyShade * 0.22) * (0.93 + shadowBand * 0.07);
+        color *= (0.80 + valleyShade * 0.23) * (0.92 + shadowBand * 0.08);
         color += albedo * vec3(1.0, 0.32, 0.07) * uFire * 0.42;
         color = mix(color, color * vec3(0.82, 0.86, 0.93), uDark * 0.16);
 
