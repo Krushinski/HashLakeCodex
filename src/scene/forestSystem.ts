@@ -314,9 +314,9 @@ const makeFoliageMaterial = (
       kind: "grass",
       seed: color & 0xfff,
       size: 96,
-      base: color,
-      accent: 0x4f6540,
-      dark: 0x07120b,
+      base: 0x8f9a67,
+      accent: 0xc1c58b,
+      dark: 0x4f6146,
     }),
     roughnessMap: createProceduralRoughnessTexture("grass", (color & 0xfff) + 13, 96),
     vertexColors: true,
@@ -363,16 +363,16 @@ export const createForestSystem = (): ForestSystem => {
       kind: "wood",
       seed: 622,
       size: 96,
-      base: 0x3b2115,
-      accent: 0x6f4528,
-      dark: 0x160905,
+      base: 0x5c3822,
+      accent: 0x8b5c36,
+      dark: 0x2e190d,
     }),
     roughnessMap: createProceduralRoughnessTexture("wood", 629, 96),
     roughness: 0.92,
   });
-  const foliageMaterial = makeFoliageMaterial(0x183927, windUniforms) as THREE.MeshStandardMaterial;
-  const darkFoliageMaterial = makeFoliageMaterial(0x0d261b, windUniforms) as THREE.MeshStandardMaterial;
-  const clusterMaterial = makeFoliageMaterial(0x0b251a, windUniforms) as THREE.MeshStandardMaterial;
+  const foliageMaterial = makeFoliageMaterial(0x1f4a30, windUniforms) as THREE.MeshStandardMaterial;
+  const darkFoliageMaterial = makeFoliageMaterial(0x173725, windUniforms) as THREE.MeshStandardMaterial;
+  const clusterMaterial = makeFoliageMaterial(0x143222, windUniforms) as THREE.MeshStandardMaterial;
   const silhouetteMaterial = makeFoliageMaterial(0x04100d, windUniforms, true) as THREE.MeshBasicMaterial;
 
   const tallCanopy = new THREE.ConeGeometry(2.2, 18, 8, 2);
@@ -551,9 +551,9 @@ export const createForestSystem = (): ForestSystem => {
       kind: "reed",
       seed: 646,
       size: 96,
-      base: 0x6f8147,
-      accent: 0xb2b663,
-      dark: 0x26351c,
+      base: 0x7b8c50,
+      accent: 0xbdc47a,
+      dark: 0x46552f,
     }),
     roughnessMap: createProceduralRoughnessTexture("reed", 653, 96),
     roughness: 0.88,
@@ -596,14 +596,14 @@ export const createForestSystem = (): ForestSystem => {
   const rockCount = 66;
   const rockGeometry = new THREE.DodecahedronGeometry(1, 1);
   const rockMaterial = new THREE.MeshStandardMaterial({
-    color: 0x64675f,
+    color: 0x76796f,
     map: createProceduralTexture({
       kind: "rock",
       seed: 661,
       size: 96,
-      base: 0x62665f,
-      accent: 0x9a9f8f,
-      dark: 0x202825,
+      base: 0x74786f,
+      accent: 0xacb09e,
+      dark: 0x3e4945,
     }),
     roughnessMap: createProceduralRoughnessTexture("rock", 668, 96),
     vertexColors: true,
@@ -678,14 +678,15 @@ export const createForestSystem = (): ForestSystem => {
       const palette = getWeatherPalette(weather.stormIndex);
       windUniforms.time.value = elapsed;
       windUniforms.wind.value = 0.12 + weather.dials.wind * 1.18;
-      const darken = Math.max(0.22, 1 - weather.dials.skyDark * 0.52);
+      const darken = Math.max(0.36, 1 - weather.dials.skyDark * 0.42);
       foliageMaterial.color.setHex(palette.shorelineGrass);
-      foliageMaterial.color.multiplyScalar(darken * 0.72);
-      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x06110d : 0x10281d);
-      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x030b08 : 0x0a2016);
-      reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x59613d : 0xa4b85f);
+      foliageMaterial.color.multiplyScalar(darken * 0.92);
+      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x0b1912 : 0x183b29);
+      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x07130e : 0x132f20);
+      reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x687246 : 0xa9bd68);
       rockMaterial.color.setHex(palette.rock);
-      silhouetteMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x010607 : 0x03100d);
+      rockMaterial.color.lerp(new THREE.Color(0x9aa08f), 0.18);
+      silhouetteMaterial.color.setHex(weather.dials.skyDark > 0.48 ? 0x020908 : 0x071611);
     },
     getStats: () => {
       const treeTypeCounts = getTypeCounts();

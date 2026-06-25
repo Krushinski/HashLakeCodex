@@ -1918,11 +1918,11 @@ const createSlopedStripGeometry = (
 
   const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
     const mottled =
-      Math.sin(point.x * 0.022 + point.z * 0.015 + seed * 0.31) * 0.050 +
-      Math.cos(point.x * -0.013 + point.z * 0.026 + seed * 0.17) * 0.035;
+      Math.sin(point.x * 0.022 + point.z * 0.015 + seed * 0.31) * 0.030 +
+      Math.cos(point.x * -0.013 + point.z * 0.026 + seed * 0.17) * 0.020;
     const elevation = THREE.MathUtils.clamp((y - 0.08) / 1.42, 0, 1);
-    const tone = THREE.MathUtils.clamp(0.68 + bandT * 0.10 + elevation * 0.18 + mottled, 0.46, 1.05);
-    colors.push(tone, tone * (0.96 + bandT * 0.035), tone * (0.84 + elevation * 0.08));
+    const tone = THREE.MathUtils.clamp(0.86 + bandT * 0.065 + elevation * 0.10 + mottled, 0.72, 1.08);
+    colors.push(tone, tone * (0.985 + bandT * 0.018), tone * (0.92 + elevation * 0.045));
   };
 
   for (let index = 0; index < count; index += 1) {
@@ -1986,7 +1986,7 @@ const createOrganicMoundedEllipseGeometry = (
   rings = 5,
 ) => {
   const positions: number[] = [0, centerY, 0];
-  const colors: number[] = [1.18, 1.12, 0.94];
+  const colors: number[] = [1.28, 1.20, 1.02];
   const indices: number[] = [];
 
   for (let ring = 1; ring <= rings; ring += 1) {
@@ -2008,9 +2008,9 @@ const createOrganicMoundedEllipseGeometry = (
         Math.sin(angle) * radiusZ * t * (1 + noise * 0.72 * rimBreakup),
       );
       colors.push(
-        0.78 + dryCenter * 0.34 - wetEdge * 0.18 + rippleTone,
-        0.76 + dryCenter * 0.30 - wetEdge * 0.15 + rippleTone,
-        0.63 + dryCenter * 0.18 - wetEdge * 0.10,
+        0.94 + dryCenter * 0.20 - wetEdge * 0.08 + rippleTone,
+        0.90 + dryCenter * 0.18 - wetEdge * 0.06 + rippleTone,
+        0.72 + dryCenter * 0.12 - wetEdge * 0.035,
       );
     }
   }
@@ -2049,10 +2049,10 @@ const createShoreline = () => {
     kind: "wetSand",
     seed: 901,
     size: 128,
-    base: 0x34443b,
-    accent: 0x68735d,
-    dark: 0x13241d,
-    color: 0x3a4e3f,
+    base: 0x5d6a55,
+    accent: 0x8b8f67,
+    dark: 0x3a493e,
+    color: 0xf0f4df,
     roughness: 0.96,
     side: THREE.DoubleSide,
   });
@@ -2060,10 +2060,10 @@ const createShoreline = () => {
     kind: "grass",
     seed: 902,
     size: 128,
-    base: 0x294f32,
-    accent: 0x627247,
-    dark: 0x13251a,
-    color: 0x315c39,
+    base: 0x3f7048,
+    accent: 0x7f8d5e,
+    dark: 0x294638,
+    color: 0xecf6df,
     roughness: 0.93,
     side: THREE.DoubleSide,
   });
@@ -2071,10 +2071,10 @@ const createShoreline = () => {
     kind: "grass",
     seed: 903,
     size: 128,
-    base: 0x345e38,
-    accent: 0x7f8c55,
-    dark: 0x1a2f1f,
-    color: 0x3c6841,
+    base: 0x4e7949,
+    accent: 0x949b64,
+    dark: 0x314936,
+    color: 0xe9f3dd,
     roughness: 0.92,
     side: THREE.DoubleSide,
   });
@@ -2082,10 +2082,10 @@ const createShoreline = () => {
     kind: "grass",
     seed: 904,
     size: 128,
-    base: 0x24462e,
-    accent: 0x5b6540,
-    dark: 0x102018,
-    color: 0x2a5633,
+    base: 0x385f3b,
+    accent: 0x75734e,
+    dark: 0x24352a,
+    color: 0xe2ead6,
     roughness: 0.94,
     side: THREE.DoubleSide,
   });
@@ -2093,10 +2093,10 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 905,
     size: 128,
-    base: 0x142c1e,
-    accent: 0x33422c,
-    dark: 0x07130d,
-    color: 0x16331f,
+    base: 0x24422d,
+    accent: 0x545c3e,
+    dark: 0x14251a,
+    color: 0xd9e4cf,
     roughness: 0.98,
     side: THREE.DoubleSide,
   });
@@ -2104,10 +2104,10 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 906,
     size: 128,
-    base: 0x07140d,
-    accent: 0x21301f,
-    dark: 0x020805,
-    color: 0x0a1910,
+    base: 0x172a1d,
+    accent: 0x3d4630,
+    dark: 0x0c1710,
+    color: 0xd1dcc8,
     roughness: 1,
     side: THREE.DoubleSide,
   });
@@ -2115,10 +2115,10 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 907,
     size: 128,
-    base: 0x0b2014,
-    accent: 0x273822,
-    dark: 0x030a07,
-    color: 0x0d2316,
+    base: 0x1d3725,
+    accent: 0x4a5538,
+    dark: 0x101e15,
+    color: 0xd4dfcb,
     roughness: 0.98,
     side: THREE.DoubleSide,
   });
@@ -2227,60 +2227,60 @@ const createDestinationMarkers = () => {
     kind: "sand",
     seed: 821,
     size: 192,
-    base: 0xd6c28a,
-    accent: 0xffe8af,
-    dark: 0x9b8658,
-    color: 0xe3cf95,
-    emissive: 0x312815,
-    emissiveIntensity: 0.020,
+    base: 0xecd59a,
+    accent: 0xffefc5,
+    dark: 0xc4a66e,
+    color: 0xffffff,
+    emissive: 0x21170b,
+    emissiveIntensity: 0.012,
     roughness: 0.96,
   });
   const rockMaterial = makeTexturedStandardMaterial({
     kind: "rock",
     seed: 831,
     size: 128,
-    base: 0x68736a,
-    accent: 0x9fa790,
-    dark: 0x29332f,
-    color: SCENARIO_PALETTES.Serene.rock,
-    emissive: 0x25302c,
-    emissiveIntensity: 0.08,
+    base: 0x747b70,
+    accent: 0xb2b89f,
+    dark: 0x3f4a45,
+    color: 0xf0f1e2,
+    emissive: 0x1b221e,
+    emissiveIntensity: 0.035,
     roughness: 0.93,
   });
   const islandShelfMaterial = makeTexturedStandardMaterial({
     kind: "rock",
     seed: 833,
     size: 128,
-    base: 0x889285,
-    accent: 0xb8c0a9,
-    dark: 0x4b564c,
-    color: 0x9fa895,
-    emissive: 0x202821,
-    emissiveIntensity: 0.04,
+    base: 0x9da591,
+    accent: 0xc5c9ac,
+    dark: 0x66705f,
+    color: 0xf3f3e7,
+    emissive: 0x1a211b,
+    emissiveIntensity: 0.025,
     roughness: 0.94,
   });
   const darkRockMaterial = makeTexturedStandardMaterial({
     kind: "rock",
     seed: 837,
     size: 128,
-    base: 0x3f4b48,
-    accent: 0x707a70,
-    dark: 0x111b1a,
-    color: 0x4c5655,
+    base: 0x53605c,
+    accent: 0x858c7c,
+    dark: 0x2a3735,
+    color: 0xe4e7dd,
     roughness: 0.96,
   });
   const reedMaterial = makeTexturedStandardMaterial({
     kind: "reed",
     seed: 841,
     size: 96,
-    base: 0x6c7b42,
-    accent: 0xa3a75f,
-    dark: 0x2c361f,
-    color: 0x72824b,
+    base: 0x76884d,
+    accent: 0xb2b76d,
+    dark: 0x3d4a2a,
+    color: 0xf0f3da,
     roughness: 0.88,
   });
   const pineMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1f4028,
+    color: 0x24492b,
     roughness: 0.88,
   });
   sandMaterial.vertexColors = true;

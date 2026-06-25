@@ -105,30 +105,43 @@ export const createProceduralTexture = ({
       const fine =
         Math.sin((u * 19.0 + v * 6.0 + seed * 0.017) * Math.PI * 2) * 0.5 +
         Math.cos((v * 23.0 - u * 5.0 + seed * 0.019) * Math.PI * 2) * 0.5;
-      const grain = (rng() - 0.5) * 0.55;
-      let amount = 0.48 + broad * 0.10 + fine * 0.045 + grain * 0.08;
+      const grain = (rng() - 0.5) * 0.36;
+      let amount = 0.56 + broad * 0.065 + fine * 0.028 + grain * 0.052;
 
       if (kind === "sand" || kind === "wetSand") {
         const ripple =
           Math.sin((u * 12.0 + Math.sin(v * Math.PI * 2) * 0.52 + seed * 0.01) * Math.PI * 2) *
           0.5;
-        amount += ripple * (kind === "sand" ? 0.055 : 0.030);
+        amount += ripple * (kind === "sand" ? 0.038 : 0.020);
       } else if (kind === "wood") {
         const plank = Math.sin((u * 7.0 + seed * 0.03) * Math.PI * 2);
         const grainLine = Math.sin((v * 34.0 + u * 7.0 + seed * 0.02) * Math.PI * 2);
-        amount += plank * 0.07 + grainLine * 0.035;
+        amount += plank * 0.050 + grainLine * 0.030;
       } else if (kind === "rock") {
-        amount += Math.sin((u * 9.0 - v * 11.0 + seed * 0.05) * Math.PI * 2) * 0.075;
+        amount += Math.sin((u * 9.0 - v * 11.0 + seed * 0.05) * Math.PI * 2) * 0.046;
       } else if (kind === "grass" || kind === "forestFloor") {
-        amount += Math.sin((u * 8.0 + v * 13.0 + seed * 0.03) * Math.PI * 2) * 0.05;
+        amount += Math.sin((u * 8.0 + v * 13.0 + seed * 0.03) * Math.PI * 2) * 0.026;
       }
 
       amount = THREE.MathUtils.clamp(amount, 0, 1);
       const mid = mixRgb(darkRgb, accentRgb, amount);
+      const influence =
+        kind === "sand"
+          ? 0.46
+          : kind === "wetSand"
+            ? 0.40
+            : kind === "forestFloor"
+              ? 0.42
+              : kind === "grass"
+                ? 0.44
+                : kind === "rock"
+                  ? 0.50
+                  : 0.56;
+      const finalRgb = mixRgb(baseRgb, mid, influence);
       const offset = (y * size + x) * 4;
-      image.data[offset] = Math.round((mid.r + baseRgb.r * 0.36) / 1.36);
-      image.data[offset + 1] = Math.round((mid.g + baseRgb.g * 0.36) / 1.36);
-      image.data[offset + 2] = Math.round((mid.b + baseRgb.b * 0.36) / 1.36);
+      image.data[offset] = finalRgb.r;
+      image.data[offset + 1] = finalRgb.g;
+      image.data[offset + 2] = finalRgb.b;
       image.data[offset + 3] = 255;
     }
   }
@@ -136,16 +149,16 @@ export const createProceduralTexture = ({
   context.putImageData(image, 0, 0);
 
   if (kind === "sand") {
-    drawSpeckles(context, rng, size, colorToRgb(0xfff1be), 220, 0.14, 0.75);
-    drawSpeckles(context, rng, size, colorToRgb(0xa98f5e), 150, 0.10, 0.55);
+    drawSpeckles(context, rng, size, colorToRgb(0xfff4c9), 180, 0.10, 0.72);
+    drawSpeckles(context, rng, size, colorToRgb(0xbc9f68), 100, 0.052, 0.50);
   } else if (kind === "wetSand") {
-    drawSpeckles(context, rng, size, colorToRgb(0x91a28a), 160, 0.12, 0.65);
+    drawSpeckles(context, rng, size, colorToRgb(0xa2aa8d), 110, 0.070, 0.62);
   } else if (kind === "rock") {
-    drawSpeckles(context, rng, size, colorToRgb(0xc0c4b4), 90, 0.08, 1.25);
-    drawSpeckles(context, rng, size, colorToRgb(0x18221f), 120, 0.10, 1.1);
+    drawSpeckles(context, rng, size, colorToRgb(0xc7c9b8), 80, 0.064, 1.10);
+    drawSpeckles(context, rng, size, colorToRgb(0x2d3934), 80, 0.052, 0.95);
   } else if (kind === "grass" || kind === "forestFloor") {
-    drawSpeckles(context, rng, size, colorToRgb(0x91a067), 190, kind === "grass" ? 0.08 : 0.045, 0.8);
-    drawSpeckles(context, rng, size, colorToRgb(0x07140c), 120, 0.07, 1.0);
+    drawSpeckles(context, rng, size, colorToRgb(0x9aa670), 150, kind === "grass" ? 0.052 : 0.032, 0.76);
+    drawSpeckles(context, rng, size, colorToRgb(0x172619), 80, 0.036, 0.86);
   }
 
   const texture = new THREE.CanvasTexture(canvas);

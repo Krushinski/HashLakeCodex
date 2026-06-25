@@ -22,11 +22,11 @@ const ASSET_PATHS: Record<ScenicAssetKey, string> = {
 const ACTIVE_SCENIC_ASSET_LOADS: ScenicAssetKey[] = [];
 
 const scenicMaterials = {
-  mountainFar: new THREE.MeshStandardMaterial({ color: 0x4f6363, roughness: 0.96, metalness: 0 }),
-  mountainMid: new THREE.MeshStandardMaterial({ color: 0x223735, roughness: 0.98, metalness: 0 }),
-  mountainNear: new THREE.MeshStandardMaterial({ color: 0x061612, roughness: 1, metalness: 0 }),
+  mountainFar: new THREE.MeshStandardMaterial({ color: 0x647676, roughness: 0.96, metalness: 0 }),
+  mountainMid: new THREE.MeshStandardMaterial({ color: 0x314740, roughness: 0.98, metalness: 0 }),
+  mountainNear: new THREE.MeshStandardMaterial({ color: 0x10241e, roughness: 1, metalness: 0 }),
   mountainCap: new THREE.MeshStandardMaterial({ color: 0x9fa79a, roughness: 0.92, metalness: 0 }),
-  treeline: new THREE.MeshBasicMaterial({ color: 0x020b09, toneMapped: false }),
+  treeline: new THREE.MeshBasicMaterial({ color: 0x061410, toneMapped: false }),
 };
 
 const normalizeLoadedScene = (scene: THREE.Group, key: ScenicAssetKey) => {
