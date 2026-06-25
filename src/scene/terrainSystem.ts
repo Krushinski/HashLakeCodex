@@ -169,11 +169,16 @@ const createTerrainMaterial = (
         float slope = clamp(normal.y, 0.0, 1.0);
         float roughNoise = bl_fbm(vWorldPos.xz * 0.012);
         float broadNoise = bl_fbm(vWorldPos.xz * 0.0028 + 7.0);
+        float strata = sin(vWorldPos.y * 0.034 + bl_fbm(vWorldPos.xz * 0.006 + 31.0) * 4.2) * 0.5 + 0.5;
+        float faceBreakup = bl_fbm(vec2(vWorldPos.x * 0.015 + vWorldPos.y * 0.009, vWorldPos.z * 0.015));
         vec3 rock = mix(vec3(0.40, 0.42, 0.39), vec3(0.13, 0.16, 0.18), roughNoise)
           * (0.74 + 0.26 * broadNoise);
+        rock = mix(rock, rock * vec3(1.14, 1.10, 0.96), strata * (1.0 - slope) * 0.16);
+        rock = mix(rock, rock * vec3(0.72, 0.78, 0.84), faceBreakup * (1.0 - slope) * 0.13);
         float forest = smoothstep(0.45, 0.16, vElev) * smoothstep(0.34, 0.62, slope) * uForest;
         vec3 forestColor = vec3(0.035, 0.080, 0.050)
           * (0.75 + 0.55 * bl_fbm(vWorldPos.xz * 0.022 + 3.0));
+        forestColor = mix(forestColor, forestColor * vec3(1.22, 1.12, 0.76), broadNoise * 0.16);
         vec3 albedo = mix(rock, forestColor, forest);
         float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
           * smoothstep(0.18, 0.46, slope);

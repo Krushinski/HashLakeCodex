@@ -2,6 +2,10 @@ import * as THREE from "three";
 import type { WeatherSnapshot } from "../state/weatherEngine";
 import { getWeatherPalette } from "./artDirection";
 import {
+  createProceduralRoughnessTexture,
+  createProceduralTexture,
+} from "./proceduralMaterials";
+import {
   LAKE_MAP,
   ZONE_TRUTH,
   distanceToShore,
@@ -306,6 +310,15 @@ const makeFoliageMaterial = (
 
   const material = new THREE.MeshStandardMaterial({
     color,
+    map: createProceduralTexture({
+      kind: "grass",
+      seed: color & 0xfff,
+      size: 96,
+      base: color,
+      accent: 0x4f6540,
+      dark: 0x07120b,
+    }),
+    roughnessMap: createProceduralRoughnessTexture("grass", (color & 0xfff) + 13, 96),
     vertexColors: true,
     roughness: 0.96,
     metalness: 0,
@@ -346,6 +359,15 @@ export const createForestSystem = (): ForestSystem => {
 
   const trunkMaterial = new THREE.MeshStandardMaterial({
     color: 0x4c3020,
+    map: createProceduralTexture({
+      kind: "wood",
+      seed: 622,
+      size: 96,
+      base: 0x3b2115,
+      accent: 0x6f4528,
+      dark: 0x160905,
+    }),
+    roughnessMap: createProceduralRoughnessTexture("wood", 629, 96),
     roughness: 0.92,
   });
   const foliageMaterial = makeFoliageMaterial(0x183927, windUniforms) as THREE.MeshStandardMaterial;
@@ -525,6 +547,15 @@ export const createForestSystem = (): ForestSystem => {
   const reedGeometry = new THREE.CylinderGeometry(0.08, 0.16, 4.8, 5, 1);
   const reedMaterial = new THREE.MeshStandardMaterial({
     color: 0x95aa55,
+    map: createProceduralTexture({
+      kind: "reed",
+      seed: 646,
+      size: 96,
+      base: 0x6f8147,
+      accent: 0xb2b663,
+      dark: 0x26351c,
+    }),
+    roughnessMap: createProceduralRoughnessTexture("reed", 653, 96),
     roughness: 0.88,
   });
   installWindShader(reedMaterial, windUniforms);
@@ -566,6 +597,15 @@ export const createForestSystem = (): ForestSystem => {
   const rockGeometry = new THREE.DodecahedronGeometry(1, 1);
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: 0x64675f,
+    map: createProceduralTexture({
+      kind: "rock",
+      seed: 661,
+      size: 96,
+      base: 0x62665f,
+      accent: 0x9a9f8f,
+      dark: 0x202825,
+    }),
+    roughnessMap: createProceduralRoughnessTexture("rock", 668, 96),
     vertexColors: true,
     roughness: 0.95,
   });

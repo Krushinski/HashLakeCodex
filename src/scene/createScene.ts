@@ -26,6 +26,10 @@ import {
   animateWater,
   createWater,
 } from "./waterSystem";
+import {
+  applyPlanarUvs,
+  makeTexturedStandardMaterial,
+} from "./proceduralMaterials";
 
 type HashlakeSceneOptions = {
   container: HTMLElement;
@@ -1448,20 +1452,38 @@ const createBoat = () => {
   boat.position.copy(BOAT_HOME);
   boat.scale.setScalar(0.82);
 
-  const hullMaterial = new THREE.MeshStandardMaterial({
-    color: 0x7a3f1d,
+  const hullMaterial = makeTexturedStandardMaterial({
+    kind: "wood",
+    seed: 701,
+    size: 128,
+    base: 0x6d3218,
+    accent: 0xb56a32,
+    dark: 0x2f1308,
+    color: 0x82411d,
     roughness: 0.34,
     metalness: 0.03,
     emissive: 0x160704,
     emissiveIntensity: 0.055,
   });
-  const trimMaterial = new THREE.MeshStandardMaterial({
-    color: 0xc79655,
+  const trimMaterial = makeTexturedStandardMaterial({
+    kind: "wood",
+    seed: 707,
+    size: 128,
+    base: 0x9a6435,
+    accent: 0xd8a15d,
+    dark: 0x563016,
+    color: 0xb87a3d,
     roughness: 0.30,
     metalness: 0.02,
   });
-  const deckMaterial = new THREE.MeshStandardMaterial({
-    color: 0xb87538,
+  const deckMaterial = makeTexturedStandardMaterial({
+    kind: "wood",
+    seed: 713,
+    size: 128,
+    base: 0x8b4a22,
+    accent: 0xd08a45,
+    dark: 0x3e190b,
+    color: 0xb46b31,
     roughness: 0.28,
     metalness: 0.02,
     emissive: 0x150805,
@@ -1505,7 +1527,7 @@ const createBoat = () => {
     roughness: 0.7,
   });
 
-  const hull = new THREE.Mesh(createSpeedboatHullGeometry(), hullMaterial);
+  const hull = new THREE.Mesh(applyPlanarUvs(createSpeedboatHullGeometry(), 7.4), hullMaterial);
   hull.castShadow = true;
   boat.add(hull);
 
@@ -1890,8 +1912,18 @@ const createSlopedStripGeometry = (
 ) => {
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
   const count = Math.min(inner.length, outer.length);
+
+  const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
+    const mottled =
+      Math.sin(point.x * 0.022 + point.z * 0.015 + seed * 0.31) * 0.050 +
+      Math.cos(point.x * -0.013 + point.z * 0.026 + seed * 0.17) * 0.035;
+    const elevation = THREE.MathUtils.clamp((y - 0.08) / 1.42, 0, 1);
+    const tone = THREE.MathUtils.clamp(0.68 + bandT * 0.10 + elevation * 0.18 + mottled, 0.46, 1.05);
+    colors.push(tone, tone * (0.96 + bandT * 0.035), tone * (0.84 + elevation * 0.08));
+  };
 
   for (let index = 0; index < count; index += 1) {
     const t = index / count;
@@ -1911,6 +1943,8 @@ const createSlopedStripGeometry = (
       outerY + outerNoise,
       outer[index].z,
     );
+    pushTone(inner[index], 0, innerY + innerNoise);
+    pushTone(outer[index], 1, outerY + outerNoise);
   }
 
   for (let index = 0; index < count; index += 1) {
@@ -1923,9 +1957,10 @@ const createSlopedStripGeometry = (
   }
 
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  return geometry;
+  return applyPlanarUvs(geometry, 92, 900, 700);
 };
 
 const createRadialBoundary = (
@@ -1951,11 +1986,14 @@ const createOrganicMoundedEllipseGeometry = (
   rings = 5,
 ) => {
   const positions: number[] = [0, centerY, 0];
+  const colors: number[] = [1.18, 1.12, 0.94];
   const indices: number[] = [];
 
   for (let ring = 1; ring <= rings; ring += 1) {
     const t = ring / rings;
     const height = edgeY + (centerY - edgeY) * Math.pow(1 - smoothstepNumber(0, 1, t), 0.74);
+    const dryCenter = 1 - smoothstepNumber(0.18, 0.92, t);
+    const wetEdge = smoothstepNumber(0.58, 1, t);
     for (let index = 0; index < count; index += 1) {
       const angle = (index / count) * Math.PI * 2;
       const noise =
@@ -1963,10 +2001,16 @@ const createOrganicMoundedEllipseGeometry = (
         Math.cos(angle * 5.1 + seed * 0.31 + ring * 0.24) * wobble * 0.42 +
         Math.sin(angle * 8.6 + seed * 0.11) * wobble * 0.18;
       const rimBreakup = ring === rings ? 1.12 : 0.72;
+      const rippleTone = Math.sin(angle * 7.0 + seed * 0.07 + ring * 0.9) * 0.025;
       positions.push(
         Math.cos(angle) * radiusX * t * (1 + noise * rimBreakup),
         height + noise * 0.08,
         Math.sin(angle) * radiusZ * t * (1 + noise * 0.72 * rimBreakup),
+      );
+      colors.push(
+        0.78 + dryCenter * 0.34 - wetEdge * 0.18 + rippleTone,
+        0.76 + dryCenter * 0.30 - wetEdge * 0.15 + rippleTone,
+        0.63 + dryCenter * 0.18 - wetEdge * 0.10,
       );
     }
   }
@@ -1992,27 +2036,104 @@ const createOrganicMoundedEllipseGeometry = (
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  return geometry;
+  return applyPlanarUvs(geometry, Math.max(34, Math.max(radiusX, radiusZ) * 0.72), radiusX, radiusZ);
 };
 
 const createShoreline = () => {
   const group = new THREE.Group();
   group.name = "Clean lake basin terrain";
-  const makeTerrainMaterial = (color: number) =>
-    new THREE.MeshBasicMaterial({
-      color,
-      fog: true,
-      side: THREE.DoubleSide,
-    });
-  const wetSandMaterial = makeTerrainMaterial(0x384c38);
-  const bankToeMaterial = makeTerrainMaterial(0x2d6b40);
-  const bankMaterial = makeTerrainMaterial(0x235331);
-  const forestShelfMaterial = makeTerrainMaterial(0x123321);
-  const landMaterial = makeTerrainMaterial(0x08170f);
-  const midForestMaterial = makeTerrainMaterial(0x0a2014);
+  const wetSandMaterial = makeTexturedStandardMaterial({
+    kind: "wetSand",
+    seed: 901,
+    size: 128,
+    base: 0x34443b,
+    accent: 0x68735d,
+    dark: 0x13241d,
+    color: 0x3a4e3f,
+    roughness: 0.96,
+    side: THREE.DoubleSide,
+  });
+  const bankToeMaterial = makeTexturedStandardMaterial({
+    kind: "grass",
+    seed: 902,
+    size: 128,
+    base: 0x294f32,
+    accent: 0x627247,
+    dark: 0x13251a,
+    color: 0x315c39,
+    roughness: 0.93,
+    side: THREE.DoubleSide,
+  });
+  const grassTransitionMaterial = makeTexturedStandardMaterial({
+    kind: "grass",
+    seed: 903,
+    size: 128,
+    base: 0x345e38,
+    accent: 0x7f8c55,
+    dark: 0x1a2f1f,
+    color: 0x3c6841,
+    roughness: 0.92,
+    side: THREE.DoubleSide,
+  });
+  const bankMaterial = makeTexturedStandardMaterial({
+    kind: "grass",
+    seed: 904,
+    size: 128,
+    base: 0x24462e,
+    accent: 0x5b6540,
+    dark: 0x102018,
+    color: 0x2a5633,
+    roughness: 0.94,
+    side: THREE.DoubleSide,
+  });
+  const forestShelfMaterial = makeTexturedStandardMaterial({
+    kind: "forestFloor",
+    seed: 905,
+    size: 128,
+    base: 0x142c1e,
+    accent: 0x33422c,
+    dark: 0x07130d,
+    color: 0x16331f,
+    roughness: 0.98,
+    side: THREE.DoubleSide,
+  });
+  const landMaterial = makeTexturedStandardMaterial({
+    kind: "forestFloor",
+    seed: 906,
+    size: 128,
+    base: 0x07140d,
+    accent: 0x21301f,
+    dark: 0x020805,
+    color: 0x0a1910,
+    roughness: 1,
+    side: THREE.DoubleSide,
+  });
+  const midForestMaterial = makeTexturedStandardMaterial({
+    kind: "forestFloor",
+    seed: 907,
+    size: 128,
+    base: 0x0b2014,
+    accent: 0x273822,
+    dark: 0x030a07,
+    color: 0x0d2316,
+    roughness: 0.98,
+    side: THREE.DoubleSide,
+  });
   const landInner = getExpandedOutline(ZONE_TRUTH.forestShelfOuter);
+  [
+    wetSandMaterial,
+    bankToeMaterial,
+    grassTransitionMaterial,
+    bankMaterial,
+    forestShelfMaterial,
+    landMaterial,
+    midForestMaterial,
+  ].forEach((material) => {
+    material.vertexColors = true;
+  });
   const land = new THREE.Mesh(
     createSlopedStripGeometry(
       landInner,
@@ -2043,7 +2164,7 @@ const createShoreline = () => {
 
   const grassTransition = new THREE.Mesh(
     createSlopedStripGeometry(getExpandedOutline(42), getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), 0.72, 1.02, 17, 0.014),
-    makeTerrainMaterial(0x2f6b3f),
+    grassTransitionMaterial,
   );
   grassTransition.receiveShadow = true;
   group.add(grassTransition);
@@ -2092,31 +2213,78 @@ const animateShoreline = (
 const createDestinationMarkers = () => {
   const group = new THREE.Group();
   group.name = "Phase 12 destination landmarks";
-  const dockMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5b36, roughness: 0.72 });
-  const sandMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf0d8a2,
-    emissive: 0x312815,
-    emissiveIntensity: 0.030,
-    roughness: 0.92,
+  const dockMaterial = makeTexturedStandardMaterial({
+    kind: "wood",
+    seed: 811,
+    size: 128,
+    base: 0x7c4b29,
+    accent: 0xbe8050,
+    dark: 0x3a2112,
+    color: 0x8b5b36,
+    roughness: 0.72,
   });
-  const rockMaterial = new THREE.MeshStandardMaterial({
+  const sandMaterial = makeTexturedStandardMaterial({
+    kind: "sand",
+    seed: 821,
+    size: 192,
+    base: 0xd6c28a,
+    accent: 0xffe8af,
+    dark: 0x9b8658,
+    color: 0xe3cf95,
+    emissive: 0x312815,
+    emissiveIntensity: 0.020,
+    roughness: 0.96,
+  });
+  const rockMaterial = makeTexturedStandardMaterial({
+    kind: "rock",
+    seed: 831,
+    size: 128,
+    base: 0x68736a,
+    accent: 0x9fa790,
+    dark: 0x29332f,
     color: SCENARIO_PALETTES.Serene.rock,
     emissive: 0x25302c,
-    emissiveIntensity: 0.16,
-    roughness: 0.9,
-  });
-  const islandShelfMaterial = new THREE.MeshStandardMaterial({
-    color: 0xaeb8a6,
-    emissive: 0x202821,
     emissiveIntensity: 0.08,
-    roughness: 0.92,
+    roughness: 0.93,
   });
-  const darkRockMaterial = new THREE.MeshStandardMaterial({ color: 0x4c5655, roughness: 0.96 });
-  const reedMaterial = new THREE.MeshStandardMaterial({ color: 0x6f8147, roughness: 0.86 });
-  const pineMaterial = new THREE.MeshStandardMaterial({
-    color: 0x24492b,
+  const islandShelfMaterial = makeTexturedStandardMaterial({
+    kind: "rock",
+    seed: 833,
+    size: 128,
+    base: 0x889285,
+    accent: 0xb8c0a9,
+    dark: 0x4b564c,
+    color: 0x9fa895,
+    emissive: 0x202821,
+    emissiveIntensity: 0.04,
+    roughness: 0.94,
+  });
+  const darkRockMaterial = makeTexturedStandardMaterial({
+    kind: "rock",
+    seed: 837,
+    size: 128,
+    base: 0x3f4b48,
+    accent: 0x707a70,
+    dark: 0x111b1a,
+    color: 0x4c5655,
+    roughness: 0.96,
+  });
+  const reedMaterial = makeTexturedStandardMaterial({
+    kind: "reed",
+    seed: 841,
+    size: 96,
+    base: 0x6c7b42,
+    accent: 0xa3a75f,
+    dark: 0x2c361f,
+    color: 0x72824b,
     roughness: 0.88,
   });
+  const pineMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1f4028,
+    roughness: 0.88,
+  });
+  sandMaterial.vertexColors = true;
+  islandShelfMaterial.vertexColors = true;
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x91f2bf });
   const lanternMaterial = new THREE.MeshBasicMaterial({ color: 0xffd37d });
   const dockCenter = getDestinationCenter("dock");
