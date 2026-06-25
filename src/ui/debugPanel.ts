@@ -335,6 +335,7 @@ const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
     `M${counts.mediumConifer}`,
     `L${counts.layeredConifer}`,
     `B${counts.broadEvergreenCluster}`,
+    `C${counts.canopyMound}`,
     `F${counts.distantSilhouetteTree}`,
     `Y${counts.youngPine}`,
   ].join(" ");

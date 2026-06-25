@@ -127,7 +127,7 @@ export const createProceduralTexture = ({
       const mid = mixRgb(darkRgb, accentRgb, amount);
       const influence =
         kind === "sand"
-          ? 0.28
+          ? 0.22
           : kind === "wetSand"
             ? 0.40
             : kind === "forestFloor"
@@ -149,8 +149,8 @@ export const createProceduralTexture = ({
   context.putImageData(image, 0, 0);
 
   if (kind === "sand") {
-    drawSpeckles(context, rng, size, colorToRgb(0xffffed), 190, 0.082, 0.68);
-    drawSpeckles(context, rng, size, colorToRgb(0xc7aa72), 82, 0.038, 0.46);
+    drawSpeckles(context, rng, size, colorToRgb(0xffffff), 210, 0.074, 0.62);
+    drawSpeckles(context, rng, size, colorToRgb(0xd2bd82), 70, 0.030, 0.42);
   } else if (kind === "wetSand") {
     drawSpeckles(context, rng, size, colorToRgb(0xa2aa8d), 110, 0.070, 0.62);
   } else if (kind === "rock") {

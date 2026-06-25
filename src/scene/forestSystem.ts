@@ -28,6 +28,7 @@ export type NativeTreeTypeKey =
   | "mediumConifer"
   | "layeredConifer"
   | "broadEvergreenCluster"
+  | "canopyMound"
   | "distantSilhouetteTree"
   | "youngPine";
 
@@ -92,6 +93,7 @@ const emptyTypeCounts = (): NativeTreeTypeCounts => ({
   mediumConifer: 0,
   layeredConifer: 0,
   broadEvergreenCluster: 0,
+  canopyMound: 0,
   distantSilhouetteTree: 0,
   youngPine: 0,
 });
@@ -168,15 +170,15 @@ const groundHeightAt = (point: LakePoint) => {
     return THREE.MathUtils.lerp(1.02, 1.16, (clearance - 42) / (ZONE_TRUTH.shorelineGrassOuter - 42));
   }
   if (clearance < ZONE_TRUTH.raisedBankOuter) {
-    return THREE.MathUtils.lerp(1.16, 1.38, (clearance - ZONE_TRUTH.shorelineGrassOuter) / (ZONE_TRUTH.raisedBankOuter - ZONE_TRUTH.shorelineGrassOuter));
+    return THREE.MathUtils.lerp(1.16, 1.42, (clearance - ZONE_TRUTH.shorelineGrassOuter) / (ZONE_TRUTH.raisedBankOuter - ZONE_TRUTH.shorelineGrassOuter));
   }
   if (clearance < 214) {
-    return THREE.MathUtils.lerp(1.38, 1.60, (clearance - ZONE_TRUTH.forestShelfInner) / (214 - ZONE_TRUTH.forestShelfInner));
+    return THREE.MathUtils.lerp(1.42, 1.70, (clearance - ZONE_TRUTH.forestShelfInner) / (214 - ZONE_TRUTH.forestShelfInner));
   }
   if (clearance < ZONE_TRUTH.forestShelfOuter) {
-    return THREE.MathUtils.lerp(1.60, 1.86, (clearance - 214) / (ZONE_TRUTH.forestShelfOuter - 214));
+    return THREE.MathUtils.lerp(1.70, 2.02, (clearance - 214) / (ZONE_TRUTH.forestShelfOuter - 214));
   }
-  return 1.94;
+  return 2.10;
 };
 
 const getBandRange = (band: PlacementBand) => {
@@ -184,10 +186,10 @@ const getBandRange = (band: PlacementBand) => {
     return { min: 44, max: 108, jitter: 30 };
   }
   if (band === "mid") {
-    return { min: 92, max: 226, jitter: 54 };
+    return { min: 88, max: 238, jitter: 64 };
   }
   if (band === "far") {
-    return { min: 156, max: ZONE_TRUTH.farForestMaxShoreClearance, jitter: 108 };
+    return { min: 146, max: ZONE_TRUTH.farForestMaxShoreClearance, jitter: 126 };
   }
   if (band === "cove") {
     return { min: 86, max: 230, jitter: 48 };
@@ -253,14 +255,14 @@ const sampleTreeInstance = (
 
   const point = { x: shore.x, z: shore.z };
   const inland = THREE.MathUtils.clamp((-distanceToShore(point) - 38) / 300, 0, 1);
-  const lightness = baseLightness - inland * 0.064 + (rng() - 0.5) * 0.045;
+  const lightness = baseLightness - inland * 0.074 + (rng() - 0.5) * 0.052;
   return {
     point,
     groundY: groundHeightAt(point),
     yaw: rng() * Math.PI * 2,
-    heightScale: 0.78 + rng() * 0.50 + inland * 0.40,
-    widthScale: 0.72 + rng() * 0.52 + inland * 0.10,
-    color: new THREE.Color().setHSL(baseHue + (rng() - 0.5) * 0.044, 0.22 + rng() * 0.20, lightness),
+    heightScale: 0.76 + rng() * 0.56 + inland * 0.50,
+    widthScale: 0.70 + rng() * 0.58 + inland * 0.14,
+    color: new THREE.Color().setHSL(baseHue + (rng() - 0.5) * 0.052, 0.20 + rng() * 0.22, lightness),
     band,
   } satisfies TreeInstance;
 };
@@ -314,9 +316,9 @@ const makeFoliageMaterial = (
       kind: "grass",
       seed: color & 0xfff,
       size: 96,
-      base: 0x81905d,
-      accent: 0xb5bd82,
-      dark: 0x334934,
+      base: 0x788a58,
+      accent: 0xb3bf7d,
+      dark: 0x2f4932,
     }),
     roughnessMap: createProceduralRoughnessTexture("grass", (color & 0xfff) + 13, 96),
     vertexColors: true,
@@ -375,12 +377,13 @@ export const createForestSystem = (): ForestSystem => {
   const clusterMaterial = makeFoliageMaterial(0x143222, windUniforms) as THREE.MeshStandardMaterial;
   const silhouetteMaterial = makeFoliageMaterial(0x04100d, windUniforms, true) as THREE.MeshBasicMaterial;
 
-  const tallCanopy = new THREE.ConeGeometry(2.15, 19.2, 8, 2);
+  const tallCanopy = new THREE.ConeGeometry(2.15, 20.4, 8, 2);
   const shortCanopy = new THREE.ConeGeometry(2.9, 10.5, 8, 2);
-  const mediumCanopy = new THREE.ConeGeometry(3.35, 14.8, 9, 2);
+  const mediumCanopy = new THREE.ConeGeometry(3.45, 15.6, 9, 2);
   const youngCanopy = new THREE.ConeGeometry(1.35, 5.8, 7, 1);
-  const broadCanopy = new THREE.DodecahedronGeometry(3.45, 1);
-  const silhouetteCanopy = new THREE.ConeGeometry(3.8, 19.5, 6, 1);
+  const broadCanopy = new THREE.DodecahedronGeometry(3.75, 1);
+  const canopyMoundGeometry = new THREE.DodecahedronGeometry(4.4, 1);
+  const silhouetteCanopy = new THREE.ConeGeometry(4.0, 21.0, 6, 1);
   const layerLow = new THREE.ConeGeometry(3.7, 7.5, 8, 1);
   const layerMid = new THREE.ConeGeometry(2.8, 6.8, 8, 1);
   const layerTop = new THREE.ConeGeometry(1.9, 6.2, 8, 1);
@@ -477,12 +480,12 @@ export const createForestSystem = (): ForestSystem => {
     treeBuilds.push({ key, meshes: [canopy, trunks], baseCount: instances.length });
   };
 
-  addSimpleTreeType("tallNarrowPine", 126, ["mid", "far", "far", "far", "cove"], tallCanopy, foliageMaterial, 5.2, 1.0, 13.1, 0.92, 1.02, 0.35, 0.17);
-  addSimpleTreeType("shortPine", 60, ["near", "dock", "mid"], shortCanopy, foliageMaterial, 3.0, 0.86, 7.4, 0.94, 0.95, 0.34, 0.19);
-  addSimpleTreeType("mediumConifer", 124, ["mid", "far", "far", "near", "far"], mediumCanopy, foliageMaterial, 4.0, 0.96, 10.0, 1.0, 1.0, 0.35, 0.18);
-  addSimpleTreeType("youngPine", 52, ["near", "dock"], youngCanopy, foliageMaterial, 1.7, 0.58, 4.2, 0.84, 0.92, 0.34, 0.21);
+  addSimpleTreeType("tallNarrowPine", 158, ["mid", "far", "far", "far", "cove"], tallCanopy, foliageMaterial, 5.2, 1.0, 13.1, 0.92, 1.02, 0.35, 0.17);
+  addSimpleTreeType("shortPine", 66, ["near", "dock", "mid"], shortCanopy, foliageMaterial, 3.0, 0.86, 7.4, 0.94, 0.95, 0.34, 0.19);
+  addSimpleTreeType("mediumConifer", 160, ["mid", "far", "far", "near", "far"], mediumCanopy, foliageMaterial, 4.0, 0.96, 10.0, 1.0, 1.0, 0.35, 0.18);
+  addSimpleTreeType("youngPine", 58, ["near", "dock"], youngCanopy, foliageMaterial, 1.7, 0.58, 4.2, 0.84, 0.92, 0.34, 0.21);
 
-  const layeredInstances = makeInstances(112, "layeredConifer", ["mid", "far", "far", "far", "cove"], 0.35, 0.165);
+  const layeredInstances = makeInstances(148, "layeredConifer", ["mid", "far", "far", "far", "cove"], 0.35, 0.165);
   const layeredTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, layeredInstances.length, "Native tree type - layeredConifer trunks");
   const layeredLow = makeInstancedMesh(layerLow, darkFoliageMaterial, layeredInstances.length, "Native tree type - layeredConifer low skirt");
   const layeredMid = makeInstancedMesh(layerMid, darkFoliageMaterial, layeredInstances.length, "Native tree type - layeredConifer middle skirt");
@@ -502,7 +505,7 @@ export const createForestSystem = (): ForestSystem => {
     baseCount: layeredInstances.length,
   });
 
-  const broadInstances = makeInstances(88, "broadEvergreenCluster", ["far", "far", "far", "mid", "cove"], 0.34, 0.145);
+  const broadInstances = makeInstances(126, "broadEvergreenCluster", ["far", "far", "far", "mid", "cove"], 0.34, 0.145);
   const broad = makeInstancedMesh(broadCanopy, clusterMaterial, broadInstances.length, "Native tree type - broadEvergreenCluster crowns");
   const broadTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, broadInstances.length, "Native tree type - broadEvergreenCluster trunks");
   broadInstances.forEach((instance, index) => {
@@ -524,7 +527,30 @@ export const createForestSystem = (): ForestSystem => {
     baseCount: broadInstances.length,
   });
 
-  const distantInstances = makeInstances(520, "distantSilhouetteTree", ["far", "far", "far", "far", "mid"], 0.36, 0.105);
+  const canopyInstances = makeInstances(240, "canopyMound", ["mid", "far", "far", "far", "cove"], 0.335, 0.132);
+  const canopyMounds = makeInstancedMesh(canopyMoundGeometry, clusterMaterial, canopyInstances.length, "Native tree type - canopyMound crowns");
+  canopyInstances.forEach((instance, index) => {
+    const inland = THREE.MathUtils.clamp((-distanceToShore(instance.point) - 86) / 260, 0, 1);
+    position.set(instance.point.x, instance.groundY + 5.0 * instance.heightScale, instance.point.z);
+    quaternion.setFromAxisAngle(up, instance.yaw);
+    scale.set(
+      (1.05 + inland * 0.42) * instance.widthScale,
+      (0.58 + inland * 0.18) * instance.heightScale,
+      (0.72 + rng() * 0.42) * instance.widthScale,
+    );
+    matrix.compose(position, quaternion, scale);
+    canopyMounds.setMatrixAt(index, matrix);
+    canopyMounds.setColorAt(index, instance.color);
+  });
+  finalizeMesh(canopyMounds, canopyInstances.length);
+  group.add(canopyMounds);
+  treeBuilds.push({
+    key: "canopyMound",
+    meshes: [canopyMounds],
+    baseCount: canopyInstances.length,
+  });
+
+  const distantInstances = makeInstances(740, "distantSilhouetteTree", ["far", "far", "far", "far", "mid"], 0.36, 0.105);
   const distant = makeInstancedMesh(silhouetteCanopy, silhouetteMaterial, distantInstances.length, "Native tree type - distantSilhouetteTree band");
   distantInstances.forEach((instance, index) => {
     const height = 0.72 + rng() * 1.05 + (instance.band === "far" ? 0.25 : 0);
@@ -681,8 +707,8 @@ export const createForestSystem = (): ForestSystem => {
       const darken = Math.max(0.36, 1 - weather.dials.skyDark * 0.42);
       foliageMaterial.color.setHex(palette.shorelineGrass);
       foliageMaterial.color.multiplyScalar(darken * 0.92);
-      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x0b1912 : 0x1b422d);
-      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x07130e : 0x153622);
+      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x0b1912 : 0x1d492f);
+      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x07130e : 0x173b24);
       reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x687246 : 0xa9bd68);
       rockMaterial.color.setHex(palette.rock);
       rockMaterial.color.lerp(new THREE.Color(0x9aa08f), 0.18);

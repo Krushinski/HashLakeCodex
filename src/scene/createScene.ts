@@ -326,14 +326,14 @@ const SCENIC_CAMERA_PRESETS: ScenicCameraPreset[] = [
     sideOffset: -10,
   },
   {
-    name: "Wide Reflection",
-    distance: 104,
-    height: 30,
-    lookAhead: 24,
-    lookHeight: 6.6,
+    name: "Helicopter Truth View",
+    distance: 154,
+    height: 76,
+    lookAhead: 82,
+    lookHeight: 18,
     yawOffset: Math.PI * 0.18,
-    lookPitch: -0.02,
-    sideOffset: -4,
+    lookPitch: -0.055,
+    sideOffset: -8,
   },
   {
     name: "Three-Quarter Boat Portrait",
@@ -1456,10 +1456,10 @@ const createBoat = () => {
     kind: "wood",
     seed: 701,
     size: 128,
-    base: 0x7b3b1d,
-    accent: 0xc47a3a,
+    base: 0x884523,
+    accent: 0xd18440,
     dark: 0x35170a,
-    color: 0x935027,
+    color: 0xa15c30,
     roughness: 0.34,
     metalness: 0.03,
     emissive: 0x1d0a04,
@@ -1469,10 +1469,10 @@ const createBoat = () => {
     kind: "wood",
     seed: 707,
     size: 128,
-    base: 0xaa7140,
-    accent: 0xe5b06d,
+    base: 0xb87b46,
+    accent: 0xf0bc77,
     dark: 0x61391a,
-    color: 0xc98b4b,
+    color: 0xd19958,
     roughness: 0.30,
     metalness: 0.02,
   });
@@ -1480,10 +1480,10 @@ const createBoat = () => {
     kind: "wood",
     seed: 713,
     size: 128,
-    base: 0x9a5529,
-    accent: 0xdf984f,
+    base: 0xaa622f,
+    accent: 0xeda75c,
     dark: 0x4a210e,
-    color: 0xc47a3c,
+    color: 0xd28a47,
     roughness: 0.28,
     metalness: 0.02,
     emissive: 0x150805,
@@ -1984,19 +1984,19 @@ type MoundToneProfile = {
 };
 
 const sandMoundTone: MoundToneProfile = {
-  center: [2.04, 1.98, 1.78],
-  dry: [1.84, 1.76, 1.52],
-  damp: [1.10, 0.92, 0.64],
-  edge: [0.82, 0.69, 0.48],
-  ripple: 0.012,
+  center: [2.26, 2.20, 2.02],
+  dry: [2.04, 1.96, 1.74],
+  damp: [1.16, 0.99, 0.70],
+  edge: [0.84, 0.72, 0.52],
+  ripple: 0.008,
 };
 
 const sandbarMoundTone: MoundToneProfile = {
-  center: [2.12, 2.06, 1.84],
-  dry: [1.92, 1.84, 1.58],
-  damp: [1.12, 0.94, 0.64],
-  edge: [0.82, 0.69, 0.48],
-  ripple: 0.010,
+  center: [2.34, 2.28, 2.08],
+  dry: [2.12, 2.04, 1.80],
+  damp: [1.18, 1.00, 0.70],
+  edge: [0.84, 0.72, 0.52],
+  ripple: 0.007,
 };
 
 const rockMoundTone: MoundToneProfile = {
@@ -2091,10 +2091,10 @@ const createShoreline = () => {
     kind: "wetSand",
     seed: 901,
     size: 128,
-    base: 0x6f735b,
-    accent: 0xa2a277,
-    dark: 0x465142,
-    color: 0xf7efd0,
+    base: 0x78785f,
+    accent: 0xaaa77b,
+    dark: 0x4b5544,
+    color: 0xf9f1d4,
     roughness: 0.96,
     side: THREE.DoubleSide,
   });
@@ -2102,8 +2102,8 @@ const createShoreline = () => {
     kind: "grass",
     seed: 902,
     size: 128,
-    base: 0x476f46,
-    accent: 0x8e9a65,
+    base: 0x4b7448,
+    accent: 0x97a46d,
     dark: 0x2c4634,
     color: 0xeef5dc,
     roughness: 0.93,
@@ -2113,8 +2113,8 @@ const createShoreline = () => {
     kind: "grass",
     seed: 903,
     size: 128,
-    base: 0x4a7344,
-    accent: 0x9aa36c,
+    base: 0x4e7545,
+    accent: 0xa1aa72,
     dark: 0x2b4431,
     color: 0xe8f0d8,
     roughness: 0.92,
@@ -2124,8 +2124,8 @@ const createShoreline = () => {
     kind: "grass",
     seed: 904,
     size: 128,
-    base: 0x345a38,
-    accent: 0x747a50,
+    base: 0x345c39,
+    accent: 0x7a8157,
     dark: 0x213329,
     color: 0xdde7d1,
     roughness: 0.94,
@@ -2135,8 +2135,8 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 905,
     size: 128,
-    base: 0x213d2b,
-    accent: 0x556442,
+    base: 0x203f2c,
+    accent: 0x5b6a46,
     dark: 0x122419,
     color: 0xd4dec9,
     roughness: 0.98,
@@ -2146,8 +2146,8 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 906,
     size: 128,
-    base: 0x182f20,
-    accent: 0x445339,
+    base: 0x17311f,
+    accent: 0x485a3c,
     dark: 0x0d1a12,
     color: 0xd0dcc7,
     roughness: 1,
@@ -2157,8 +2157,8 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 907,
     size: 128,
-    base: 0x1b3524,
-    accent: 0x4e5e3e,
+    base: 0x1b3825,
+    accent: 0x536442,
     dark: 0x0f2016,
     color: 0xd2deca,
     roughness: 0.98,
@@ -2180,8 +2180,8 @@ const createShoreline = () => {
     createSlopedStripGeometry(
       landInner,
       createRadialBoundary(landInner, LAKE_MAP.worldRadius),
-      1.66,
-      1.94,
+      1.78,
+      2.10,
       22,
       0.018,
     ),
@@ -2212,21 +2212,21 @@ const createShoreline = () => {
   group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.34, 29, 0.014),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.38, 29, 0.014),
     bankMaterial,
   );
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
   const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.34, 1.56, 37, 0.012),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.38, 1.66, 37, 0.012),
     forestShelfMaterial,
   );
   forestShelf.receiveShadow = true;
   group.add(forestShelf);
 
   const midForestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.56, 1.72, 43, 0.014),
+    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.66, 1.88, 43, 0.014),
     midForestMaterial,
   );
   midForestShelf.receiveShadow = true;
@@ -2269,9 +2269,9 @@ const createDestinationMarkers = () => {
     kind: "sand",
     seed: 821,
     size: 192,
-    base: 0xfffae8,
-    accent: 0xfffff7,
-    dark: 0xd3bd84,
+    base: 0xfffff0,
+    accent: 0xffffff,
+    dark: 0xdac991,
     color: 0xffffff,
     emissive: 0x30291c,
     emissiveIntensity: 0.032,
