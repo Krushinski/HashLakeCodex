@@ -26,6 +26,11 @@ import {
   isScenicExperimentalRequested,
   type ScenicExperimentalStats,
 } from "./realismSpike";
+import {
+  createWebGpuScenicBackdropSystem,
+  isWebGpuScenicRequested,
+  type WebGpuScenicStats,
+} from "./webgpuScenicBackdrop";
 import { createTerrainSystem } from "./terrainSystem";
 import {
   type WaterSurface,
@@ -169,6 +174,7 @@ type SceneTelemetry = {
   pixelRatio: number;
   renderScale: number;
   scenicExperimental: ScenicExperimentalStats;
+  webGpuScenic: WebGpuScenicStats;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
   activeRings: number;
@@ -568,6 +574,7 @@ export const createHashlakeScene = ({
   container.append(renderer.domElement);
   const rendererCapabilities = detectRendererCapabilities(renderer);
   const scenicExperimentalRequested = isScenicExperimentalRequested();
+  const webGpuScenicRequested = isWebGpuScenicRequested();
 
   const sunlight = new THREE.DirectionalLight(SCENARIO_PALETTES.Serene.directionalLight, 3.6);
   sunlight.position.set(-36, 72, 45);
@@ -593,6 +600,8 @@ export const createHashlakeScene = ({
   scene.add(forestSystem.group);
   const realismSpikeSystem = createRealismSpikeSystem(rendererCapabilities);
   scene.add(realismSpikeSystem.group);
+  const webGpuScenicSystem = createWebGpuScenicBackdropSystem(rendererCapabilities);
+  scene.add(webGpuScenicSystem.group);
   const scenicAssetSystem = createScenicAssetSystem();
   scene.add(scenicAssetSystem.group);
   const horizonHaze = createHorizonHaze();
@@ -761,7 +770,7 @@ export const createHashlakeScene = ({
   const getScenicExperimentalGate = () => {
     const eligible = rendererCapabilities.webgl2 && !isMobileViewport;
     const autoRequested = qualityState.preset === "Scenic";
-    const requested = scenicExperimentalRequested || autoRequested;
+    const requested = !webGpuScenicRequested && (scenicExperimentalRequested || autoRequested);
     const active =
       requested &&
       eligible &&
@@ -783,6 +792,32 @@ export const createHashlakeScene = ({
       requested,
       eligible,
       active,
+      reason,
+    };
+  };
+
+  const getWebGpuScenicGate = () => {
+    const webglEligible = rendererCapabilities.webgl2 && !isMobileViewport;
+    const eligible = webglEligible && rendererCapabilities.webgpu;
+    const requested = webGpuScenicRequested;
+    const active = requested && webglEligible;
+    const fallbackActive = !active;
+    const reason = active
+      ? rendererCapabilities.webgpu
+        ? "WebGPU probe + WebGL scenic proof"
+        : "WebGPU unavailable; WebGL scenic approximation"
+      : !requested
+        ? "not requested"
+        : !rendererCapabilities.webgl2
+            ? "requires WebGL2 fallback"
+            : isMobileViewport
+              ? "disabled on mobile viewport"
+              : "capability gate closed";
+    return {
+      requested,
+      eligible,
+      active,
+      fallbackActive,
       reason,
     };
   };
@@ -866,7 +901,9 @@ export const createHashlakeScene = ({
     const scenicAssetStatuses = scenicAssetSystem.getStatuses();
     const scenicAssetsActive = qualityState.preset !== "Performance";
     const scenicExperimentalGate = getScenicExperimentalGate();
+    const webGpuScenicGate = getWebGpuScenicGate();
     realismSpikeSystem.setGate(scenicExperimentalGate);
+    webGpuScenicSystem.setGate(webGpuScenicGate);
     terrainSystem.setScenicBackdropActive(
       scenicAssetsActive &&
         (scenicAssetStatuses.mountain === "loaded" ||
@@ -880,6 +917,7 @@ export const createHashlakeScene = ({
     animateShoreline(shoreline, elapsed, weather);
     terrainSystem.update(weather, camera);
     realismSpikeSystem.update(weather, camera, elapsed);
+    webGpuScenicSystem.update(weather, camera, elapsed);
     if (elapsed - lastForestUpdateAt >= qualityState.forestUpdateInterval) {
       forestSystem.update(elapsed, weather);
       lastForestUpdateAt = elapsed;
@@ -1324,6 +1362,7 @@ export const createHashlakeScene = ({
           pixelRatio: qualityState.pixelRatio,
           renderScale: qualityState.effectScale,
           scenicExperimental: realismSpikeSystem.getStats(),
+          webGpuScenic: webGpuScenicSystem.getStats(),
           activeWakeBlocks: getActiveWakeBlocks(),
           activeEffectBlocks: effectStats.splashBlocks,
           activeRings: effectStats.rings,
