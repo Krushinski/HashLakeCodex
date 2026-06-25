@@ -127,13 +127,13 @@ export const createProceduralTexture = ({
       const mid = mixRgb(darkRgb, accentRgb, amount);
       const influence =
         kind === "sand"
-          ? 0.34
+          ? 0.28
           : kind === "wetSand"
             ? 0.40
             : kind === "forestFloor"
-              ? 0.42
-              : kind === "grass"
-                ? 0.44
+              ? 0.48
+            : kind === "grass"
+                ? 0.48
                 : kind === "rock"
                   ? 0.50
                   : 0.56;
@@ -149,16 +149,16 @@ export const createProceduralTexture = ({
   context.putImageData(image, 0, 0);
 
   if (kind === "sand") {
-    drawSpeckles(context, rng, size, colorToRgb(0xfff4c9), 180, 0.10, 0.72);
-    drawSpeckles(context, rng, size, colorToRgb(0xbc9f68), 100, 0.052, 0.50);
+    drawSpeckles(context, rng, size, colorToRgb(0xffffed), 190, 0.082, 0.68);
+    drawSpeckles(context, rng, size, colorToRgb(0xc7aa72), 82, 0.038, 0.46);
   } else if (kind === "wetSand") {
     drawSpeckles(context, rng, size, colorToRgb(0xa2aa8d), 110, 0.070, 0.62);
   } else if (kind === "rock") {
     drawSpeckles(context, rng, size, colorToRgb(0xc7c9b8), 80, 0.064, 1.10);
     drawSpeckles(context, rng, size, colorToRgb(0x2d3934), 80, 0.052, 0.95);
   } else if (kind === "grass" || kind === "forestFloor") {
-    drawSpeckles(context, rng, size, colorToRgb(0x9aa670), 150, kind === "grass" ? 0.052 : 0.032, 0.76);
-    drawSpeckles(context, rng, size, colorToRgb(0x172619), 80, 0.036, 0.86);
+    drawSpeckles(context, rng, size, colorToRgb(0xa8b57a), 170, kind === "grass" ? 0.052 : 0.038, 0.82);
+    drawSpeckles(context, rng, size, colorToRgb(0x18281b), 96, kind === "grass" ? 0.034 : 0.046, 0.92);
   }
 
   const texture = new THREE.CanvasTexture(canvas);

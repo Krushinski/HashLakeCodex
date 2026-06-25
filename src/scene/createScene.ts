@@ -1456,23 +1456,23 @@ const createBoat = () => {
     kind: "wood",
     seed: 701,
     size: 128,
-    base: 0x6d3218,
-    accent: 0xb56a32,
-    dark: 0x2f1308,
-    color: 0x82411d,
+    base: 0x7b3b1d,
+    accent: 0xc47a3a,
+    dark: 0x35170a,
+    color: 0x935027,
     roughness: 0.34,
     metalness: 0.03,
-    emissive: 0x160704,
-    emissiveIntensity: 0.055,
+    emissive: 0x1d0a04,
+    emissiveIntensity: 0.06,
   });
   const trimMaterial = makeTexturedStandardMaterial({
     kind: "wood",
     seed: 707,
     size: 128,
-    base: 0x9a6435,
-    accent: 0xd8a15d,
-    dark: 0x563016,
-    color: 0xb87a3d,
+    base: 0xaa7140,
+    accent: 0xe5b06d,
+    dark: 0x61391a,
+    color: 0xc98b4b,
     roughness: 0.30,
     metalness: 0.02,
   });
@@ -1480,10 +1480,10 @@ const createBoat = () => {
     kind: "wood",
     seed: 713,
     size: 128,
-    base: 0x8b4a22,
-    accent: 0xd08a45,
-    dark: 0x3e190b,
-    color: 0xb46b31,
+    base: 0x9a5529,
+    accent: 0xdf984f,
+    dark: 0x4a210e,
+    color: 0xc47a3c,
     roughness: 0.28,
     metalness: 0.02,
     emissive: 0x150805,
@@ -1984,11 +1984,19 @@ type MoundToneProfile = {
 };
 
 const sandMoundTone: MoundToneProfile = {
-  center: [1.72, 1.66, 1.48],
-  dry: [1.50, 1.42, 1.24],
-  damp: [1.00, 0.82, 0.54],
-  edge: [0.78, 0.64, 0.42],
-  ripple: 0.016,
+  center: [2.04, 1.98, 1.78],
+  dry: [1.84, 1.76, 1.52],
+  damp: [1.10, 0.92, 0.64],
+  edge: [0.82, 0.69, 0.48],
+  ripple: 0.012,
+};
+
+const sandbarMoundTone: MoundToneProfile = {
+  center: [2.12, 2.06, 1.84],
+  dry: [1.92, 1.84, 1.58],
+  damp: [1.12, 0.94, 0.64],
+  edge: [0.82, 0.69, 0.48],
+  ripple: 0.010,
 };
 
 const rockMoundTone: MoundToneProfile = {
@@ -2083,10 +2091,10 @@ const createShoreline = () => {
     kind: "wetSand",
     seed: 901,
     size: 128,
-    base: 0x5d6a55,
-    accent: 0x8b8f67,
-    dark: 0x3a493e,
-    color: 0xf0f4df,
+    base: 0x6f735b,
+    accent: 0xa2a277,
+    dark: 0x465142,
+    color: 0xf7efd0,
     roughness: 0.96,
     side: THREE.DoubleSide,
   });
@@ -2094,10 +2102,10 @@ const createShoreline = () => {
     kind: "grass",
     seed: 902,
     size: 128,
-    base: 0x3f7048,
-    accent: 0x7f8d5e,
-    dark: 0x294638,
-    color: 0xecf6df,
+    base: 0x476f46,
+    accent: 0x8e9a65,
+    dark: 0x2c4634,
+    color: 0xeef5dc,
     roughness: 0.93,
     side: THREE.DoubleSide,
   });
@@ -2105,10 +2113,10 @@ const createShoreline = () => {
     kind: "grass",
     seed: 903,
     size: 128,
-    base: 0x4e7949,
-    accent: 0x949b64,
-    dark: 0x314936,
-    color: 0xe9f3dd,
+    base: 0x4a7344,
+    accent: 0x9aa36c,
+    dark: 0x2b4431,
+    color: 0xe8f0d8,
     roughness: 0.92,
     side: THREE.DoubleSide,
   });
@@ -2116,10 +2124,10 @@ const createShoreline = () => {
     kind: "grass",
     seed: 904,
     size: 128,
-    base: 0x385f3b,
-    accent: 0x75734e,
-    dark: 0x24352a,
-    color: 0xe2ead6,
+    base: 0x345a38,
+    accent: 0x747a50,
+    dark: 0x213329,
+    color: 0xdde7d1,
     roughness: 0.94,
     side: THREE.DoubleSide,
   });
@@ -2127,10 +2135,10 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 905,
     size: 128,
-    base: 0x24422d,
-    accent: 0x545c3e,
-    dark: 0x14251a,
-    color: 0xd9e4cf,
+    base: 0x213d2b,
+    accent: 0x556442,
+    dark: 0x122419,
+    color: 0xd4dec9,
     roughness: 0.98,
     side: THREE.DoubleSide,
   });
@@ -2138,10 +2146,10 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 906,
     size: 128,
-    base: 0x172a1d,
-    accent: 0x3d4630,
-    dark: 0x0c1710,
-    color: 0xd1dcc8,
+    base: 0x182f20,
+    accent: 0x445339,
+    dark: 0x0d1a12,
+    color: 0xd0dcc7,
     roughness: 1,
     side: THREE.DoubleSide,
   });
@@ -2149,10 +2157,10 @@ const createShoreline = () => {
     kind: "forestFloor",
     seed: 907,
     size: 128,
-    base: 0x1d3725,
-    accent: 0x4a5538,
-    dark: 0x101e15,
-    color: 0xd4dfcb,
+    base: 0x1b3524,
+    accent: 0x4e5e3e,
+    dark: 0x0f2016,
+    color: 0xd2deca,
     roughness: 0.98,
     side: THREE.DoubleSide,
   });
@@ -2172,8 +2180,8 @@ const createShoreline = () => {
     createSlopedStripGeometry(
       landInner,
       createRadialBoundary(landInner, LAKE_MAP.worldRadius),
-      1.42,
-      1.50,
+      1.66,
+      1.94,
       22,
       0.018,
     ),
@@ -2204,21 +2212,21 @@ const createShoreline = () => {
   group.add(grassTransition);
 
   const raisedBank = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.31, 29, 0.014),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.34, 29, 0.014),
     bankMaterial,
   );
   raisedBank.receiveShadow = true;
   group.add(raisedBank);
 
   const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.31, 1.50, 37, 0.012),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.34, 1.56, 37, 0.012),
     forestShelfMaterial,
   );
   forestShelf.receiveShadow = true;
   group.add(forestShelf);
 
   const midForestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.50, 1.62, 43, 0.014),
+    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.56, 1.72, 43, 0.014),
     midForestMaterial,
   );
   midForestShelf.receiveShadow = true;
@@ -2261,12 +2269,12 @@ const createDestinationMarkers = () => {
     kind: "sand",
     seed: 821,
     size: 192,
-    base: 0xf7edcf,
-    accent: 0xffffef,
-    dark: 0xc49c5f,
+    base: 0xfffae8,
+    accent: 0xfffff7,
+    dark: 0xd3bd84,
     color: 0xffffff,
-    emissive: 0x302b20,
-    emissiveIntensity: 0.026,
+    emissive: 0x30291c,
+    emissiveIntensity: 0.032,
     roughness: 0.96,
   });
   const rockMaterial = makeTexturedStandardMaterial({
@@ -2395,6 +2403,7 @@ const createDestinationMarkers = () => {
       0.19,
       208,
       7,
+      sandbarMoundTone,
     ),
     sandMaterial,
   );

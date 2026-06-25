@@ -171,12 +171,12 @@ const createTerrainMaterial = (
         float broadNoise = bl_fbm(vWorldPos.xz * 0.0028 + 7.0);
         float strata = sin(vWorldPos.y * 0.034 + bl_fbm(vWorldPos.xz * 0.006 + 31.0) * 4.2) * 0.5 + 0.5;
         float faceBreakup = bl_fbm(vec2(vWorldPos.x * 0.015 + vWorldPos.y * 0.009, vWorldPos.z * 0.015));
-        vec3 rock = mix(vec3(0.44, 0.46, 0.42), vec3(0.22, 0.26, 0.27), roughNoise)
+        vec3 rock = mix(vec3(0.50, 0.52, 0.48), vec3(0.27, 0.31, 0.31), roughNoise)
           * (0.82 + 0.22 * broadNoise);
         rock = mix(rock, rock * vec3(1.16, 1.12, 0.98), strata * (1.0 - slope) * 0.13);
         rock = mix(rock, rock * vec3(0.82, 0.88, 0.94), faceBreakup * (1.0 - slope) * 0.085);
         float forest = smoothstep(0.45, 0.16, vElev) * smoothstep(0.34, 0.62, slope) * uForest;
-        vec3 forestColor = vec3(0.065, 0.120, 0.075)
+        vec3 forestColor = vec3(0.080, 0.145, 0.092)
           * (0.82 + 0.44 * bl_fbm(vWorldPos.xz * 0.022 + 3.0));
         forestColor = mix(forestColor, forestColor * vec3(1.16, 1.10, 0.82), broadNoise * 0.12);
         vec3 albedo = mix(rock, forestColor, forest);
@@ -185,16 +185,16 @@ const createTerrainMaterial = (
         albedo = mix(albedo, vec3(0.72, 0.74, 0.70), snow * 0.24);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
-        vec3 color = albedo * (uSunColor * diffuse * 1.18 + uAmbient * (0.38 + 0.44 * slope));
+        vec3 color = albedo * (uSunColor * diffuse * 1.24 + uAmbient * (0.42 + 0.48 * slope));
         vec3 sideNormal = normalize(vec3(normal.x, 0.0, normal.z) + vec3(0.001, 0.0, 0.001));
         float sideLight = smoothstep(-0.55, 0.70, dot(sideNormal, normalize(vec3(-0.72, 0.0, -0.44))));
-        color *= 0.76 + sideLight * 0.34;
-        color *= 0.76 + slope * 0.24;
+        color *= 0.80 + sideLight * 0.36;
+        color *= 0.80 + slope * 0.24;
         float valleyShade = smoothstep(0.08, 0.52, vElev);
         float shadowBand = smoothstep(0.22, 0.82, bl_fbm(vec2(vWorldPos.x * 0.006, vWorldPos.y * 0.013) + 12.0));
         color *= (0.78 + valleyShade * 0.22) * (0.93 + shadowBand * 0.07);
         color += albedo * vec3(1.0, 0.32, 0.07) * uFire * 0.42;
-        color = mix(color, color * vec3(0.72, 0.76, 0.84), uDark * 0.26);
+        color = mix(color, color * vec3(0.78, 0.82, 0.90), uDark * 0.20);
 
         float distanceToCamera = distance(vWorldPos, uCamPos);
         float haze = 1.0 - exp(-pow(distanceToCamera * uHazeDen, 1.45));
