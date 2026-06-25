@@ -905,9 +905,10 @@ export const createHashlakeScene = ({
     realismSpikeSystem.setGate(scenicExperimentalGate);
     webGpuScenicSystem.setGate(webGpuScenicGate);
     terrainSystem.setScenicBackdropActive(
-      scenicAssetsActive &&
-        (scenicAssetStatuses.mountain === "loaded" ||
-          scenicAssetStatuses.mountainAlpha === "loaded"),
+      webGpuScenicGate.active ||
+        (scenicAssetsActive &&
+          (scenicAssetStatuses.mountain === "loaded" ||
+            scenicAssetStatuses.mountainAlpha === "loaded")),
     );
     forestSystem.setScenicTreelineActive(
       scenicAssetsActive && scenicAssetStatuses.treeline === "loaded",

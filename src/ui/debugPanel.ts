@@ -140,9 +140,13 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "WebGPU active", value: "no", tone: "muted" },
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
   { group: "global", label: "Fallback", value: "active", tone: "good" },
-  { group: "global", label: "P67 terrain", value: "0", tone: "muted" },
-  { group: "global", label: "P67 forest", value: "0", tone: "muted" },
-  { group: "global", label: "P67 fog", value: "off", tone: "muted" },
+  { group: "global", label: "Scenic active", value: "no", tone: "muted" },
+  { group: "global", label: "Scenic terrain", value: "no", tone: "muted" },
+  { group: "global", label: "Scenic forest", value: "no", tone: "muted" },
+  { group: "global", label: "Scenic fog", value: "no", tone: "muted" },
+  { group: "global", label: "P68 terrain", value: "0", tone: "muted" },
+  { group: "global", label: "P68 forest", value: "0", tone: "muted" },
+  { group: "global", label: "P68 fog", value: "off", tone: "muted" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
   { group: "weather", label: "Wake blocks", value: "0" },
   { group: "weather", label: "Splash blocks", value: "0" },
@@ -1165,17 +1169,37 @@ export const createDebugPanel = (
       telemetry.webGpuScenic.fallbackActive ? "good" : "warn",
     );
     setMetric(
-      "P67 terrain",
+      "Scenic active",
+      telemetry.webGpuScenic.active ? "yes" : "no",
+      telemetry.webGpuScenic.active ? "good" : "muted",
+    );
+    setMetric(
+      "Scenic terrain",
+      telemetry.webGpuScenic.terrainVisible ? "yes" : "no",
+      telemetry.webGpuScenic.terrainVisible ? "good" : "muted",
+    );
+    setMetric(
+      "Scenic forest",
+      telemetry.webGpuScenic.forestVisible ? "yes" : "no",
+      telemetry.webGpuScenic.forestVisible ? "good" : "muted",
+    );
+    setMetric(
+      "Scenic fog",
+      telemetry.webGpuScenic.fogVisible ? "yes" : "no",
+      telemetry.webGpuScenic.fogVisible ? "good" : "muted",
+    );
+    setMetric(
+      "P68 terrain",
       String(telemetry.webGpuScenic.terrainVertices),
       telemetry.webGpuScenic.active ? "good" : "muted",
     );
     setMetric(
-      "P67 forest",
+      "P68 forest",
       String(telemetry.webGpuScenic.forestInstances),
       telemetry.webGpuScenic.active ? "good" : "muted",
     );
     setMetric(
-      "P67 fog",
+      "P68 fog",
       telemetry.webGpuScenic.fogMode,
       telemetry.webGpuScenic.active ? "good" : "muted",
     );
