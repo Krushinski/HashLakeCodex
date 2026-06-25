@@ -75,6 +75,16 @@ export const createEventToasts = (
       return;
     }
 
+    if (event.type === "scenic") {
+      if (event.message) {
+        pushToast(
+          event.message,
+          event.message.toLowerCase().includes("enabled") ? "signal" : "neutral",
+        );
+      }
+      return;
+    }
+
     if (event.message) {
       pushToast(event.message, "neutral");
     }

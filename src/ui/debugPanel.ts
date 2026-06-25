@@ -128,7 +128,7 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Renderer", value: "WebGLRenderer", tone: "muted" },
   { group: "global", label: "WebGL2", value: "--", tone: "muted" },
   { group: "global", label: "WebGPU", value: "--", tone: "muted" },
-  { group: "global", label: "Quality", value: "Balanced", tone: "muted" },
+  { group: "global", label: "Perf Governor", value: "Balanced", tone: "muted" },
   { group: "global", label: "Frame ms", value: "--" },
   { group: "global", label: "Pixel ratio", value: "1.00" },
   { group: "global", label: "Render scale", value: "1.00" },
@@ -136,6 +136,7 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Legacy verts", value: "0", tone: "muted" },
   { group: "global", label: "Legacy forest", value: "0", tone: "muted" },
   { group: "global", label: "Legacy fog", value: "0", tone: "muted" },
+  { group: "global", label: "Scenic Mode", value: "OFF", tone: "muted" },
   { group: "global", label: "WebGPU scenic", value: "off", tone: "muted" },
   { group: "global", label: "WebGPU active", value: "no", tone: "muted" },
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
@@ -145,9 +146,9 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Scenic terrain", value: "no", tone: "muted" },
   { group: "global", label: "Scenic forest", value: "no", tone: "muted" },
   { group: "global", label: "Scenic fog", value: "no", tone: "muted" },
-  { group: "global", label: "P69 terrain", value: "0", tone: "muted" },
-  { group: "global", label: "P69 forest", value: "0", tone: "muted" },
-  { group: "global", label: "P69 fog", value: "off", tone: "muted" },
+  { group: "global", label: "P70 terrain", value: "0", tone: "muted" },
+  { group: "global", label: "P70 forest", value: "0", tone: "muted" },
+  { group: "global", label: "P70 fog", value: "off", tone: "muted" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
   { group: "weather", label: "Wake blocks", value: "0" },
   { group: "weather", label: "Splash blocks", value: "0" },
@@ -1120,7 +1121,11 @@ export const createDebugPanel = (
     setMetric("Renderer", telemetry.scenicExperimental.rendererPath, "muted");
     setMetric("WebGL2", telemetry.scenicExperimental.webgl2 ? "supported" : "no", telemetry.scenicExperimental.webgl2 ? "good" : "warn");
     setMetric("WebGPU", telemetry.scenicExperimental.webgpu ? "available" : "deferred", telemetry.scenicExperimental.webgpu ? "good" : "muted");
-    setMetric("Quality", telemetry.qualityPreset, telemetry.qualityPreset === "Performance" ? "warn" : telemetry.qualityPreset === "Scenic" ? "good" : "muted");
+    setMetric(
+      "Perf Governor",
+      telemetry.qualityPreset,
+      telemetry.qualityPreset === "Performance" ? "warn" : telemetry.qualityPreset === "Scenic" ? "good" : "muted",
+    );
     setMetric("Frame ms", `${telemetry.frameTimeMs.toFixed(1)} ms`);
     setMetric("Pixel ratio", telemetry.pixelRatio.toFixed(2));
     setMetric("Render scale", telemetry.renderScale.toFixed(2));
@@ -1143,6 +1148,17 @@ export const createDebugPanel = (
       "Legacy fog",
       `${telemetry.scenicExperimental.fogLayers} layers`,
       telemetry.scenicExperimental.active ? "good" : "muted",
+    );
+    setMetric(
+      "Scenic Mode",
+      telemetry.webGpuScenic.scenicMode,
+      telemetry.webGpuScenic.scenicMode === "ON"
+        ? "good"
+        : telemetry.webGpuScenic.scenicMode === "ERROR"
+          ? "bad"
+          : telemetry.webGpuScenic.scenicMode === "FALLBACK"
+            ? "warn"
+            : "muted",
     );
     setMetric(
       "WebGPU scenic",
@@ -1196,17 +1212,17 @@ export const createDebugPanel = (
       telemetry.webGpuScenic.fogVisible ? "good" : "muted",
     );
     setMetric(
-      "P69 terrain",
+      "P70 terrain",
       String(telemetry.webGpuScenic.terrainVertices),
       telemetry.webGpuScenic.active ? "good" : "muted",
     );
     setMetric(
-      "P69 forest",
+      "P70 forest",
       String(telemetry.webGpuScenic.forestInstances),
       telemetry.webGpuScenic.active ? "good" : "muted",
     );
     setMetric(
-      "P69 fog",
+      "P70 fog",
       telemetry.webGpuScenic.fogMode,
       telemetry.webGpuScenic.active ? "good" : "muted",
     );

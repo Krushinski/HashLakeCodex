@@ -28,7 +28,7 @@ import {
 } from "./realismSpike";
 import {
   createWebGpuScenicBackdropSystem,
-  isWebGpuScenicRequested,
+  getWebGpuScenicPreference,
   type WebGpuScenicStats,
 } from "./webgpuScenicBackdrop";
 import { createTerrainSystem } from "./terrainSystem";
@@ -574,7 +574,8 @@ export const createHashlakeScene = ({
   container.append(renderer.domElement);
   const rendererCapabilities = detectRendererCapabilities(renderer);
   const scenicExperimentalRequested = isScenicExperimentalRequested();
-  let webGpuScenicRequested = isWebGpuScenicRequested();
+  const initialWebGpuScenicPreference = getWebGpuScenicPreference();
+  let webGpuScenicRequested = initialWebGpuScenicPreference.requested;
 
   const sunlight = new THREE.DirectionalLight(SCENARIO_PALETTES.Serene.directionalLight, 3.6);
   sunlight.position.set(-36, 72, 45);
@@ -715,6 +716,16 @@ export const createHashlakeScene = ({
   let animationId = 0;
   let hasRenderedFrame = false;
   let isRunning = false;
+  const scenicAutoEnableEligible =
+    !initialWebGpuScenicPreference.explicitDisabled &&
+    !initialWebGpuScenicPreference.explicit &&
+    !isMobileViewport &&
+    (rendererCapabilities.webgpu || rendererCapabilities.webgl2);
+  const scenicAutoEnableAt = startedAt + 5600;
+  let scenicAutoEnabled = false;
+  let scenicAutoReduced = false;
+  let scenicAutoLowSamples = 0;
+  let lastScenicHudMode: "OFF" | "ON" | "FALLBACK" | "ERROR" | null = null;
 
   const resize = () => {
     const { clientWidth, clientHeight } = container;
@@ -822,14 +833,40 @@ export const createHashlakeScene = ({
     };
   };
 
-  const setWebGpuScenicRequested = (requested: boolean, source: "keyboard" | "debug" | "event" = "event") => {
+  type ScenicRequestSource = "keyboard" | "debug" | "event" | "auto" | "auto-reduced";
+
+  const setWebGpuScenicRequested = (
+    requested: boolean,
+    source: ScenicRequestSource = "event",
+  ) => {
     webGpuScenicRequested = requested;
-    try {
-      window.localStorage.setItem("hashlake.webgpuScenic", String(requested));
-    } catch {
-      // Non-critical: URL flag and in-memory state still work if storage is unavailable.
+    const shouldPersist = source === "keyboard" || source === "debug";
+    if (shouldPersist) {
+      try {
+        window.localStorage.setItem("hashlake.webgpuScenic", String(requested));
+      } catch {
+        // Non-critical: URL flag and in-memory state still work if storage is unavailable.
+      }
     }
-    showDriveHudMessage(driveHud, requested ? "SCENIC BACKDROP ON" : "SCENIC BACKDROP OFF");
+    showDriveHudMessage(driveHud, requested ? "SCENIC MODE ON" : "FALLBACK MODE");
+    eventBus.emit({
+      type: "scenic",
+      message:
+        source === "auto-reduced"
+          ? "Scenic reduced for performance"
+          : requested
+            ? "Scenic mode enabled"
+            : "Scenic mode disabled",
+    });
+    if (
+      requested &&
+      (!rendererCapabilities.webgl2 || isMobileViewport)
+    ) {
+      eventBus.emit({
+        type: "scenic",
+        message: "Scenic unavailable - fallback active",
+      });
+    }
     if (source !== "event") {
       window.dispatchEvent(
         new CustomEvent("hashlake:scenic-mode-changed", {
@@ -839,7 +876,7 @@ export const createHashlakeScene = ({
     }
   };
 
-  const toggleWebGpuScenicRequested = (source: "keyboard" | "debug" | "event" = "event") => {
+  const toggleWebGpuScenicRequested = (source: ScenicRequestSource = "event") => {
     setWebGpuScenicRequested(!webGpuScenicRequested, source);
   };
 
@@ -859,6 +896,23 @@ export const createHashlakeScene = ({
 
     if (now < qualityState.warmupUntil) {
       return;
+    }
+
+    if (scenicAutoEnabled && webGpuScenicRequested) {
+      if (fps < 22) {
+        scenicAutoLowSamples += 1;
+      } else if (fps > 27) {
+        scenicAutoLowSamples = Math.max(0, scenicAutoLowSamples - 1);
+      } else {
+        scenicAutoLowSamples = Math.max(0, scenicAutoLowSamples - 0.5);
+      }
+
+      if (scenicAutoLowSamples >= 3) {
+        scenicAutoReduced = true;
+        scenicAutoEnabled = false;
+        scenicAutoLowSamples = 0;
+        setWebGpuScenicRequested(false, "auto-reduced");
+      }
     }
 
     const deviceCap = Math.min(window.devicePixelRatio || 1, QUALITY_MAX_PIXEL_RATIO);
@@ -918,6 +972,18 @@ export const createHashlakeScene = ({
     const delta = Math.min(0.045, Math.max(0.001, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
     governQuality(delta, now);
+    if (
+      scenicAutoEnableEligible &&
+      !scenicAutoEnabled &&
+      !scenicAutoReduced &&
+      !webGpuScenicRequested &&
+      now >= scenicAutoEnableAt &&
+      qualityState.fps >= 24 &&
+      qualityState.preset !== "Performance"
+    ) {
+      scenicAutoEnabled = true;
+      setWebGpuScenicRequested(true, "auto");
+    }
     const weather = weatherStore.getSnapshot();
     const scenicAssetStatuses = scenicAssetSystem.getStatuses();
     const scenicAssetsActive = qualityState.preset !== "Performance";
@@ -925,6 +991,25 @@ export const createHashlakeScene = ({
     const webGpuScenicGate = getWebGpuScenicGate();
     realismSpikeSystem.setGate(scenicExperimentalGate);
     webGpuScenicSystem.setGate(webGpuScenicGate);
+    const scenicHudMode = webGpuScenicGate.active
+      ? "ON"
+      : webGpuScenicGate.requested
+        ? "FALLBACK"
+        : "OFF";
+    if (lastScenicHudMode !== scenicHudMode) {
+      if (
+        lastScenicHudMode !== null &&
+        scenicHudMode === "FALLBACK" &&
+        webGpuScenicGate.requested
+      ) {
+        showDriveHudMessage(driveHud, "FALLBACK MODE");
+        eventBus.emit({
+          type: "scenic",
+          message: "Scenic unavailable - fallback active",
+        });
+      }
+      lastScenicHudMode = scenicHudMode;
+    }
     terrainSystem.setScenicBackdropActive(
       webGpuScenicGate.active ||
         (scenicAssetsActive &&

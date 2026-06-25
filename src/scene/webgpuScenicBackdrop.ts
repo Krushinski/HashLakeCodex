@@ -17,6 +17,7 @@ export type WebGpuScenicStats = {
   active: boolean;
   fallbackActive: boolean;
   reason: string;
+  scenicMode: "OFF" | "ON" | "FALLBACK" | "ERROR";
   rendererPath: "WebGL Performance" | "WebGL ScenicExperimental" | "WebGPU ScenicExperimental";
   webgpuAvailable: boolean;
   webgpuActive: boolean;
@@ -31,6 +32,13 @@ export type WebGpuScenicStats = {
   fogVisible: boolean;
   compareMode: boolean;
   extraRenderPass: boolean;
+};
+
+export type WebGpuScenicPreference = {
+  requested: boolean;
+  source: "url-on" | "url-off" | "storage-on" | "storage-off" | "unset";
+  explicit: boolean;
+  explicitDisabled: boolean;
 };
 
 export type WebGpuScenicGate = {
@@ -64,22 +72,33 @@ const TERRAIN_SEGMENTS_Z = 88;
 const TERRAIN_WIDTH = 3300;
 const TERRAIN_NEAR_Z = -640;
 const TERRAIN_FAR_Z = -2320;
-const FOREST_SPIRE_TARGET = 52000;
-const FOREST_CANOPY_TARGET = 8200;
+const FOREST_SPIRE_TARGET = 76000;
+const FOREST_CANOPY_TARGET = 16800;
 
-export const isWebGpuScenicRequested = () => {
+export const getWebGpuScenicPreference = (): WebGpuScenicPreference => {
   try {
     const params = new URLSearchParams(window.location.search);
     if (params.get("webgpuScenic") === "1") {
-      return true;
+      return { requested: true, source: "url-on", explicit: true, explicitDisabled: false };
     }
     if (params.get("webgpuScenic") === "0") {
-      return false;
+      return { requested: false, source: "url-off", explicit: true, explicitDisabled: true };
     }
-    return window.localStorage.getItem("hashlake.webgpuScenic") === "true";
+    const stored = window.localStorage.getItem("hashlake.webgpuScenic");
+    if (stored === "true") {
+      return { requested: true, source: "storage-on", explicit: true, explicitDisabled: false };
+    }
+    if (stored === "false") {
+      return { requested: false, source: "storage-off", explicit: true, explicitDisabled: true };
+    }
   } catch {
-    return false;
+    // Storage may be unavailable in restrictive browser contexts. Fall back safely.
   }
+  return { requested: false, source: "unset", explicit: false, explicitDisabled: false };
+};
+
+export const isWebGpuScenicRequested = () => {
+  return getWebGpuScenicPreference().requested;
 };
 
 const isScenicCompareRequested = () => {
@@ -349,9 +368,9 @@ const angleDelta = (a: number, b: number) => {
 const buildAlpineRingGeometry = () => {
   const noise = makeNoise2D(68273);
   const thetaSegments = 256;
-  const radialSegments = 22;
-  const rInner = 620;
-  const rOuter = 2380;
+  const radialSegments = 24;
+  const rInner = 700;
+  const rOuter = 2520;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const flatnesses: number[] = [];
@@ -374,7 +393,7 @@ const buildAlpineRingGeometry = () => {
       noise.fbm(cos * 5.4 + warp * 4.0, sin * 5.4 - warp * 3.0, 5) * 0.48 +
       Math.max(0, Math.sin(theta * 19.0 + 0.8)) * 0.12;
     ridge = THREE.MathUtils.clamp(ridge, 0.20, 1.46);
-    const peakHeight = 150 + ridge * 410;
+    const peakHeight = 195 + ridge * 505;
 
     for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
       const radial = radialIndex / radialSegments;
@@ -427,8 +446,8 @@ const buildFoothillSkirtGeometry = () => {
   const noise = makeNoise2D(69137);
   const thetaSegments = 192;
   const radialSegments = 8;
-  const rInner = 540;
-  const rOuter = 960;
+  const rInner = 660;
+  const rOuter = 1160;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const flatnesses: number[] = [];
@@ -446,8 +465,8 @@ const buildFoothillSkirtGeometry = () => {
         rInner +
         (rOuter - rInner) * radial +
         noise.fbm(cos * 9.0 + radial * 2.0, sin * 9.0 - radial * 2.0, 3) * 18;
-      const mound = Math.sin(radial * Math.PI) * (28 + hummock * 34);
-      const y = 3.5 + mound + radial * 20 + noise.fbm(cos * radius * 0.009, sin * radius * 0.009, 4) * 7;
+      const mound = Math.sin(radial * Math.PI) * (34 + hummock * 44);
+      const y = 7 + mound + radial * 26 + noise.fbm(cos * radius * 0.009, sin * radius * 0.009, 4) * 8;
       vertices.push(cos * radius, y, sin * radius);
       elevs.push(THREE.MathUtils.clamp(y / 130, 0, 0.34));
       flatnesses.push(THREE.MathUtils.clamp(0.52 + radial * 0.26 + ridgeNoise * 0.12, 0.28, 0.86));
@@ -519,11 +538,11 @@ const createTerrainMaterial = () =>
         float macro = bl_fbm(vWorldPos.xz * 0.0045 + vec2(-17.0, 22.0));
         float strata = sin(vWorldPos.y * 0.075 + grain * 3.5 + macro * 2.0) * 0.5 + 0.5;
 
-        vec3 forest = vec3(0.024, 0.068, 0.040);
-        vec3 meadow = vec3(0.105, 0.160, 0.092);
-        vec3 rock = mix(vec3(0.245, 0.270, 0.265), vec3(0.560, 0.540, 0.486), strata);
-        vec3 scree = vec3(0.390, 0.386, 0.355);
-        vec3 snow = vec3(0.790, 0.812, 0.784);
+        vec3 forest = vec3(0.022, 0.074, 0.040);
+        vec3 meadow = vec3(0.120, 0.185, 0.100);
+        vec3 rock = mix(vec3(0.235, 0.266, 0.260), vec3(0.650, 0.640, 0.565), strata);
+        vec3 scree = vec3(0.430, 0.420, 0.372);
+        vec3 snow = vec3(0.900, 0.920, 0.860);
 
         float forestBand = smoothstep(0.34, 0.06, vElev) * smoothstep(0.38, 0.88, vFlatness);
         float meadowBand = smoothstep(0.40, 0.11, vElev) * smoothstep(0.24, 0.74, vFlatness);
@@ -533,21 +552,21 @@ const createTerrainMaterial = () =>
         vec3 albedo = mix(rock, meadow, meadowBand * 0.36);
         albedo = mix(albedo, forest, forestBand * 0.88);
         albedo = mix(albedo, scree, clamp(rockBand * steep * 0.52, 0.0, 0.62));
-        albedo = mix(albedo, snow, snowBand * 0.42);
-        albedo *= 0.72 + macro * 0.34 + grain * 0.11;
+        albedo = mix(albedo, snow, snowBand * 0.58);
+        albedo *= 0.78 + macro * 0.36 + grain * 0.12;
 
         vec3 sunDir = normalize(vec3(-0.38, 0.66, -0.55));
         float diffuse = max(dot(normal, sunDir), 0.0);
         float rim = smoothstep(-0.2, 0.9, dot(normalize(vec3(normal.x, 0.0, normal.z) + 0.001), normalize(vec3(-0.65, 0.0, -0.52))));
-        vec3 color = albedo * (uAmbient * (0.48 + vFlatness * 0.34) + uSunColor * diffuse * 1.05);
-        color *= 0.80 + rim * 0.30;
+        vec3 color = albedo * (uAmbient * (0.50 + vFlatness * 0.34) + uSunColor * diffuse * 1.20);
+        color *= 0.82 + rim * 0.38;
         color += albedo * vec3(0.90, 0.24, 0.08) * uFire * 0.28;
         color = mix(color, color * vec3(0.76, 0.82, 0.92), uDark * 0.20);
 
         float dist = distance(vWorldPos, uCamera);
         float aerial = 1.0 - exp(-pow(dist * 0.00056, 1.42));
         float lowFog = smoothstep(160.0, 18.0, vWorldPos.y) * smoothstep(690.0, 1180.0, -vWorldPos.z) * 0.34;
-        color = mix(color, uFogColor, clamp(aerial * 0.42 + lowFog, 0.0, 0.66));
+        color = mix(color, uFogColor, clamp(aerial * 0.50 + lowFog, 0.0, 0.72));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -583,11 +602,11 @@ const buildForest = (sampler: TerrainSampler) => {
   while (placed < FOREST_SPIRE_TARGET && attempts < maxAttempts) {
     attempts += 1;
     const x = (rng() - 0.5) * TERRAIN_WIDTH * 0.98;
-    const z = TERRAIN_NEAR_Z - 36 - rng() * 1080;
+    const z = TERRAIN_NEAR_Z - 38 - rng() * 1260;
     const y = sampler.sampleHeight(x, z);
     const altitude = (y - low) / span;
     const slope = sampler.sampleSlope(x, z);
-    if (z > -700) {
+    if (z > -690) {
       continue;
     }
     if (altitude < 0.035 || altitude > 0.55) {
@@ -600,19 +619,19 @@ const buildForest = (sampler: TerrainSampler) => {
       smoothBlend(0.0, 0.18, altitude) *
       smoothBlend(0.62, 0.24, altitude) *
       smoothBlend(0.28, 0.72, slope) *
-      (0.62 + 0.38 * Math.max(0, Math.sin(x * 0.007 + z * 0.006 + 1.4)));
+      (0.72 + 0.28 * Math.max(0, Math.sin(x * 0.007 + z * 0.006 + 1.4)));
     if (rng() > density) {
       continue;
     }
 
-    const far = THREE.MathUtils.clamp((-z - 720) / 1120, 0, 1);
-    const scale = 4.0 + rng() * 7.8 + far * 10.5;
+    const far = THREE.MathUtils.clamp((-z - 700) / 1260, 0, 1);
+    const scale = 4.4 + rng() * 8.4 + far * 12.8;
     dummy.position.set(x + (rng() - 0.5) * 8.5, y + scale * 0.38, z + (rng() - 0.5) * 8.5);
     dummy.rotation.set((rng() - 0.5) * 0.10, rng() * Math.PI * 2, (rng() - 0.5) * 0.10);
     dummy.scale.set(scale * (0.56 + rng() * 0.36), scale * (1.75 + rng() * 1.10), scale * (0.56 + rng() * 0.34));
     dummy.updateMatrix();
     spires.setMatrixAt(placed, dummy.matrix);
-    color.setHSL(0.335 + (rng() - 0.5) * 0.040, 0.28 + rng() * 0.14, 0.022 + rng() * 0.065);
+    color.setHSL(0.335 + (rng() - 0.5) * 0.044, 0.30 + rng() * 0.14, 0.032 + rng() * 0.078);
     spires.setColorAt(placed, color);
     placed += 1;
   }
@@ -623,21 +642,21 @@ const buildForest = (sampler: TerrainSampler) => {
   while (canopyPlaced < FOREST_CANOPY_TARGET && canopyAttempts < maxCanopyAttempts) {
     canopyAttempts += 1;
     const x = (rng() - 0.5) * TERRAIN_WIDTH * 0.98;
-    const z = TERRAIN_NEAR_Z - 58 - rng() * 980;
+    const z = TERRAIN_NEAR_Z - 64 - rng() * 1180;
     const y = sampler.sampleHeight(x, z);
     const altitude = (y - low) / span;
     const slope = sampler.sampleSlope(x, z);
-    if (z > -720 || altitude < 0.03 || altitude > 0.43 || slope < 0.30) {
+    if (z > -710 || altitude < 0.03 || altitude > 0.46 || slope < 0.30) {
       continue;
     }
-    const far = THREE.MathUtils.clamp((-z - 720) / 980, 0, 1);
-    const scale = 10 + rng() * 24 + far * 20;
+    const far = THREE.MathUtils.clamp((-z - 710) / 1180, 0, 1);
+    const scale = 12 + rng() * 28 + far * 26;
     dummy.position.set(x + (rng() - 0.5) * 15, y + scale * 0.18, z + (rng() - 0.5) * 15);
     dummy.rotation.set((rng() - 0.5) * 0.08, rng() * Math.PI * 2, (rng() - 0.5) * 0.08);
     dummy.scale.set(scale * (1.25 + rng() * 1.8), scale * (0.28 + rng() * 0.24), scale * (0.90 + rng() * 1.3));
     dummy.updateMatrix();
     canopy.setMatrixAt(canopyPlaced, dummy.matrix);
-    color.setHSL(0.332 + (rng() - 0.5) * 0.035, 0.26 + rng() * 0.12, 0.026 + rng() * 0.055);
+    color.setHSL(0.332 + (rng() - 0.5) * 0.038, 0.28 + rng() * 0.12, 0.030 + rng() * 0.064);
     canopy.setColorAt(canopyPlaced, color);
     canopyPlaced += 1;
   }
@@ -657,7 +676,7 @@ const buildForest = (sampler: TerrainSampler) => {
   canopy.frustumCulled = false;
 
   const group = new THREE.Group();
-  group.name = "Phase 69 dense ecological forest wall";
+  group.name = "Phase 70 dense ecological forest wall";
   group.add(canopy, spires);
   return { group, count: placed + canopyPlaced, attempts: attempts + canopyAttempts };
 };
@@ -738,7 +757,7 @@ const createHeightFogMaterial = () =>
         float fine = bl_fbm(vWorldPos.xz * 0.014 + vec2(-uTime * 0.018, uTime * 0.011));
         float breakup = smoothstep(0.15, 0.82, slow * 0.78 + fine * 0.32);
         float heightFade = smoothstep(160.0, 20.0, vWorldPos.y);
-        float basin = smoothstep(650.0, 1180.0, -vWorldPos.z) * smoothstep(2120.0, 1420.0, -vWorldPos.z);
+        float basin = smoothstep(560.0, 1020.0, -vWorldPos.z) * smoothstep(2300.0, 1500.0, -vWorldPos.z);
         float alpha = vFogAlpha * uOpacity * heightFade * basin * (0.52 + breakup * 0.94) * (1.0 - uDark * 0.16);
         if (alpha < 0.010) {
           discard;
@@ -785,7 +804,7 @@ export const createWebGpuScenicBackdropSystem = (
   capabilities: RendererCapabilityTelemetry,
 ): WebGpuScenicBackdropSystem => {
   const group = new THREE.Group();
-  group.name = "Phase 69 WebGPU alpine scenic layer v2";
+  group.name = "Phase 70 WebGPU alpine scenic layer v3";
   group.visible = false;
 
   const stats: WebGpuScenicStats = {
@@ -794,6 +813,7 @@ export const createWebGpuScenicBackdropSystem = (
     active: false,
     fallbackActive: true,
     reason: "not requested",
+    scenicMode: "OFF",
     rendererPath: "WebGL Performance",
     webgpuAvailable: capabilities.webgpu,
     webgpuActive: false,
@@ -824,18 +844,18 @@ export const createWebGpuScenicBackdropSystem = (
     const terrain = buildTerrain();
     terrainMaterial = createTerrainMaterial();
     const terrainMesh = new THREE.Mesh(terrain.geometry, terrainMaterial);
-    terrainMesh.name = "Phase 69 eroded alpine terrain v2";
+    terrainMesh.name = "Phase 70 eroded alpine terrain v3";
     terrainMesh.frustumCulled = false;
     group.add(terrainMesh);
 
     peakMaterial = createTerrainMaterial();
     const foothillMesh = new THREE.Mesh(buildFoothillSkirtGeometry(), peakMaterial.clone());
-    foothillMesh.name = "Phase 69 grounded mountain-foot skirt";
+    foothillMesh.name = "Phase 70 grounded mountain-foot skirt";
     foothillMesh.frustumCulled = false;
     group.add(foothillMesh);
 
     const ringMesh = new THREE.Mesh(buildAlpineRingGeometry(), peakMaterial);
-    ringMesh.name = "Phase 69 visible alpine ring backdrop";
+    ringMesh.name = "Phase 70 visible alpine ring backdrop";
     ringMesh.frustumCulled = false;
     group.add(ringMesh);
 
@@ -846,8 +866,8 @@ export const createWebGpuScenicBackdropSystem = (
           z: -1220,
           depth: 290,
           width: 3300,
-          baseY: 42,
-          peakY: 360,
+          baseY: 18,
+          peakY: 470,
           xSegments: 220,
           ySegments: 20,
         }),
@@ -859,35 +879,49 @@ export const createWebGpuScenicBackdropSystem = (
           z: -1680,
           depth: 360,
           width: 3700,
-          baseY: 92,
-          peakY: 430,
+          baseY: 62,
+          peakY: 560,
           xSegments: 240,
           ySegments: 22,
         }),
         peakMaterial.clone(),
       ),
+      new THREE.Mesh(
+        buildPeakWallGeometry({
+          seed: 68187,
+          z: -2060,
+          depth: 450,
+          width: 4300,
+          baseY: 112,
+          peakY: 700,
+          xSegments: 272,
+          ySegments: 24,
+        }),
+        peakMaterial.clone(),
+      ),
     ];
     peakWalls.forEach((wall, index) => {
-      wall.name = `Phase 69 craggy alpine peak wall ${index + 1}`;
+      wall.name = `Phase 70 craggy alpine peak wall ${index + 1}`;
       wall.frustumCulled = false;
       group.add(wall);
     });
 
     const forest = buildForest(terrain.sampler);
-    forest.group.name = "Phase 69 ecological instanced mountain-base forest";
+    forest.group.name = "Phase 70 ecological instanced mountain-base forest";
     group.add(forest.group);
 
     const fogGeometries = [
-      buildHeightFogGeometry(-690, -1120, 28, 2900),
-      buildHeightFogGeometry(-780, -1380, 58, 3060),
-      buildHeightFogGeometry(-920, -1660, 92, 2860),
-      buildHeightFogGeometry(-1080, -1940, 132, 2520),
-      buildHeightFogGeometry(-1260, -2200, 176, 2100),
+      buildHeightFogGeometry(-640, -1040, 22, 3180),
+      buildHeightFogGeometry(-700, -1220, 42, 3260),
+      buildHeightFogGeometry(-800, -1460, 70, 3180),
+      buildHeightFogGeometry(-920, -1700, 104, 2920),
+      buildHeightFogGeometry(-1080, -1960, 142, 2600),
+      buildHeightFogGeometry(-1260, -2260, 186, 2220),
     ];
     fogMaterials = fogGeometries.map(() => createHeightFogMaterial());
     fogGeometries.forEach((geometry, index) => {
       const fog = new THREE.Mesh(geometry, fogMaterials[index]);
-      fog.name = `Phase 69 pooled height fog layer ${index + 1}`;
+      fog.name = `Phase 70 pooled height fog layer ${index + 1}`;
       fog.renderOrder = 4 + index;
       fog.frustumCulled = false;
       group.add(fog);
@@ -900,7 +934,7 @@ export const createWebGpuScenicBackdropSystem = (
       peakWalls.reduce((count, wall) => count + wall.geometry.attributes.position.count, 0);
     stats.forestInstances = forest.count;
     stats.fogLayers = fogGeometries.length;
-    stats.fogMode = "WebGL pooled alpine height fog v2";
+    stats.fogMode = "WebGL pooled alpine height fog v3";
   };
 
   return {
@@ -921,9 +955,9 @@ export const createWebGpuScenicBackdropSystem = (
       }
       group.children.forEach((child) => {
         if (
-          !child.name.startsWith("Phase 69 craggy alpine peak wall") &&
-          child.name !== "Phase 69 grounded mountain-foot skirt" &&
-          child.name !== "Phase 69 visible alpine ring backdrop"
+          !child.name.startsWith("Phase 70 craggy alpine peak wall") &&
+          child.name !== "Phase 70 grounded mountain-foot skirt" &&
+          child.name !== "Phase 70 visible alpine ring backdrop"
         ) {
           return;
         }
@@ -939,7 +973,7 @@ export const createWebGpuScenicBackdropSystem = (
         material.uniforms.uColor.value.setHex(palette.fogColor);
         material.uniforms.uTime.value = elapsed;
         material.uniforms.uDark.value = dark;
-        material.uniforms.uOpacity.value = 0.105 + weather.dials.fog * 0.16 + index * 0.026;
+        material.uniforms.uOpacity.value = 0.132 + weather.dials.fog * 0.18 + index * 0.028;
       });
     },
     setGate: (gate) => {
@@ -948,6 +982,13 @@ export const createWebGpuScenicBackdropSystem = (
       stats.active = gate.active;
       stats.fallbackActive = gate.fallbackActive;
       stats.reason = gate.reason;
+      stats.scenicMode = gate.active
+        ? "ON"
+        : gate.requested
+          ? gate.reason.toLowerCase().includes("error")
+            ? "ERROR"
+            : "FALLBACK"
+          : "OFF";
       stats.rendererPath = gate.active ? "WebGL ScenicExperimental" : "WebGL Performance";
       stats.webgpuActive = false;
       group.visible = gate.active;

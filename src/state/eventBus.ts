@@ -6,7 +6,8 @@ export type HashlakeEventType =
   | "gust"
   | "crash"
   | "rally"
-  | "stale";
+  | "stale"
+  | "scenic";
 
 export type HashlakeEvent = {
   type: HashlakeEventType;
