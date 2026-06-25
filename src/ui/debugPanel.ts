@@ -16,7 +16,10 @@ import {
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { LAKE_MAP, LAKE_OUTLINE } from "../scene/lakeMap";
 import type { ScenicAssetStatuses } from "../scene/scenicAssets";
-import type { TreeAlphaAssetStatuses } from "../scene/forestSystem";
+import type {
+  NativeTreeTypeCounts,
+  TreeAlphaAssetStatuses,
+} from "../scene/forestSystem";
 
 type FeedRow = {
   name: FeedName;
@@ -86,11 +89,17 @@ export type SceneTelemetry = {
   lastSplashDistanceToBoat: number | null;
   lastBoatImpulseStrength: number;
   treeInstances: number;
+  nativeTreeInstances: number;
+  instancedTreeInstances: number;
+  individualTreeInstances: number;
+  treeTypeCounts: NativeTreeTypeCounts;
+  rejectedTreeCandidates: number;
   treeAlphaInstances: number;
   treeAlphaAssets: TreeAlphaAssetStatuses;
   forestBandInstances: number;
   forestBandMethod: string;
   reedInstances: number;
+  rockInstances: number;
   mountainVertices: number;
   postEnabled: boolean;
   reflectionEnabled: boolean;
@@ -119,11 +128,17 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Splash dist", value: "--" },
   { group: "weather", label: "Boat impulse", value: "0.00" },
   { group: "weather", label: "Trees", value: "0" },
+  { group: "weather", label: "Native trees", value: "0" },
+  { group: "weather", label: "Instanced trees", value: "0" },
+  { group: "weather", label: "Individual trees", value: "0", tone: "muted" },
+  { group: "weather", label: "Tree types", value: "T0 S0 M0 L0 B0 F0 Y0", tone: "muted" },
+  { group: "weather", label: "Tree rejects", value: "0", tone: "muted" },
   { group: "weather", label: "Tree alpha", value: "fallback", tone: "muted" },
   { group: "weather", label: "Tree samples", value: "0" },
   { group: "weather", label: "Forest band", value: "0" },
   { group: "weather", label: "Band method", value: "instanced", tone: "muted" },
   { group: "weather", label: "Reeds", value: "0" },
+  { group: "weather", label: "Rocks", value: "0" },
   { group: "weather", label: "Mount verts", value: "0" },
   { group: "weather", label: "Post", value: "on", tone: "good" },
   { group: "weather", label: "Shader reflect", value: "off", tone: "muted" },
@@ -312,6 +327,17 @@ const getWhaleWatchTone = (status: LiveBitcoinSnapshot["whaleWatch"]["status"]) 
 
 const formatTxid = (txid: string | null) =>
   txid ? `${txid.slice(0, 6)}...${txid.slice(-6)}` : "--";
+
+const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
+  [
+    `T${counts.tallNarrowPine}`,
+    `S${counts.shortPine}`,
+    `M${counts.mediumConifer}`,
+    `L${counts.layeredConifer}`,
+    `B${counts.broadEvergreenCluster}`,
+    `F${counts.distantSilhouetteTree}`,
+    `Y${counts.youngPine}`,
+  ].join(" ");
 
 const createMetricCards = (group: MetricTile["group"]) =>
   metricTiles
@@ -1067,6 +1093,19 @@ export const createDebugPanel = (
     );
     setMetric("Boat impulse", telemetry.lastBoatImpulseStrength.toFixed(2));
     setMetric("Trees", String(telemetry.treeInstances));
+    setMetric("Native trees", String(telemetry.nativeTreeInstances));
+    setMetric("Instanced trees", String(telemetry.instancedTreeInstances), "good");
+    setMetric(
+      "Individual trees",
+      String(telemetry.individualTreeInstances),
+      telemetry.individualTreeInstances > 0 ? "warn" : "muted",
+    );
+    setMetric("Tree types", formatTreeTypeCounts(telemetry.treeTypeCounts), "muted");
+    setMetric(
+      "Tree rejects",
+      String(telemetry.rejectedTreeCandidates),
+      telemetry.rejectedTreeCandidates > 0 ? "warn" : "good",
+    );
     const treeAlphaLoaded = Object.values(telemetry.treeAlphaAssets).filter((status) => status === "loaded").length;
     const treeAlphaErrors = Object.values(telemetry.treeAlphaAssets).filter((status) => status === "error").length;
     setMetric(
@@ -1078,6 +1117,7 @@ export const createDebugPanel = (
     setMetric("Forest band", String(telemetry.forestBandInstances));
     setMetric("Band method", telemetry.forestBandMethod, "muted");
     setMetric("Reeds", String(telemetry.reedInstances));
+    setMetric("Rocks", String(telemetry.rockInstances));
     setMetric("Mount verts", String(telemetry.mountainVertices));
     setMetric("Post", telemetry.postEnabled ? "on" : "off", telemetry.postEnabled ? "good" : "muted");
     setMetric(

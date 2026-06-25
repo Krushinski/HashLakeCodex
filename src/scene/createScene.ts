@@ -4,7 +4,11 @@ import type { HashlakeEventBus } from "../state/eventBus";
 import type { WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { SCENARIO_PALETTES, getWeatherPalette } from "./artDirection";
 import { createSceneEffects } from "./effects";
-import { createForestSystem, type TreeAlphaAssetStatuses } from "./forestSystem";
+import {
+  createForestSystem,
+  type NativeTreeTypeCounts,
+  type TreeAlphaAssetStatuses,
+} from "./forestSystem";
 import {
   LAKE_FEATURE_FOOTPRINTS,
   LAKE_MAP,
@@ -159,11 +163,17 @@ type SceneTelemetry = {
   lastSplashDistanceToBoat: number | null;
   lastBoatImpulseStrength: number;
   treeInstances: number;
+  nativeTreeInstances: number;
+  instancedTreeInstances: number;
+  individualTreeInstances: number;
+  treeTypeCounts: NativeTreeTypeCounts;
+  rejectedTreeCandidates: number;
   treeAlphaInstances: number;
   treeAlphaAssets: TreeAlphaAssetStatuses;
   forestBandInstances: number;
   forestBandMethod: string;
   reedInstances: number;
+  rockInstances: number;
   mountainVertices: number;
   postEnabled: boolean;
   reflectionEnabled: boolean;
@@ -1269,11 +1279,17 @@ export const createHashlakeScene = ({
           lastSplashDistanceToBoat: effectStats.lastSplashDistanceToBoat,
           lastBoatImpulseStrength: effectStats.lastBoatImpulseStrength,
           treeInstances: forestStats.treeInstances,
+          nativeTreeInstances: forestStats.nativeTreeInstances,
+          instancedTreeInstances: forestStats.instancedTreeInstances,
+          individualTreeInstances: forestStats.individualTreeInstances,
+          treeTypeCounts: forestStats.treeTypeCounts,
+          rejectedTreeCandidates: forestStats.rejectedTreeCandidates,
           treeAlphaInstances: forestStats.treeAlphaInstances,
           treeAlphaAssets: forestStats.treeAlphaAssets,
           forestBandInstances: forestStats.forestBandInstances,
           forestBandMethod: forestStats.forestBandMethod,
           reedInstances: forestStats.reedInstances,
+          rockInstances: forestStats.rockInstances,
           mountainVertices: terrainStats.mountainVertices,
           postEnabled: postSystem.enabled && terrainStats.postEnabled,
           reflectionEnabled: water.reflectionEnabled || terrainStats.reflectionEnabled,

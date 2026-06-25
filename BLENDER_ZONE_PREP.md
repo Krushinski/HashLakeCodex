@@ -71,18 +71,18 @@ Use `ZONE_TRUTH_CONTRACT.md` before adding any Blender asset. The named ready zo
 
 ## Midground forest band
 
-- Current native state: procedural forest massing, tree clusters, and native terrain shelves support the lake silhouette. Phase 53 removed the translucent forest-ready overlay rings because they read as gray debug geometry instead of natural ground.
-- Current weaknesses: individual cones still read in places and cluster placement is still generic around the whole outline.
-- Topology readiness: suitable for merged silhouette bands or low-poly cluster replacements. Use the midground shelf for cove-side and rear-shore clusters.
-- Future Blender role: grouped conifer silhouettes, forest edge strips, layered tree masses, and cove-side tree clusters.
-- Keep native: weather sway and quality preset density gates.
-- Risk: hundreds of separate tree meshes are too expensive; use merged/instanced geometry.
+- Current native state: Phase 57 replaces the single cone forest with a deterministic, zone-validated native tree library: tall narrow pine, short pine, medium conifer, layered conifer, broad evergreen cluster, distant silhouette tree, and young pine/sapling. Near, mid, far, cove, and dock bands are all sampled through `lakeMap.ts` helpers.
+- Current weaknesses: procedural silhouettes are richer but still primitive-built; close foreground trees will eventually need better trunks, branch breakup, and ground dressing.
+- Topology readiness: suitable for future merged tree masses only after the asset can prove the same water/beach/island/sandbar exclusions. Use the midground shelf for cove-side and rear-shore clusters.
+- Future Blender role: grouped conifer silhouettes, forest edge strips, layered tree masses, and cove-side tree clusters that sit on validated mainland forest shelf geometry.
+- Keep native: placement law, weather sway, quality preset density gates, Debug type counts, and fallback native forest.
+- Risk: hundreds of separate tree meshes are too expensive; use merged/instanced geometry and never place assets by eye over the water.
 
 ## Background forest band
 
-- Current native state: distant forest impression without the removed fake water reflection planes, plus a semi-far staging shelf for future background forest silhouettes.
-- Current weaknesses: horizon forest lacks the density and realism of the inspiration image.
-- Topology readiness: ready for distant silhouette-only assets. Keep far assets above the shoreline and off the water plane.
+- Current native state: Phase 57 uses an instanced distant silhouette tree band plus broad evergreen clusters for a darker forest mass below the mountains. The old fake water reflection planes remain banned.
+- Current weaknesses: horizon forest is denser and moodier, but still procedural and not yet a handcrafted alpine treeline.
+- Topology readiness: ready for distant silhouette-only assets if they are real geometry above the shoreline and validated against the far mainland forest zone.
 - Future Blender role: merged far treeline strips above shoreline, never transparent water reflection planes.
 - Keep native: shader reflection mood and atmospheric haze.
 - Risk: any water-level reflection strip can reintroduce the UFO artifact.
@@ -116,10 +116,10 @@ Use `ZONE_TRUTH_CONTRACT.md` before adding any Blender asset. The named ready zo
 
 ## Tree alpha assets
 
-- Current native state: three corrected Blender-generated low-poly tree alpha GLBs now exist in `public/assets/models/`: tall pine, short pine, and layered conifer.
-- Current weaknesses: only six corrected sample placements are used in one dock/reed-side test cluster; this is deliberately not a forest replacement.
-- Correction notes: Phase 48 regenerated the GLBs with attached trunks, dark materials, base origins, and a loader-side scale/material normalization plus cache-bust query. The bad tiny/white ghost-test placements near `-351, -218` and `501, -218` are not used.
-- Topology readiness: the foreground, midground, and semi-far shelves are ready for sparse alpha placement, but the full forest still needs a placement plan.
-- Future Blender role: expand from these alpha shapes into merged/instanced tree clusters and forest edge strips.
-- Keep native: quality gates, fallback cone forest, wind sway system, far silhouette bands, and scene/collision boundaries.
-- Risk: mass deploying GLB clones without instancing or merged meshes could hurt Drive Mode performance.
+- Current native state: Phase 57 disables tree alpha usage by default and reports those assets as fallback-only. The visible forest is native procedural instanced geometry.
+- Current weaknesses: the alpha tests are not a production forest path and should not return unless they beat the native shapes without ghosts, white remnants, scale errors, or water placement errors.
+- Correction notes: old bad tiny/white ghost-test placements near `-351, -218` and `501, -218` are still forbidden. Any future alpha or Blender tree must use the same `lakeMap.ts` candidate validation as native trees.
+- Topology readiness: foreground, midground, and semi-far shelves are ready for sparse asset experiments only after the Phase 57 tree bands are preserved as fallback.
+- Future Blender role: replace or augment native type groups with merged/instanced tree clusters and forest edge strips, not individual clone spam.
+- Keep native: quality gates, native forest fallback, wind sway system, far silhouette bands, Debug counts, and scene/collision boundaries.
+- Risk: mass deploying GLB clones without instancing or merged meshes could hurt Drive Mode performance and resurrect ghost-tree cleanup loops.

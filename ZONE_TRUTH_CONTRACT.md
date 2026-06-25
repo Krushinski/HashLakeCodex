@@ -47,7 +47,9 @@ From lake center outward:
 ## Runtime Guard Expectations
 
 - Forest trees are sampled from outline offsets and must pass `isMainlandForestZone`.
-- Far forest silhouettes are instanced cones and must pass `isMainlandForestZone`.
+- Phase 57 native forest trees are instanced by type and must pass `isMainlandForestZone` with near/mid/far/cove/dock band clearances.
+- Automatic trees must stay out of water, shallows, beach pockets, island, sandbar, dock openings, and cove openings.
+- Far forest silhouettes are native instanced trees and must pass `isMainlandForestZone` with far clearances.
 - Reeds must pass `isReedWetlandZone`.
 - Shore rocks must pass `isMainlandShoreZone`.
 - Scenic GLB treeline loading is disabled until future assets can satisfy this contract.

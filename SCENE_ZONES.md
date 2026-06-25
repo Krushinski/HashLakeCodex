@@ -38,13 +38,13 @@ This file is an executable art-direction contract. Native procedural work should
 
 ## Background Forest
 
-- Current status: far treeline mesh mass plus instanced conifer silhouettes and fake reflection strips.
+- Current status: Phase 57 native instanced far-forest band with dark distant silhouette trees, broad evergreen clusters, and no fake reflection strips.
 - Target: dense dark conifer mass below mountains, irregular skyline, broad reflected influence in water.
-- Geometry directive: primary read should be one continuous silhouette band; individual cones are secondary texture.
+- Geometry directive: primary read should be one continuous silhouette band; individual trees are secondary texture. Every candidate must pass `isMainlandForestZone` with far clearances.
 - Material directive: near-black green/teal mass, slightly stronger in Scenic, reduced in Performance.
 - Lighting directive: silhouette remains readable under serene and storm palettes.
 - Motion directive: far mass static; closer instances may sway lightly.
-- Native options: merged silhouette band, instanced crowns, reflection strip tuning.
+- Native options: instanced distant silhouettes, broad dark evergreen clusters, quality-gated density, subtle wind on non-silhouette materials.
 - Future Blender options: optional far treeline GLB strip with irregular skyline and very few materials.
 - Performance risk: medium if individual trees proliferate; low for merged/instanced bands.
 - Must not: become scattered toy cones or consume per-frame DOM/debug work.
@@ -52,13 +52,13 @@ This file is an executable art-direction contract. Native procedural work should
 
 ## Rear Shore / Midground Forest
 
-- Current status: procedural tree instances, cove sides, reeds, rocks, quality-gated update cadence.
+- Current status: Phase 57 native tree library: tall narrow pine, short pine, medium conifer, layered conifer, broad evergreen cluster, distant silhouette tree, and young pine/sapling. Placements are deterministic, instanced, and validated against `lakeMap.ts`.
 - Target: believable cove edge, forested mass, rocky and sandy transitions, subtle wind.
-- Geometry directive: cluster trees in pockets; keep Drive lanes and boundaries readable.
+- Geometry directive: cluster trees in near, mid, far, cove, and dock bands; keep Drive lanes and boundaries readable. Skip candidates in water, shallows, beach pockets, island, sandbar, dock openings, and cove openings unless a future special feature explicitly allows them.
 - Material directive: earthy greens, darker cove edge, muted rocks, reeds in pockets rather than everywhere.
 - Lighting directive: preserve scenic depth; do not flatten into one green wall.
 - Motion directive: wind shader only, no heavy animation.
-- Native options: grouped tree density, cove silhouette darkening, reed clusters, rock accents.
+- Native options: grouped tree density, cove silhouette darkening, reed clusters, rock accents, deterministic type-count telemetry.
 - Future Blender options: small reusable cove/shoreline kit if native silhouettes hit a ceiling.
 - Performance risk: medium due to instance counts; quality governor may reduce richness.
 - Must not: block minimap logic, collide with invisible lake boundary, or clutter Drive view.
@@ -66,7 +66,7 @@ This file is an executable art-direction contract. Native procedural work should
 
 ## Foreground Land / Shoreline
 
-- Current status: organic lake outline with sand, wet sand, grass transition, bank, rocks, reeds.
+- Current status: organic lake outline with sand, wet sand, grass transition, bank, zone-validated rocks, and reeds. Phase 57 keeps conifers back from the immediate waterline and reserves reeds for the wetland helper zone only.
 - Target: grounded transitions between grass, sand, rocks, reeds, dock, island, cove, and water.
 - Geometry directive: shoreline must follow the organic lake shape; use strips and small instanced accents.
 - Material directive: less sticker-like sandbar, wet edges, darker banks, natural blue-green shallows.
@@ -108,7 +108,7 @@ This file is an executable art-direction contract. Native procedural work should
 
 ## Special Places
 
-- Current status: dock, sandbar, cove, island/rocks, reed marsh, minimap labels, simple procedural geometry.
+- Current status: dock, sandbar, cove, island/rocks, reed marsh, minimap labels, simple procedural geometry. Phase 57 automatic trees avoid island/sandbar and preserve dock/cove openings.
 - Target: memorable navigation/composition anchors for background-worthy tableaus.
 - Geometry directive: keep locations simple and readable; strengthen silhouettes and material transitions.
 - Material directive: sandbar muted, island grounded, dock warm, rocks cool, reeds pocketed.
