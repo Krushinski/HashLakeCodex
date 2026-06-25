@@ -91,8 +91,8 @@ Use `ZONE_TRUTH_CONTRACT.md` before adding any Blender asset. The named ready zo
 
 - Current native state: procedural layered mountain silhouettes and moody sky integration.
 - Current weaknesses: ridges can feel soft/rounded rather than alpine and craggy.
-- Topology readiness: good candidate for future distant low-poly backdrop assets.
-- Future Blender role: layered ridgelines, sharper silhouettes, shaded faces, and tasteful light caps.
+- Topology readiness: good candidate for future distant low-poly backdrop assets. Phase 57 generated `public/assets/models/hl-mountain-range-alpha-v1.glb` as a controlled local test, but the screenshot read as a pale sawtooth horizon band, so the asset remains disabled by default and native mountains stay active.
+- Future Blender role: replace the Phase 57 alpha with layered ridgelines, sharper silhouettes, shaded faces, and tasteful light caps that beat the native fallback before enabling.
 - Keep native: weather tinting, haze, storm-dark overrides, and performance quality gates.
 - Risk: huge geometry or many materials can overwhelm the scene without much foreground benefit.
 

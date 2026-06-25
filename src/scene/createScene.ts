@@ -810,7 +810,9 @@ export const createHashlakeScene = ({
     const scenicAssetStatuses = scenicAssetSystem.getStatuses();
     const scenicAssetsActive = qualityState.preset !== "Performance";
     terrainSystem.setScenicBackdropActive(
-      scenicAssetsActive && scenicAssetStatuses.mountain === "loaded",
+      scenicAssetsActive &&
+        (scenicAssetStatuses.mountain === "loaded" ||
+          scenicAssetStatuses.mountainAlpha === "loaded"),
     );
     forestSystem.setScenicTreelineActive(
       scenicAssetsActive && scenicAssetStatuses.treeline === "loaded",

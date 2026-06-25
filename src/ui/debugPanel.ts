@@ -128,6 +128,7 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Post", value: "on", tone: "good" },
   { group: "weather", label: "Shader reflect", value: "off", tone: "muted" },
   { group: "weather", label: "Mountain asset", value: "fallback", tone: "muted" },
+  { group: "weather", label: "Mountain alpha", value: "fallback", tone: "muted" },
   { group: "weather", label: "Treeline asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Shoreline asset", value: "fallback", tone: "muted" },
   { group: "weather", label: "Debug UI", value: "hidden", tone: "muted" },
@@ -1085,6 +1086,11 @@ export const createDebugPanel = (
       telemetry.reflectionEnabled ? "good" : "muted",
     );
     setMetric("Mountain asset", telemetry.scenicAssets.mountain, getAssetTone(telemetry.scenicAssets.mountain));
+    setMetric(
+      "Mountain alpha",
+      telemetry.scenicAssets.mountainAlpha,
+      getAssetTone(telemetry.scenicAssets.mountainAlpha),
+    );
     setMetric("Treeline asset", telemetry.scenicAssets.treeline, getAssetTone(telemetry.scenicAssets.treeline));
     setMetric("Shoreline asset", telemetry.scenicAssets.shoreline, getAssetTone(telemetry.scenicAssets.shoreline));
     setMetric("Debug UI", "visible", "good");
