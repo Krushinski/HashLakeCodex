@@ -83,6 +83,7 @@ const TREE_TYPE_KEYS: NativeTreeTypeKey[] = [
   "mediumConifer",
   "layeredConifer",
   "broadEvergreenCluster",
+  "canopyMound",
   "distantSilhouetteTree",
   "youngPine",
 ];
