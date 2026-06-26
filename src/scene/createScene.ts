@@ -2831,12 +2831,12 @@ const createClouds = () => {
     return group;
   }
   const cloudConfigs = [
-    { x: -610, y: 188, z: -650, scale: 1.0, width: 270, depth: 30, wisps: 4, phase: 0.2, yaw: 0.08 },
+    { x: -680, y: 254, z: -900, scale: 0.72, width: 220, depth: 24, wisps: 3, phase: 0.2, yaw: 0.08 },
     { x: -330, y: 214, z: -720, scale: 1.12, width: 330, depth: 38, wisps: 5, phase: 1.8, yaw: -0.04 },
     { x: -70, y: 176, z: -560, scale: 0.92, width: 230, depth: 28, wisps: 4, phase: 3.1, yaw: 0.13 },
     { x: 210, y: 206, z: -690, scale: 1.08, width: 310, depth: 36, wisps: 5, phase: 4.7, yaw: -0.10 },
     { x: 520, y: 184, z: -610, scale: 0.94, width: 260, depth: 30, wisps: 4, phase: 6.0, yaw: 0.06 },
-    { x: -500, y: 162, z: -330, scale: 0.72, width: 190, depth: 24, wisps: 3, phase: 7.4, yaw: -0.16 },
+    { x: -560, y: 238, z: -780, scale: 0.58, width: 170, depth: 22, wisps: 3, phase: 7.4, yaw: -0.10 },
     { x: -150, y: 232, z: -820, scale: 0.86, width: 260, depth: 34, wisps: 4, phase: 8.9, yaw: 0.04 },
     { x: 390, y: 156, z: -300, scale: 0.70, width: 180, depth: 22, wisps: 3, phase: 10.3, yaw: 0.18 },
     { x: 690, y: 224, z: -760, scale: 0.82, width: 220, depth: 32, wisps: 3, phase: 11.6, yaw: -0.08 },
@@ -2861,7 +2861,7 @@ const createClouds = () => {
         map: cloudTextures[(bankIndex + wisp) % cloudTextures.length],
         color: 0xdfe8e3,
         transparent: true,
-        opacity: 0.20 + (wisp % 3) * 0.035,
+        opacity: 0.15 + (wisp % 3) * 0.026,
         depthWrite: false,
         depthTest: true,
         side: THREE.DoubleSide,

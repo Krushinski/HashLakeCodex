@@ -146,9 +146,9 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Scenic terrain", value: "no", tone: "muted" },
   { group: "global", label: "Scenic forest", value: "no", tone: "muted" },
   { group: "global", label: "Scenic fog", value: "no", tone: "muted" },
-  { group: "global", label: "P71 terrain", value: "0", tone: "muted" },
-  { group: "global", label: "P71 forest", value: "0", tone: "muted" },
-  { group: "global", label: "P71 fog", value: "off", tone: "muted" },
+  { group: "global", label: "P72 terrain", value: "0", tone: "muted" },
+  { group: "global", label: "P72 forest", value: "0", tone: "muted" },
+  { group: "global", label: "P72 fog", value: "off", tone: "muted" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
   { group: "weather", label: "Wake blocks", value: "0" },
   { group: "weather", label: "Splash blocks", value: "0" },
@@ -1212,17 +1212,17 @@ export const createDebugPanel = (
       telemetry.webGpuScenic.fogVisible ? "good" : "muted",
     );
     setMetric(
-      "P71 terrain",
+      "P72 terrain",
       String(telemetry.webGpuScenic.terrainVertices),
       telemetry.webGpuScenic.active ? "good" : "muted",
     );
     setMetric(
-      "P71 forest",
+      "P72 forest",
       String(telemetry.webGpuScenic.forestInstances),
       telemetry.webGpuScenic.active ? "good" : "muted",
     );
     setMetric(
-      "P71 fog",
+      "P72 fog",
       telemetry.webGpuScenic.fogMode,
       telemetry.webGpuScenic.active ? "good" : "muted",
     );

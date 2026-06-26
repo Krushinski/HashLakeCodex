@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { WeatherSnapshot } from "../state/weatherEngine";
-import { LAKE_MAP, ZONE_TRUTH } from "./lakeMap";
+import { LAKE_MAP } from "./lakeMap";
 import { getWeatherPalette } from "./artDirection";
 import type { RendererCapabilityTelemetry } from "./realismSpike";
 import { GLSL_NOISE, makeNoise2D, makeRng } from "./scenicUtils";
@@ -70,23 +70,24 @@ type TerrainSampler = {
 
 const SCENIC_ZONE = {
   lakeContainerRadius: LAKE_MAP.worldRadius,
-  farForestNearZ: -760,
-  farForestFarZ: -1660,
-  foothillInnerRadius: LAKE_MAP.worldRadius + Math.max(320, ZONE_TRUTH.farForestMaxShoreClearance - 40),
-  foothillOuterRadius: LAKE_MAP.worldRadius + 700,
-  mountainInnerRadius: LAKE_MAP.worldRadius + 900,
-  mountainOuterRadius: LAKE_MAP.worldRadius + 1960,
-  terrainNearZ: -920,
-  terrainFarZ: -2520,
-  mountainHeightScale: 0.66,
+  farForestNearZ: -650,
+  farForestFarZ: -1510,
+  foothillInnerRadius: LAKE_MAP.worldRadius + 150,
+  foothillOuterRadius: LAKE_MAP.worldRadius + 500,
+  mountainInnerRadius: LAKE_MAP.worldRadius + 300,
+  mountainOuterRadius: LAKE_MAP.worldRadius + 1540,
+  terrainNearZ: -720,
+  terrainFarZ: -2240,
+  mountainHeightScale: 0.78,
 } as const;
 const TERRAIN_SEGMENTS_X = 256;
 const TERRAIN_SEGMENTS_Z = 88;
-const TERRAIN_WIDTH = 3600;
+const TERRAIN_WIDTH = 9000;
 const TERRAIN_NEAR_Z = SCENIC_ZONE.terrainNearZ;
 const TERRAIN_FAR_Z = SCENIC_ZONE.terrainFarZ;
-const FOREST_SPIRE_TARGET = 76000;
-const FOREST_CANOPY_TARGET = 16800;
+const FOREST_SPIRE_TARGET = 82000;
+const FOREST_CANOPY_TARGET = 24000;
+const LAND_FOG_COLOR = new THREE.Color(0x314737);
 
 export const getWebGpuScenicPreference = (): WebGpuScenicPreference => {
   try {
@@ -127,6 +128,14 @@ const smoothBlend = (edge0: number, edge1: number, value: number) => {
   return t * t * (3 - 2 * t);
 };
 
+const setConstantEdgeFade = (geometry: THREE.BufferGeometry, value = 1) => {
+  const count = geometry.attributes.position.count;
+  const edge = new Float32Array(count);
+  edge.fill(value);
+  geometry.setAttribute("edgeFade", new THREE.BufferAttribute(edge, 1));
+  return geometry;
+};
+
 const createHeightFunction = () => {
   const noise = makeNoise2D(67031);
 
@@ -159,7 +168,7 @@ const createHeightFunction = () => {
   };
 
   return (x: number, z: number) => {
-    const zDepth = THREE.MathUtils.clamp((-z - 900) / 1580, 0, 1);
+    const zDepth = THREE.MathUtils.clamp((-z - 700) / 1360, 0, 1);
     const xNorm = x / (TERRAIN_WIDTH * 0.5);
     const centerPeak = Math.exp(-((xNorm - 0.03) ** 2) / 0.038);
     const leftPeak = Math.exp(-((xNorm + 0.48) ** 2) / 0.024);
@@ -168,28 +177,28 @@ const createHeightFunction = () => {
     const farNeedles = Math.max(0, Math.sin((xNorm + 0.12) * 21.0)) * 0.11;
     const ridgeLine =
       0.18 +
-      centerPeak * 1.22 +
-      leftPeak * 0.70 +
-      rightPeak * 0.82 +
-      shoulder * 0.44 +
-      farNeedles +
-      eroded(x * 0.66, z * 0.76) * 0.72;
+      centerPeak * 1.42 +
+      leftPeak * 0.80 +
+      rightPeak * 0.94 +
+      shoulder * 0.52 +
+      farNeedles * 1.25 +
+      eroded(x * 0.66, z * 0.76) * 0.86;
     const valleyFloor = smoothBlend(0.0, 0.38, zDepth);
     const mountainRise = Math.pow(THREE.MathUtils.clamp(zDepth, 0, 1), 1.05);
     const ravines =
       Math.abs(noise.fbm(x * 0.012 + 41.0, z * 0.010 - 17.0, 4)) *
-      86 *
+      108 *
       mountainRise;
     const cliffCuts =
       Math.max(0, noise.fbm(x * 0.020 - 12, z * 0.024 + 8, 3)) *
-      54 *
+      70 *
       mountainRise *
       smoothBlend(0.34, 0.86, zDepth);
-    const highFrequency = noise.fbm(x * 0.035 - 14, z * 0.024 + 33, 4) * 24 * mountainRise;
+    const highFrequency = noise.fbm(x * 0.035 - 14, z * 0.024 + 33, 4) * 32 * mountainRise;
     return (
-      10 +
-      valleyFloor * 16 +
-      Math.max(0, ridgeLine) * 238 * mountainRise -
+      12 +
+      valleyFloor * 18 +
+      Math.max(0, ridgeLine) * 278 * mountainRise -
       ravines -
       cliffCuts +
       highFrequency
@@ -261,6 +270,7 @@ const buildTerrain = () => {
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("elev", new THREE.BufferAttribute(elevs, 1));
   geometry.setAttribute("flatness", new THREE.BufferAttribute(slopes, 1));
+  geometry.setAttribute("edgeFade", new THREE.BufferAttribute(new Float32Array(positions.length / 3).fill(1), 1));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
 
@@ -308,6 +318,7 @@ const buildPeakWallGeometry = ({
   peakY,
   xSegments,
   ySegments,
+  edgeFade = 0.14,
 }: {
   seed: number;
   z: number;
@@ -317,42 +328,55 @@ const buildPeakWallGeometry = ({
   peakY: number;
   xSegments: number;
   ySegments: number;
+  edgeFade?: number;
 }) => {
   const noise = makeNoise2D(seed);
   const positions: number[] = [];
   const elevs: number[] = [];
   const flatnesses: number[] = [];
+  const edgeFades: number[] = [];
   const indices: number[] = [];
 
   for (let xIndex = 0; xIndex <= xSegments; xIndex += 1) {
     const xT = xIndex / xSegments;
     const xNorm = xT * 2 - 1;
     const x = xNorm * width * 0.5;
-    const center = Math.exp(-((xNorm - 0.08) ** 2) / 0.070);
-    const left = Math.exp(-((xNorm + 0.52) ** 2) / 0.042);
-    const right = Math.exp(-((xNorm - 0.62) ** 2) / 0.052);
+    const edgeMask = smoothBlend(0.0, edgeFade, xT) * smoothBlend(1.0, 1.0 - edgeFade, xT);
+    const center = Math.exp(-((xNorm - 0.06) ** 2) / 0.045);
+    const left = Math.exp(-((xNorm + 0.47) ** 2) / 0.032);
+    const right = Math.exp(-((xNorm - 0.60) ** 2) / 0.040);
+    const needle = Math.exp(-((xNorm + 0.12) ** 2) / 0.012);
+    const saddle = Math.exp(-((xNorm - 0.28) ** 2) / 0.090);
+    const distantShoulder = Math.exp(-((xNorm + 0.78) ** 2) / 0.064);
     const skyline =
-      0.50 +
-      center * 0.62 +
-      left * 0.36 +
-      right * 0.42 +
-      noise.fbm(xNorm * 3.2 + 21, 4.4, 5) * 0.25 +
-      Math.max(0, Math.sin(xNorm * 28.0 + 1.7)) * 0.10;
-    const ridgeTop = baseY + peakY * THREE.MathUtils.clamp(skyline, 0.34, 1.48);
+      0.38 +
+      center * 0.82 +
+      left * 0.48 +
+      right * 0.56 +
+      needle * 0.40 +
+      distantShoulder * 0.24 -
+      saddle * 0.18 +
+      noise.fbm(xNorm * 3.2 + 21, 4.4, 5) * 0.30 +
+      Math.max(0, Math.sin(xNorm * 31.0 + 1.7)) * 0.11;
+    const ridgeTop = baseY + peakY * THREE.MathUtils.clamp(skyline, 0.30, 1.42) * (0.56 + edgeMask * 0.44);
     const cutA = Math.abs(noise.fbm(xNorm * 7.5 - 8, 2.1, 4));
     const cutB = Math.abs(noise.fbm(xNorm * 13.0 + 6, -3.4, 3));
+    const cutC = Math.max(0, noise.fbm(xNorm * 21.0 - 2, 6.1, 3));
     for (let yIndex = 0; yIndex <= ySegments; yIndex += 1) {
       const yT = yIndex / ySegments;
-      const terrace = Math.pow(yT, 0.78);
-      const ravine = (cutA * 42 + cutB * 20) * Math.sin(yT * Math.PI) * (1 - yT * 0.25);
-      const fold = noise.fbm(xNorm * 5.2 + yT * 2.4, yT * 7.2 - 14, 4) * 26 * Math.sin(yT * Math.PI);
-      const y = baseY + (ridgeTop - baseY) * terrace - ravine + fold;
+      const terrace = Math.pow(yT, 0.72);
+      const ridgeSpine = Math.pow(yT, 1.35);
+      const ravine = (cutA * 48 + cutB * 26 + cutC * 18) * Math.sin(yT * Math.PI) * (1 - yT * 0.18);
+      const fold = noise.fbm(xNorm * 5.2 + yT * 2.4, yT * 7.2 - 14, 4) * 32 * Math.sin(yT * Math.PI);
+      const verticalStrata = Math.sin((yT * 8.0 + xNorm * 4.6) + noise.fbm(xNorm * 9.0, yT * 5.0, 3) * 2.6) * 8;
+      const y = baseY + (ridgeTop - baseY) * terrace - ravine + fold + verticalStrata * ridgeSpine;
       const zOffset =
-        -depth * yT +
-        noise.fbm(xNorm * 4.8 + yT * 8.2, yT * 5.4 + 3, 3) * 34 * Math.sin(yT * Math.PI);
-      positions.push(x + noise.fbm(xNorm * 11 + yT, 18.0, 3) * 8 * Math.sin(yT * Math.PI), y, z + zOffset);
+        -depth * yT * (0.42 + edgeMask * 0.58) +
+        noise.fbm(xNorm * 4.8 + yT * 8.2, yT * 5.4 + 3, 3) * 46 * Math.sin(yT * Math.PI) * edgeMask;
+      positions.push(x + noise.fbm(xNorm * 11 + yT, 18.0, 3) * 12 * Math.sin(yT * Math.PI), y, z + zOffset);
       elevs.push(THREE.MathUtils.clamp((y - baseY) / Math.max(1, peakY * 1.35), 0, 1));
       flatnesses.push(THREE.MathUtils.clamp(0.18 + (1 - yT) * 0.44 + noise.fbm(xNorm * 8.0, yT * 6.0, 3) * 0.18, 0.05, 0.82));
+      edgeFades.push(edgeMask);
     }
   }
 
@@ -369,94 +393,7 @@ const buildPeakWallGeometry = ({
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
   geometry.setAttribute("flatness", new THREE.Float32BufferAttribute(flatnesses, 1));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-};
-
-const angleDelta = (a: number, b: number) => {
-  let delta = a - b;
-  while (delta > Math.PI) {
-    delta -= Math.PI * 2;
-  }
-  while (delta < -Math.PI) {
-    delta += Math.PI * 2;
-  }
-  return delta;
-};
-
-const buildAlpineRingGeometry = () => {
-  const noise = makeNoise2D(68273);
-  const thetaSegments = 256;
-  const radialSegments = 24;
-  const rInner = SCENIC_ZONE.mountainInnerRadius;
-  const rOuter = SCENIC_ZONE.mountainOuterRadius;
-  const vertices: number[] = [];
-  const elevs: number[] = [];
-  const flatnesses: number[] = [];
-  const indices: number[] = [];
-  const heroTheta = -Math.PI * 0.55;
-
-  for (let thetaIndex = 0; thetaIndex <= thetaSegments; thetaIndex += 1) {
-    const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
-    const cos = Math.cos(theta);
-    const sin = Math.sin(theta);
-    const warp = noise.fbm(cos * 3.2 + 13.0, sin * 3.2 - 8.0, 4) * 0.34;
-    const centerPeak = Math.exp(-(angleDelta(theta, heroTheta) ** 2) / (0.32 * 0.32));
-    const leftPeak = Math.exp(-(angleDelta(theta, heroTheta - 0.78) ** 2) / (0.38 * 0.38));
-    const rightPeak = Math.exp(-(angleDelta(theta, heroTheta + 0.92) ** 2) / (0.42 * 0.42));
-    let ridge =
-      0.42 +
-      centerPeak * 0.54 +
-      leftPeak * 0.34 +
-      rightPeak * 0.38 +
-      noise.fbm(cos * 5.4 + warp * 4.0, sin * 5.4 - warp * 3.0, 5) * 0.38 +
-      Math.max(0, Math.sin(theta * 19.0 + 0.8)) * 0.09;
-    ridge = THREE.MathUtils.clamp(ridge, 0.18, 1.20);
-    const peakHeight = (126 + ridge * 332) * SCENIC_ZONE.mountainHeightScale;
-
-    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
-      const radial = radialIndex / radialSegments;
-      const radius = rInner + (rOuter - rInner) * radial;
-      const rise = Math.sin(Math.min(radial / 0.78, 1) * Math.PI * 0.5);
-      const farDrop = radial < 0.82 ? 1 : 1 - (radial - 0.82) / 0.22;
-      const shoulder = Math.pow(Math.max(0, rise), 0.96) * Math.max(0, farDrop);
-      const foothill = smoothBlend(0.0, 0.22, radial) * smoothBlend(0.52, 0.18, radial);
-      const local =
-        noise.fbm(cos * radius * 0.006 + 31, sin * radius * 0.006 - 11, 5) *
-        peakHeight *
-        0.24 *
-        shoulder;
-      const ravine =
-        Math.abs(noise.fbm(cos * radius * 0.013 + 7, sin * radius * 0.012 + 19, 4)) *
-        peakHeight *
-        0.18 *
-        (1 - radial * 0.35) *
-        shoulder;
-      const y = Math.max(7, 7 + foothill * (24 + ridge * 18) + peakHeight * shoulder + local - ravine);
-      vertices.push(cos * radius, y, sin * radius);
-      elevs.push(THREE.MathUtils.clamp(y / 430, 0, 1));
-      flatnesses.push(THREE.MathUtils.clamp(0.18 + (1 - radial) * 0.42 + noise.fbm(cos * 9, sin * 9, 3) * 0.18, 0.04, 0.82));
-    }
-  }
-
-  const columns = radialSegments + 1;
-  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
-    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-      const a = thetaIndex * columns + radialIndex;
-      const b = a + columns;
-      if ((thetaIndex + radialIndex) % 2 === 0) {
-        indices.push(a, b, a + 1, b, b + 1, a + 1);
-      } else {
-        indices.push(a, b, b + 1, a, b + 1, a + 1);
-      }
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-  geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
-  geometry.setAttribute("flatness", new THREE.Float32BufferAttribute(flatnesses, 1));
+  geometry.setAttribute("edgeFade", new THREE.Float32BufferAttribute(edgeFades, 1));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -506,6 +443,7 @@ const buildFoothillSkirtGeometry = () => {
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
   geometry.setAttribute("flatness", new THREE.Float32BufferAttribute(flatnesses, 1));
+  setConstantEdgeFade(geometry);
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -513,11 +451,11 @@ const buildFoothillSkirtGeometry = () => {
 
 const buildValleyApronGeometry = () => {
   const noise = makeNoise2D(70319);
-  const xSegments = 192;
-  const zSegments = 14;
-  const width = 3860;
-  const nearZ = -820;
-  const farZ = -1540;
+  const xSegments = 220;
+  const zSegments = 18;
+  const width = 9000;
+  const nearZ = -690;
+  const farZ = -1350;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const flatnesses: number[] = [];
@@ -526,25 +464,27 @@ const buildValleyApronGeometry = () => {
   for (let zIndex = 0; zIndex <= zSegments; zIndex += 1) {
     const zT = zIndex / zSegments;
     const z = nearZ + (farZ - nearZ) * zT;
-    const zRise = Math.pow(zT, 1.18);
+    const zRise = Math.pow(zT, 1.05);
     for (let xIndex = 0; xIndex <= xSegments; xIndex += 1) {
       const xT = xIndex / xSegments;
       const xNorm = xT * 2 - 1;
       const shoulder = Math.abs(xNorm);
       const cut = noise.fbm(xNorm * 4.8 + 17, zT * 5.2 - 9, 4);
       const mound = noise.fbm(xNorm * 9.0 - 21, zT * 8.0 + 13, 3);
-      const valleyDip = Math.exp(-(xNorm * xNorm) / 0.78) * (1 - zT) * 8;
+      const ridgelets = Math.max(0, Math.sin(xNorm * 17.0 + zT * 8.0 + cut * 2.0)) * (8 + zT * 18);
+      const valleyDip = Math.exp(-(xNorm * xNorm) / 0.68) * (1 - zT) * 5;
       const y =
-        10 +
-        zRise * 58 +
-        shoulder * (8 + zT * 12) +
-        cut * 16 +
-        mound * 6 -
+        18 +
+        zRise * 76 +
+        shoulder * (12 + zT * 18) +
+        cut * 24 +
+        mound * 12 +
+        ridgelets -
         valleyDip;
-      const x = xNorm * width * 0.5 + noise.fbm(xNorm * 13, zT * 6 + 4, 3) * 10 * (0.35 + zT);
-      vertices.push(x, Math.max(7, y), z + noise.fbm(xNorm * 5 - 2, zT * 7 + 29, 3) * 8);
-      elevs.push(THREE.MathUtils.clamp(y / 135, 0.02, 0.46));
-      flatnesses.push(THREE.MathUtils.clamp(0.58 + zT * 0.22 + cut * 0.08, 0.36, 0.86));
+      const x = xNorm * width * 0.5 + noise.fbm(xNorm * 13, zT * 6 + 4, 3) * 18 * (0.35 + zT);
+      vertices.push(x, Math.max(12, y), z + noise.fbm(xNorm * 5 - 2, zT * 7 + 29, 3) * 22);
+      elevs.push(THREE.MathUtils.clamp(y / 160, 0.06, 0.56));
+      flatnesses.push(THREE.MathUtils.clamp(0.32 + zT * 0.16 + cut * 0.12, 0.18, 0.62));
     }
   }
 
@@ -565,6 +505,7 @@ const buildValleyApronGeometry = () => {
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
   geometry.setAttribute("flatness", new THREE.Float32BufferAttribute(flatnesses, 1));
+  setConstantEdgeFade(geometry);
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -572,6 +513,7 @@ const buildValleyApronGeometry = () => {
 
 const createTerrainMaterial = () =>
   new THREE.ShaderMaterial({
+    transparent: true,
     uniforms: {
       uCamera: { value: new THREE.Vector3() },
       uFogColor: { value: new THREE.Color(0xd8e7e2) },
@@ -583,10 +525,12 @@ const createTerrainMaterial = () =>
     vertexShader: `
       attribute float elev;
       attribute float flatness;
+      attribute float edgeFade;
       varying vec3 vWorldPos;
       varying vec3 vNormal;
       varying float vElev;
       varying float vFlatness;
+      varying float vEdgeFade;
 
       void main() {
         vec4 worldPosition = modelMatrix * vec4(position, 1.0);
@@ -594,6 +538,7 @@ const createTerrainMaterial = () =>
         vNormal = normalize(mat3(modelMatrix) * normal);
         vElev = elev;
         vFlatness = flatness;
+        vEdgeFade = edgeFade;
         gl_Position = projectionMatrix * viewMatrix * worldPosition;
       }
     `,
@@ -602,6 +547,7 @@ const createTerrainMaterial = () =>
       varying vec3 vNormal;
       varying float vElev;
       varying float vFlatness;
+      varying float vEdgeFade;
       uniform vec3 uCamera;
       uniform vec3 uFogColor;
       uniform vec3 uSunColor;
@@ -611,6 +557,10 @@ const createTerrainMaterial = () =>
       ${GLSL_NOISE}
 
       void main() {
+        float edgeAlpha = smoothstep(0.08, 0.54, vEdgeFade);
+        if (edgeAlpha < 0.025) {
+          discard;
+        }
         vec3 normal = normalize(vNormal);
         float steep = 1.0 - clamp(vFlatness, 0.0, 1.0);
         float grain = bl_fbm(vWorldPos.xz * 0.018 + vec2(9.0, -31.0));
@@ -618,11 +568,11 @@ const createTerrainMaterial = () =>
         float ridgeDetail = bl_fbm(vec2(vWorldPos.x * 0.012 + vWorldPos.y * 0.018, vWorldPos.z * 0.008));
         float strata = sin(vWorldPos.y * 0.075 + grain * 3.5 + macro * 2.0) * 0.5 + 0.5;
 
-        vec3 forest = vec3(0.022, 0.074, 0.040);
-        vec3 meadow = vec3(0.120, 0.185, 0.100);
-        vec3 rock = mix(vec3(0.235, 0.266, 0.260), vec3(0.650, 0.640, 0.565), strata);
-        vec3 scree = vec3(0.430, 0.420, 0.372);
-        vec3 snow = vec3(0.900, 0.920, 0.860);
+        vec3 forest = vec3(0.020, 0.062, 0.034);
+        vec3 meadow = vec3(0.100, 0.152, 0.080);
+        vec3 rock = mix(vec3(0.205, 0.226, 0.214), vec3(0.560, 0.555, 0.492), strata);
+        vec3 scree = vec3(0.342, 0.336, 0.292);
+        vec3 snow = vec3(0.820, 0.842, 0.770);
 
         float forestBand = smoothstep(0.34, 0.06, vElev) * smoothstep(0.38, 0.88, vFlatness);
         float meadowBand = smoothstep(0.40, 0.11, vElev) * smoothstep(0.24, 0.74, vFlatness);
@@ -633,7 +583,7 @@ const createTerrainMaterial = () =>
         albedo = mix(albedo, forest, forestBand * 0.88);
         albedo = mix(albedo, scree, clamp(rockBand * steep * 0.52, 0.0, 0.62));
         albedo = mix(albedo, snow, snowBand * 0.58);
-        albedo *= 0.76 + macro * 0.30 + grain * 0.10 + ridgeDetail * 0.16;
+        albedo *= 0.72 + macro * 0.26 + grain * 0.12 + ridgeDetail * 0.22;
 
         vec3 sunDir = normalize(vec3(-0.38, 0.66, -0.55));
         float diffuse = max(dot(normal, sunDir), 0.0);
@@ -644,10 +594,12 @@ const createTerrainMaterial = () =>
         color = mix(color, color * vec3(0.76, 0.82, 0.92), uDark * 0.20);
 
         float dist = distance(vWorldPos, uCamera);
-        float aerial = 1.0 - exp(-pow(dist * 0.00056, 1.42));
-        float lowFog = smoothstep(150.0, 16.0, vWorldPos.y) * smoothstep(820.0, 1320.0, -vWorldPos.z) * 0.28;
-        color = mix(color, uFogColor, clamp(aerial * 0.46 + lowFog, 0.0, 0.68));
-        gl_FragColor = vec4(color, 1.0);
+        float aerial = 1.0 - exp(-pow(dist * 0.00050, 1.36));
+        float lowFog = smoothstep(96.0, 24.0, vWorldPos.y) * smoothstep(760.0, 1120.0, -vWorldPos.z) * 0.10;
+        vec3 landMist = vec3(0.022, 0.052, 0.038);
+        color = mix(color, landMist, clamp(lowFog, 0.0, 0.11));
+        color = mix(color, uFogColor, clamp(aerial * 0.30 * smoothstep(78.0, 260.0, vWorldPos.y), 0.0, 0.42));
+        gl_FragColor = vec4(color, edgeAlpha);
       }
     `,
   });
@@ -658,6 +610,129 @@ const createForestMaterial = () =>
     roughness: 0.92,
     metalness: 0,
     vertexColors: true,
+  });
+
+const buildFarForestBaseGeometry = () => {
+  const noise = makeNoise2D(71623);
+  const xSegments = 180;
+  const zSegments = 10;
+  const width = 9000;
+  const nearZ = -660;
+  const farZ = -1120;
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const color = new THREE.Color();
+
+  for (let zIndex = 0; zIndex <= zSegments; zIndex += 1) {
+    const zT = zIndex / zSegments;
+    const z = nearZ + (farZ - nearZ) * zT;
+    for (let xIndex = 0; xIndex <= xSegments; xIndex += 1) {
+      const xT = xIndex / xSegments;
+      const xNorm = xT * 2 - 1;
+      const cluster =
+        noise.fbm(xNorm * 6.0 + 3.0, zT * 5.0 - 8.0, 4) * 10 +
+        Math.max(0, Math.sin(xNorm * 24.0 + zT * 7.0)) * 8;
+      const y = 12 + zT * 24 + cluster + Math.abs(xNorm) * 10;
+      const x = xNorm * width * 0.5 + noise.fbm(xNorm * 11.0, zT * 6.0, 3) * 20;
+      positions.push(x, y, z + noise.fbm(xNorm * 5.0, zT * 9.0 + 16.0, 3) * 18);
+      color.setHSL(0.338 + noise.fbm(xNorm * 4.0, zT * 3.0, 2) * 0.018, 0.34, 0.040 + zT * 0.028);
+      colors.push(color.r, color.g, color.b);
+    }
+  }
+
+  const columns = xSegments + 1;
+  for (let zIndex = 0; zIndex < zSegments; zIndex += 1) {
+    for (let xIndex = 0; xIndex < xSegments; xIndex += 1) {
+      const a = zIndex * columns + xIndex;
+      const b = a + columns;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+const buildFarForestSilhouetteGeometry = () => {
+  const noise = makeNoise2D(72631);
+  const xSegments = 240;
+  const verticalSegments = 4;
+  const depthLayers = [
+    { z: -625, width: 9400, yBase: 6, yTop: 78, seedOffset: 0 },
+    { z: -770, width: 9800, yBase: 10, yTop: 118, seedOffset: 17 },
+    { z: -950, width: 10200, yBase: 14, yTop: 156, seedOffset: 43 },
+    { z: -1140, width: 10600, yBase: 20, yTop: 190, seedOffset: 71 },
+  ];
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const color = new THREE.Color();
+  let vertexOffset = 0;
+
+  depthLayers.forEach((layer, layerIndex) => {
+    for (let xIndex = 0; xIndex <= xSegments; xIndex += 1) {
+      const xT = xIndex / xSegments;
+      const xNorm = xT * 2 - 1;
+      const xEdge = smoothBlend(0.02, 0.26, xT) * smoothBlend(0.98, 0.74, xT);
+      const canopyNoise = noise.fbm(xNorm * 5.2 + layer.seedOffset, layerIndex * 4.7, 5);
+      const spireNoise = Math.max(0, Math.sin(xNorm * 47.0 + layer.seedOffset) + noise.fbm(xNorm * 19.0, 7.0 + layerIndex, 3));
+      const top =
+        layer.yBase +
+        (layer.yTop - layer.yBase) * (0.22 + xEdge * 0.78) +
+        canopyNoise * 14 * xEdge +
+        Math.max(0, spireNoise) * (14 + layerIndex * 6) * xEdge;
+      const base = layer.yBase + noise.fbm(xNorm * 9.0 - 4, layerIndex + 2, 3) * 5;
+      for (let yIndex = 0; yIndex <= verticalSegments; yIndex += 1) {
+        const yT = yIndex / verticalSegments;
+        const edgeBreak = noise.fbm(xNorm * 15.0 + yT * 3.0, layerIndex * 9.0, 3);
+        const x = xNorm * layer.width * 0.5 + edgeBreak * 10 * yT;
+        const y = base + (top - base) * Math.pow(yT, 0.92);
+        const z = layer.z + noise.fbm(xNorm * 8.0, yT * 2.0 + layerIndex * 6.0, 3) * 15;
+        positions.push(x, y, z);
+        color.setHSL(0.338 + edgeBreak * 0.010, 0.36, 0.020 + yT * 0.016 + layerIndex * 0.004);
+        colors.push(color.r, color.g, color.b);
+      }
+    }
+
+    const columns = verticalSegments + 1;
+    for (let xIndex = 0; xIndex < xSegments; xIndex += 1) {
+      for (let yIndex = 0; yIndex < verticalSegments; yIndex += 1) {
+        const a = vertexOffset + xIndex * columns + yIndex;
+        const b = a + columns;
+        indices.push(a, b, a + 1, b, b + 1, a + 1);
+      }
+    }
+    vertexOffset += (xSegments + 1) * (verticalSegments + 1);
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+const createFarForestBaseMaterial = () =>
+  new THREE.MeshStandardMaterial({
+    color: 0x0c1e12,
+    roughness: 0.98,
+    metalness: 0,
+    vertexColors: true,
+  });
+
+const createFarForestSilhouetteMaterial = () =>
+  new THREE.MeshStandardMaterial({
+    color: 0x07140d,
+    roughness: 1,
+    metalness: 0,
+    vertexColors: true,
+    side: THREE.DoubleSide,
   });
 
 const buildForest = (sampler: TerrainSampler) => {
@@ -764,7 +839,7 @@ const buildForest = (sampler: TerrainSampler) => {
   canopy.frustumCulled = false;
 
   const group = new THREE.Group();
-  group.name = "Phase 71 seated ecological forest wall";
+  group.name = "Phase 72 reconciled ecological forest wall";
   group.add(canopy, spires);
   return { group, count: placed + canopyPlaced, attempts: attempts + canopyAttempts };
 };
@@ -843,11 +918,12 @@ const createHeightFogMaterial = () =>
       void main() {
         float slow = bl_fbm(vWorldPos.xz * 0.005 + vec2(uTime * 0.010, -uTime * 0.007));
         float fine = bl_fbm(vWorldPos.xz * 0.014 + vec2(-uTime * 0.018, uTime * 0.011));
-        float breakup = smoothstep(0.15, 0.82, slow * 0.78 + fine * 0.32);
-        float heightFade = smoothstep(160.0, 20.0, vWorldPos.y);
-        float basin = smoothstep(760.0, 1180.0, -vWorldPos.z) * smoothstep(2380.0, 1660.0, -vWorldPos.z);
-        float alpha = vFogAlpha * uOpacity * heightFade * basin * (0.48 + breakup * 0.84) * (1.0 - uDark * 0.16);
-        if (alpha < 0.010) {
+        float streakBreak = bl_fbm(vec2(vWorldPos.x * 0.010 + slow * 1.5, vWorldPos.y * 0.020 + uTime * 0.006));
+        float breakup = smoothstep(0.30, 0.88, slow * 0.58 + fine * 0.26 + streakBreak * 0.42);
+        float heightFade = smoothstep(126.0, 28.0, vWorldPos.y);
+        float basin = smoothstep(740.0, 1080.0, -vWorldPos.z) * smoothstep(1980.0, 1380.0, -vWorldPos.z);
+        float alpha = vFogAlpha * uOpacity * heightFade * basin * (0.12 + breakup * 0.58) * (1.0 - uDark * 0.20);
+        if (alpha < 0.014) {
           discard;
         }
         gl_FragColor = vec4(uColor, alpha);
@@ -892,7 +968,7 @@ export const createWebGpuScenicBackdropSystem = (
   capabilities: RendererCapabilityTelemetry,
 ): WebGpuScenicBackdropSystem => {
   const group = new THREE.Group();
-  group.name = "Phase 71 WebGPU alpine scenic layer seated v4";
+  group.name = "Phase 72 WebGPU alpine scenic layer reconciled hero ridges";
   group.visible = false;
 
   const stats: WebGpuScenicStats = {
@@ -932,102 +1008,110 @@ export const createWebGpuScenicBackdropSystem = (
     const terrain = buildTerrain();
     terrainMaterial = createTerrainMaterial();
     const terrainMesh = new THREE.Mesh(terrain.geometry, terrainMaterial);
-    terrainMesh.name = "Phase 71 recessed alpine terrain v4";
+    terrainMesh.name = "Phase 72 reconciled alpine terrain";
     terrainMesh.frustumCulled = false;
-    group.add(terrainMesh);
+    terrainMesh.visible = false;
 
     peakMaterial = createTerrainMaterial();
     const foothillMesh = new THREE.Mesh(buildFoothillSkirtGeometry(), peakMaterial.clone());
-    foothillMesh.name = "Phase 71 seated mountain-foot skirt";
+    foothillMesh.name = "Phase 72 grounded mountain-foot skirt";
     foothillMesh.frustumCulled = false;
     group.add(foothillMesh);
 
     const valleyApronMesh = new THREE.Mesh(buildValleyApronGeometry(), peakMaterial.clone());
-    valleyApronMesh.name = "Phase 71 seated forest-to-mountain valley apron";
+    valleyApronMesh.name = "Phase 72 broken forest-to-mountain foothill apron";
     valleyApronMesh.frustumCulled = false;
     group.add(valleyApronMesh);
 
-    const ringMesh = new THREE.Mesh(buildAlpineRingGeometry(), peakMaterial);
-    ringMesh.name = "Phase 71 distant alpine ring backdrop";
-    ringMesh.frustumCulled = false;
-    group.add(ringMesh);
+    const forestBaseMesh = new THREE.Mesh(buildFarForestBaseGeometry(), createFarForestBaseMaterial());
+    forestBaseMesh.name = "Phase 72 dark far-forest mountain-base mass";
+    forestBaseMesh.frustumCulled = false;
+    group.add(forestBaseMesh);
+
+    const forestSilhouetteMesh = new THREE.Mesh(buildFarForestSilhouetteGeometry(), createFarForestSilhouetteMaterial());
+    forestSilhouetteMesh.name = "Phase 72 opaque far-forest no-second-lake silhouette";
+    forestSilhouetteMesh.frustumCulled = false;
+    group.add(forestSilhouetteMesh);
 
     const peakWalls = [
       new THREE.Mesh(
         buildPeakWallGeometry({
           seed: 68101,
-          z: -1580,
-          depth: 260,
-          width: 3600,
-          baseY: 22,
-          peakY: 305,
+          z: -1320,
+          depth: 255,
+          width: 5400,
+          baseY: 28,
+          peakY: 520,
           xSegments: 220,
           ySegments: 20,
+          edgeFade: 0.20,
         }),
         peakMaterial,
       ),
       new THREE.Mesh(
         buildPeakWallGeometry({
           seed: 68141,
-          z: -2040,
+          z: -1760,
           depth: 330,
-          width: 4200,
-          baseY: 52,
-          peakY: 370,
+          width: 6100,
+          baseY: 58,
+          peakY: 650,
           xSegments: 240,
           ySegments: 22,
+          edgeFade: 0.18,
         }),
         peakMaterial.clone(),
       ),
       new THREE.Mesh(
         buildPeakWallGeometry({
           seed: 68187,
-          z: -2500,
+          z: -2180,
           depth: 410,
-          width: 5000,
-          baseY: 82,
-          peakY: 465,
+          width: 7000,
+          baseY: 88,
+          peakY: 780,
           xSegments: 272,
           ySegments: 24,
+          edgeFade: 0.16,
         }),
         peakMaterial.clone(),
       ),
     ];
     peakWalls.forEach((wall, index) => {
-      wall.name = `Phase 71 seated craggy alpine peak wall ${index + 1}`;
+      wall.name = `Phase 72 craggy hero alpine peak wall ${index + 1}`;
       wall.frustumCulled = false;
       group.add(wall);
     });
 
     const forest = buildForest(terrain.sampler);
-    forest.group.name = "Phase 71 ecological instanced mountain-base forest";
+    forest.group.name = "Phase 72 dense ecological mountain-base forest";
     group.add(forest.group);
 
     const fogGeometries = [
-      buildHeightFogGeometry(-780, -1160, 20, 3300),
-      buildHeightFogGeometry(-880, -1360, 34, 3380),
-      buildHeightFogGeometry(-1020, -1600, 52, 3260),
-      buildHeightFogGeometry(-1200, -1860, 76, 3000),
-      buildHeightFogGeometry(-1440, -2240, 112, 2580),
+      buildHeightFogGeometry(-700, -1060, 24, 3140),
+      buildHeightFogGeometry(-840, -1280, 42, 3320),
+      buildHeightFogGeometry(-1040, -1540, 66, 3180),
+      buildHeightFogGeometry(-1280, -1860, 96, 2860),
+      buildHeightFogGeometry(-1560, -2140, 132, 2320),
     ];
     fogMaterials = fogGeometries.map(() => createHeightFogMaterial());
     fogGeometries.forEach((geometry, index) => {
       const fog = new THREE.Mesh(geometry, fogMaterials[index]);
-      fog.name = `Phase 71 valley height fog layer ${index + 1}`;
+      fog.name = `Phase 72 broken valley height fog layer ${index + 1}`;
       fog.renderOrder = 4 + index;
       fog.frustumCulled = false;
       group.add(fog);
     });
 
     stats.terrainVertices =
-      terrain.geometry.attributes.position.count +
       foothillMesh.geometry.attributes.position.count +
       valleyApronMesh.geometry.attributes.position.count +
-      ringMesh.geometry.attributes.position.count +
+      forestBaseMesh.geometry.attributes.position.count +
+      forestSilhouetteMesh.geometry.attributes.position.count +
       peakWalls.reduce((count, wall) => count + wall.geometry.attributes.position.count, 0);
     stats.forestInstances = forest.count;
     stats.fogLayers = fogGeometries.length;
-    stats.fogMode = "WebGL valley alpine height fog v4";
+    stats.fogMode = "WebGL broken alpine valley fog v5";
   };
 
   return {
@@ -1048,10 +1132,9 @@ export const createWebGpuScenicBackdropSystem = (
       }
       group.children.forEach((child) => {
         if (
-          !child.name.startsWith("Phase 71 seated craggy alpine peak wall") &&
-          child.name !== "Phase 71 seated mountain-foot skirt" &&
-          child.name !== "Phase 71 seated forest-to-mountain valley apron" &&
-          child.name !== "Phase 71 distant alpine ring backdrop"
+          !child.name.startsWith("Phase 72 craggy hero alpine peak wall") &&
+          child.name !== "Phase 72 grounded mountain-foot skirt" &&
+          child.name !== "Phase 72 broken forest-to-mountain foothill apron"
         ) {
           return;
         }
@@ -1064,10 +1147,10 @@ export const createWebGpuScenicBackdropSystem = (
         material.uniforms.uFire.value = weather.dials.fireWeather;
       });
       fogMaterials.forEach((material, index) => {
-        material.uniforms.uColor.value.setHex(palette.fogColor);
+        material.uniforms.uColor.value.setHex(palette.fogColor).lerp(LAND_FOG_COLOR, 0.96);
         material.uniforms.uTime.value = elapsed;
         material.uniforms.uDark.value = dark;
-        material.uniforms.uOpacity.value = 0.108 + weather.dials.fog * 0.15 + index * 0.020;
+        material.uniforms.uOpacity.value = 0.018 + weather.dials.fog * 0.052 + index * 0.004;
       });
     },
     setGate: (gate) => {
