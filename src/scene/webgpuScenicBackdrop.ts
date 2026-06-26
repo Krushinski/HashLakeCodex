@@ -31,6 +31,7 @@ export type WebGpuScenicStats = {
   terrainVisible: boolean;
   forestVisible: boolean;
   fogVisible: boolean;
+  visualRegressionDisabled: boolean;
   compareMode: boolean;
   extraRenderPass: boolean;
 };
@@ -88,6 +89,8 @@ const TERRAIN_FAR_Z = SCENIC_ZONE.terrainFarZ;
 const FOREST_SPIRE_TARGET = 82000;
 const FOREST_CANOPY_TARGET = 24000;
 const LAND_FOG_COLOR = new THREE.Color(0x314737);
+const ENABLE_PHASE73_SCENIC_TERRAIN_AND_FOG = false;
+const PHASE73_VISUAL_GATE_REASON = "terrain/fog panes disabled by Phase 73 visual gate";
 
 export const getWebGpuScenicPreference = (): WebGpuScenicPreference => {
   try {
@@ -839,7 +842,7 @@ const buildForest = (sampler: TerrainSampler) => {
   canopy.frustumCulled = false;
 
   const group = new THREE.Group();
-  group.name = "Phase 72 reconciled ecological forest wall";
+  group.name = "Phase 73 reconciled ecological forest wall";
   group.add(canopy, spires);
   return { group, count: placed + canopyPlaced, attempts: attempts + canopyAttempts };
 };
@@ -968,7 +971,7 @@ export const createWebGpuScenicBackdropSystem = (
   capabilities: RendererCapabilityTelemetry,
 ): WebGpuScenicBackdropSystem => {
   const group = new THREE.Group();
-  group.name = "Phase 72 WebGPU alpine scenic layer reconciled hero ridges";
+  group.name = "Phase 73 scenic forensic forest-only layer";
   group.visible = false;
 
   const stats: WebGpuScenicStats = {
@@ -990,6 +993,7 @@ export const createWebGpuScenicBackdropSystem = (
     terrainVisible: false,
     forestVisible: false,
     fogVisible: false,
+    visualRegressionDisabled: true,
     compareMode: isScenicCompareRequested(),
     extraRenderPass: false,
   };
@@ -1006,112 +1010,122 @@ export const createWebGpuScenicBackdropSystem = (
     }
     built = true;
     const terrain = buildTerrain();
-    terrainMaterial = createTerrainMaterial();
-    const terrainMesh = new THREE.Mesh(terrain.geometry, terrainMaterial);
-    terrainMesh.name = "Phase 72 reconciled alpine terrain";
-    terrainMesh.frustumCulled = false;
-    terrainMesh.visible = false;
+    let gatedTerrainVertices = 0;
+    let gatedFogLayers = 0;
+    let gatedFogMode = PHASE73_VISUAL_GATE_REASON;
 
-    peakMaterial = createTerrainMaterial();
-    const foothillMesh = new THREE.Mesh(buildFoothillSkirtGeometry(), peakMaterial.clone());
-    foothillMesh.name = "Phase 72 grounded mountain-foot skirt";
-    foothillMesh.frustumCulled = false;
-    group.add(foothillMesh);
+    if (ENABLE_PHASE73_SCENIC_TERRAIN_AND_FOG) {
+      terrainMaterial = createTerrainMaterial();
+      const terrainMesh = new THREE.Mesh(terrain.geometry, terrainMaterial);
+      terrainMesh.name = "Phase 73 gated alpine terrain";
+      terrainMesh.frustumCulled = false;
+      terrainMesh.visible = false;
 
-    const valleyApronMesh = new THREE.Mesh(buildValleyApronGeometry(), peakMaterial.clone());
-    valleyApronMesh.name = "Phase 72 broken forest-to-mountain foothill apron";
-    valleyApronMesh.frustumCulled = false;
-    group.add(valleyApronMesh);
+      peakMaterial = createTerrainMaterial();
+      const foothillMesh = new THREE.Mesh(buildFoothillSkirtGeometry(), peakMaterial.clone());
+      foothillMesh.name = "Phase 73 gated mountain-foot skirt";
+      foothillMesh.frustumCulled = false;
+      group.add(foothillMesh);
 
-    const forestBaseMesh = new THREE.Mesh(buildFarForestBaseGeometry(), createFarForestBaseMaterial());
-    forestBaseMesh.name = "Phase 72 dark far-forest mountain-base mass";
-    forestBaseMesh.frustumCulled = false;
-    group.add(forestBaseMesh);
+      const valleyApronMesh = new THREE.Mesh(buildValleyApronGeometry(), peakMaterial.clone());
+      valleyApronMesh.name = "Phase 73 gated forest-to-mountain foothill apron";
+      valleyApronMesh.frustumCulled = false;
+      group.add(valleyApronMesh);
 
-    const forestSilhouetteMesh = new THREE.Mesh(buildFarForestSilhouetteGeometry(), createFarForestSilhouetteMaterial());
-    forestSilhouetteMesh.name = "Phase 72 opaque far-forest no-second-lake silhouette";
-    forestSilhouetteMesh.frustumCulled = false;
-    group.add(forestSilhouetteMesh);
+      const forestBaseMesh = new THREE.Mesh(buildFarForestBaseGeometry(), createFarForestBaseMaterial());
+      forestBaseMesh.name = "Phase 73 gated far-forest mountain-base mass";
+      forestBaseMesh.frustumCulled = false;
+      group.add(forestBaseMesh);
 
-    const peakWalls = [
-      new THREE.Mesh(
-        buildPeakWallGeometry({
-          seed: 68101,
-          z: -1320,
-          depth: 255,
-          width: 5400,
-          baseY: 28,
-          peakY: 520,
-          xSegments: 220,
-          ySegments: 20,
-          edgeFade: 0.20,
-        }),
-        peakMaterial,
-      ),
-      new THREE.Mesh(
-        buildPeakWallGeometry({
-          seed: 68141,
-          z: -1760,
-          depth: 330,
-          width: 6100,
-          baseY: 58,
-          peakY: 650,
-          xSegments: 240,
-          ySegments: 22,
-          edgeFade: 0.18,
-        }),
-        peakMaterial.clone(),
-      ),
-      new THREE.Mesh(
-        buildPeakWallGeometry({
-          seed: 68187,
-          z: -2180,
-          depth: 410,
-          width: 7000,
-          baseY: 88,
-          peakY: 780,
-          xSegments: 272,
-          ySegments: 24,
-          edgeFade: 0.16,
-        }),
-        peakMaterial.clone(),
-      ),
-    ];
-    peakWalls.forEach((wall, index) => {
-      wall.name = `Phase 72 craggy hero alpine peak wall ${index + 1}`;
-      wall.frustumCulled = false;
-      group.add(wall);
-    });
+      const forestSilhouetteMesh = new THREE.Mesh(buildFarForestSilhouetteGeometry(), createFarForestSilhouetteMaterial());
+      forestSilhouetteMesh.name = "Phase 73 gated far-forest silhouette";
+      forestSilhouetteMesh.frustumCulled = false;
+      group.add(forestSilhouetteMesh);
+
+      const peakWalls = [
+        new THREE.Mesh(
+          buildPeakWallGeometry({
+            seed: 68101,
+            z: -1320,
+            depth: 255,
+            width: 5400,
+            baseY: 28,
+            peakY: 520,
+            xSegments: 220,
+            ySegments: 20,
+            edgeFade: 0.20,
+          }),
+          peakMaterial,
+        ),
+        new THREE.Mesh(
+          buildPeakWallGeometry({
+            seed: 68141,
+            z: -1760,
+            depth: 330,
+            width: 6100,
+            baseY: 58,
+            peakY: 650,
+            xSegments: 240,
+            ySegments: 22,
+            edgeFade: 0.18,
+          }),
+          peakMaterial.clone(),
+        ),
+        new THREE.Mesh(
+          buildPeakWallGeometry({
+            seed: 68187,
+            z: -2180,
+            depth: 410,
+            width: 7000,
+            baseY: 88,
+            peakY: 780,
+            xSegments: 272,
+            ySegments: 24,
+            edgeFade: 0.16,
+          }),
+          peakMaterial.clone(),
+        ),
+      ];
+      peakWalls.forEach((wall, index) => {
+        wall.name = `Phase 73 gated craggy alpine peak wall ${index + 1}`;
+        wall.frustumCulled = false;
+        group.add(wall);
+      });
+
+      const fogGeometries = [
+        buildHeightFogGeometry(-700, -1060, 24, 3140),
+        buildHeightFogGeometry(-840, -1280, 42, 3320),
+        buildHeightFogGeometry(-1040, -1540, 66, 3180),
+        buildHeightFogGeometry(-1280, -1860, 96, 2860),
+        buildHeightFogGeometry(-1560, -2140, 132, 2320),
+      ];
+      fogMaterials = fogGeometries.map(() => createHeightFogMaterial());
+      fogGeometries.forEach((geometry, index) => {
+        const fog = new THREE.Mesh(geometry, fogMaterials[index]);
+        fog.name = `Phase 73 gated valley height fog layer ${index + 1}`;
+        fog.renderOrder = 4 + index;
+        fog.frustumCulled = false;
+        group.add(fog);
+      });
+
+      gatedTerrainVertices =
+        foothillMesh.geometry.attributes.position.count +
+        valleyApronMesh.geometry.attributes.position.count +
+        forestBaseMesh.geometry.attributes.position.count +
+        forestSilhouetteMesh.geometry.attributes.position.count +
+        peakWalls.reduce((count, wall) => count + wall.geometry.attributes.position.count, 0);
+      gatedFogLayers = fogGeometries.length;
+      gatedFogMode = "enabled";
+    }
 
     const forest = buildForest(terrain.sampler);
-    forest.group.name = "Phase 72 dense ecological mountain-base forest";
+    forest.group.name = "Phase 73 forensic forest reinforcement";
     group.add(forest.group);
 
-    const fogGeometries = [
-      buildHeightFogGeometry(-700, -1060, 24, 3140),
-      buildHeightFogGeometry(-840, -1280, 42, 3320),
-      buildHeightFogGeometry(-1040, -1540, 66, 3180),
-      buildHeightFogGeometry(-1280, -1860, 96, 2860),
-      buildHeightFogGeometry(-1560, -2140, 132, 2320),
-    ];
-    fogMaterials = fogGeometries.map(() => createHeightFogMaterial());
-    fogGeometries.forEach((geometry, index) => {
-      const fog = new THREE.Mesh(geometry, fogMaterials[index]);
-      fog.name = `Phase 72 broken valley height fog layer ${index + 1}`;
-      fog.renderOrder = 4 + index;
-      fog.frustumCulled = false;
-      group.add(fog);
-    });
-
-    stats.terrainVertices =
-      foothillMesh.geometry.attributes.position.count +
-      valleyApronMesh.geometry.attributes.position.count +
-      forestBaseMesh.geometry.attributes.position.count +
-      forestSilhouetteMesh.geometry.attributes.position.count +
-      peakWalls.reduce((count, wall) => count + wall.geometry.attributes.position.count, 0);
+    stats.terrainVertices = gatedTerrainVertices;
     stats.forestInstances = forest.count;
-    stats.fogLayers = fogGeometries.length;
-    stats.fogMode = "WebGL broken alpine valley fog v5";
+    stats.fogLayers = gatedFogLayers;
+    stats.fogMode = gatedFogMode;
   };
 
   return {
@@ -1132,9 +1146,9 @@ export const createWebGpuScenicBackdropSystem = (
       }
       group.children.forEach((child) => {
         if (
-          !child.name.startsWith("Phase 72 craggy hero alpine peak wall") &&
-          child.name !== "Phase 72 grounded mountain-foot skirt" &&
-          child.name !== "Phase 72 broken forest-to-mountain foothill apron"
+          !child.name.startsWith("Phase 73 gated craggy alpine peak wall") &&
+          child.name !== "Phase 73 gated mountain-foot skirt" &&
+          child.name !== "Phase 73 gated forest-to-mountain foothill apron"
         ) {
           return;
         }

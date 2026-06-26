@@ -809,9 +809,10 @@ export const createHashlakeScene = ({
 
   const getWebGpuScenicGate = () => {
     const webglEligible = rendererCapabilities.webgl2 && !isMobileViewport;
+    const visualRegressionGateClosed = true;
     const eligible = webglEligible;
     const requested = webGpuScenicRequested;
-    const active = requested && webglEligible;
+    const active = requested && webglEligible && !visualRegressionGateClosed;
     const fallbackActive = !active;
     const reason = active
       ? rendererCapabilities.webgpu
@@ -823,7 +824,9 @@ export const createHashlakeScene = ({
             ? "requires WebGL2 fallback"
             : isMobileViewport
               ? "disabled on mobile viewport"
-              : "capability gate closed";
+              : visualRegressionGateClosed
+                ? "visual regression gate: native fallback active"
+                : "capability gate closed";
     return {
       requested,
       eligible,
@@ -991,6 +994,7 @@ export const createHashlakeScene = ({
     const webGpuScenicGate = getWebGpuScenicGate();
     realismSpikeSystem.setGate(scenicExperimentalGate);
     webGpuScenicSystem.setGate(webGpuScenicGate);
+    const webGpuScenicStats = webGpuScenicSystem.getStats();
     const scenicHudMode = webGpuScenicGate.active
       ? "ON"
       : webGpuScenicGate.requested
@@ -1011,7 +1015,7 @@ export const createHashlakeScene = ({
       lastScenicHudMode = scenicHudMode;
     }
     terrainSystem.setScenicBackdropActive(
-      webGpuScenicGate.active ||
+      (webGpuScenicGate.active && webGpuScenicStats.terrainVisible) ||
         (scenicAssetsActive &&
           (scenicAssetStatuses.mountain === "loaded" ||
             scenicAssetStatuses.mountainAlpha === "loaded")),
