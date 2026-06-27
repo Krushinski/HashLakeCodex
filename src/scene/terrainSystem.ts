@@ -53,8 +53,8 @@ const buildRidgeRing = ({
   hero: boolean;
 }) => {
   const noise = makeNoise2D(seed);
-  const thetaSegments = 128;
-  const radialSegments = 10;
+  const thetaSegments = 160;
+  const radialSegments = 12;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
@@ -71,34 +71,49 @@ const buildRidgeRing = ({
       ? 0.09 + rearArc * 0.98
       : 0.09 + shoulderArc * 0.15 + rearArc * 0.78;
     let ridge =
-      noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 4) * 0.9 + 0.55;
-    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.92 : 1.68);
+      noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 5) * 0.82 + 0.58;
+    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.72 : 1.58);
     const jag =
       (Math.sin(theta * 13.0 + seed) * 0.5 + 0.5) *
       Math.max(0, noise.fbm(cos * 8.2 + seed, sin * 8.2 + 2.4, 3));
-    ridge += jag * (hero ? 0.16 : 0.08);
+    const knife =
+      Math.max(0, Math.sin(theta * (hero ? 17.0 : 12.0) + seed * 0.41)) *
+      Math.max(0, noise.fbm(cos * 12.0 - seed, sin * 12.0 + seed, 3));
+    ridge += jag * (hero ? 0.20 : 0.10) + Math.pow(knife, 1.35) * (hero ? 0.18 : 0.06);
 
     if (hero) {
       const centerPeak = angleDiff(theta, viewTheta + 0.1);
       const sidePeak = angleDiff(theta, viewTheta - 0.62);
-      ridge += 0.55 * Math.exp(-(centerPeak * centerPeak) / (0.34 * 0.34));
-      ridge += 0.38 * Math.exp(-(sidePeak * sidePeak) / (0.26 * 0.26));
-      ridge = Math.min(ridge, 1.35);
+      const rightPeak = angleDiff(theta, viewTheta + 0.56);
+      ridge += 0.72 * Math.exp(-(centerPeak * centerPeak) / (0.25 * 0.25));
+      ridge += 0.42 * Math.exp(-(sidePeak * sidePeak) / (0.22 * 0.22));
+      ridge += 0.34 * Math.exp(-(rightPeak * rightPeak) / (0.30 * 0.30));
+      ridge = Math.min(ridge, 1.55);
     }
 
     const peakHeight = (peakMin + (peakMax - peakMin) * ridge) * heightMask;
     for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
       const radial = radialIndex / radialSegments;
       const radius = rInner + (rOuter - rInner) * radial;
-      const rise =
-        Math.pow(Math.sin(Math.PI * Math.min(radial / 0.78, 1) * 0.5), 1.25) *
-        (radial < 0.78 ? 1 : 1 - (radial - 0.78) / 0.3);
+      const ridgeSpine = Math.sin(Math.PI * Math.min(radial / 0.82, 1) * 0.5);
+      const outerFalloff = radial < 0.82 ? 1 : 1 - (radial - 0.82) / 0.26;
+      const rise = Math.pow(ridgeSpine, hero ? 1.05 : 1.18) * outerFalloff;
       const detail =
         noise.fbm(cos * radius * 0.004 + 31, sin * radius * 0.004 + 17, 4) *
         peakHeight *
-        (hero ? 0.28 : 0.2) *
+        (hero ? 0.34 : 0.20) *
         Math.max(rise, 0);
-      const y = Math.max(0, peakHeight * Math.max(rise, 0) + detail);
+      const ravine =
+        Math.max(0, Math.sin(theta * (hero ? 21.0 : 14.0) + radial * 5.2 + seed)) *
+        Math.max(0, 1 - Math.abs(radial - 0.58) * 2.1) *
+        peakHeight *
+        (hero ? 0.10 : 0.04);
+      const ledge =
+        Math.sin(radial * 18.0 + theta * 4.0 + seed) *
+        peakHeight *
+        (hero ? 0.035 : 0.018) *
+        Math.max(0, rise);
+      const y = Math.max(0, peakHeight * Math.max(rise, 0) + detail - ravine + ledge);
       vertices.push(cos * radius, y, sin * radius);
       elevs.push(y / peakMax);
     }
@@ -182,32 +197,54 @@ const createTerrainMaterial = (
       void main() {
         vec3 normal = normalize(vNormal);
         float slope = clamp(normal.y, 0.0, 1.0);
-        float roughNoise = bl_fbm(vWorldPos.xz * 0.012);
-        float broadNoise = bl_fbm(vWorldPos.xz * 0.0028 + 7.0);
-        float strata = sin(vWorldPos.y * 0.034 + bl_fbm(vWorldPos.xz * 0.006 + 31.0) * 4.2) * 0.5 + 0.5;
-        float faceBreakup = bl_fbm(vec2(vWorldPos.x * 0.015 + vWorldPos.y * 0.009, vWorldPos.z * 0.015));
-        vec3 rock = mix(vec3(0.60, 0.60, 0.55), vec3(0.30, 0.35, 0.34), roughNoise)
-          * (0.86 + 0.25 * broadNoise);
-        rock = mix(rock, rock * vec3(1.24, 1.18, 0.98), strata * (1.0 - slope) * 0.17);
-        rock = mix(rock, rock * vec3(0.86, 0.92, 0.98), faceBreakup * (1.0 - slope) * 0.10);
-        float forest = smoothstep(0.45, 0.16, vElev) * smoothstep(0.34, 0.62, slope) * uForest;
-        vec3 forestColor = vec3(0.086, 0.166, 0.096)
-          * (0.86 + 0.46 * bl_fbm(vWorldPos.xz * 0.022 + 3.0));
-        forestColor = mix(forestColor, forestColor * vec3(1.24, 1.15, 0.82), broadNoise * 0.16);
+        float roughNoise = bl_fbm(vWorldPos.xz * 0.010);
+        float broadNoise = bl_fbm(vWorldPos.xz * 0.0024 + 7.0);
+        float cliff = smoothstep(0.74, 0.18, slope);
+        float strata = sin(vWorldPos.y * 0.050 + bl_fbm(vWorldPos.xz * 0.005 + 31.0) * 5.6) * 0.5 + 0.5;
+        float verticalGrain = bl_fbm(vec2(vWorldPos.x * 0.018 + vWorldPos.y * 0.026, vWorldPos.z * 0.010 + vWorldPos.y * 0.018));
+        float faceBreakup = bl_fbm(vec2(vWorldPos.x * 0.014 + vWorldPos.y * 0.012, vWorldPos.z * 0.014));
+        float alpineRibs = smoothstep(
+          0.50,
+          0.94,
+          sin(vWorldPos.x * 0.034 + vWorldPos.z * 0.018 + vWorldPos.y * 0.072 + faceBreakup * 4.0) * 0.5 + 0.5
+        ) * cliff;
+        float screeLines = smoothstep(
+          0.64,
+          0.98,
+          sin(vWorldPos.x * -0.018 + vWorldPos.z * 0.036 + vWorldPos.y * 0.044 + roughNoise * 3.0) * 0.5 + 0.5
+        ) * cliff;
+        vec3 graniteWarm = vec3(0.58, 0.58, 0.53);
+        vec3 graniteCool = vec3(0.34, 0.40, 0.41);
+        vec3 graniteDark = vec3(0.12, 0.19, 0.17);
+        vec3 rock = mix(graniteWarm, graniteCool, roughNoise);
+        rock = mix(rock, graniteDark, cliff * (0.26 + 0.30 * (1.0 - broadNoise)));
+        rock = mix(rock, rock * vec3(1.22, 1.16, 0.94), strata * cliff * 0.30);
+        rock = mix(rock, rock * vec3(0.66, 0.75, 0.80), verticalGrain * cliff * 0.26);
+        rock = mix(rock, rock * vec3(0.47, 0.55, 0.54), alpineRibs * 0.38);
+        rock = mix(rock, rock * vec3(1.32, 1.25, 1.03), screeLines * (1.0 - alpineRibs) * 0.16);
+        rock *= 0.82 + 0.34 * broadNoise + 0.18 * faceBreakup;
+        float forest = smoothstep(0.30, 0.10, vElev) * smoothstep(0.34, 0.72, slope) * uForest;
+        vec3 forestColor = vec3(0.050, 0.128, 0.066)
+          * (0.86 + 0.40 * bl_fbm(vWorldPos.xz * 0.020 + 3.0));
+        forestColor = mix(forestColor, forestColor * vec3(1.16, 1.12, 0.82), broadNoise * 0.12);
         vec3 albedo = mix(rock, forestColor, forest);
-        float snow = smoothstep(uSnowLine, uSnowLine + 0.13, vElev + roughNoise * 0.07)
-          * smoothstep(0.18, 0.46, slope);
-        albedo = mix(albedo, vec3(0.80, 0.80, 0.74), snow * 0.22);
+        float snow = smoothstep(uSnowLine - 0.14, uSnowLine + 0.08, vElev + roughNoise * 0.06)
+          * smoothstep(0.16, 0.58, slope);
+        float sunCap = smoothstep(uSnowLine - 0.24, uSnowLine + 0.04, vElev + strata * 0.05)
+          * smoothstep(0.22, 0.70, slope);
+        albedo = mix(albedo, vec3(0.82, 0.82, 0.76), snow * 0.24);
+        albedo = mix(albedo, vec3(0.74, 0.72, 0.58), sunCap * 0.10);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.30 + uAmbient * (0.45 + 0.52 * slope));
         vec3 sideNormal = normalize(vec3(normal.x, 0.0, normal.z) + vec3(0.001, 0.0, 0.001));
         float sideLight = smoothstep(-0.55, 0.70, dot(sideNormal, normalize(vec3(-0.72, 0.0, -0.44))));
-        color *= 0.86 + sideLight * 0.40;
-        color *= 0.84 + slope * 0.27;
+        color *= 0.74 + sideLight * 0.52;
+        color *= 0.78 + slope * 0.34;
         float valleyShade = smoothstep(0.08, 0.52, vElev);
         float shadowBand = smoothstep(0.22, 0.82, bl_fbm(vec2(vWorldPos.x * 0.006, vWorldPos.y * 0.013) + 12.0));
-        color *= (0.80 + valleyShade * 0.23) * (0.92 + shadowBand * 0.08);
+        float verticalShadow = smoothstep(0.20, 0.86, bl_fbm(vec2(vWorldPos.x * 0.004 + vWorldPos.y * 0.018, vWorldPos.z * 0.006) + 18.0));
+        color *= (0.68 + valleyShade * 0.36) * (0.86 + shadowBand * 0.12) * (0.78 + verticalShadow * 0.24);
         color += albedo * vec3(1.0, 0.32, 0.07) * uFire * 0.42;
         color = mix(color, color * vec3(0.82, 0.86, 0.93), uDark * 0.16);
 
