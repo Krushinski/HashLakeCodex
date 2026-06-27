@@ -58,6 +58,9 @@ type VisualModeTelemetry = {
   mountainExperimentVertices: number;
   mountainExperimentValid: boolean;
   mountainBackArcValid: boolean;
+  mountainBackArcActive: boolean;
+  mountainSideFadeoutActive: boolean;
+  mountainInvalidVertexCount: number;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
   waterMeshCount: number;
@@ -151,6 +154,9 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Experiment valid", value: "yes", tone: "good" },
   { group: "global", label: "Mountain verts", value: "0", tone: "muted" },
   { group: "global", label: "Back arc", value: "valid", tone: "good" },
+  { group: "global", label: "Back arc active", value: "no", tone: "muted" },
+  { group: "global", label: "Side fadeout", value: "yes", tone: "good" },
+  { group: "global", label: "Invalid verts", value: "0", tone: "good" },
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
   { group: "global", label: "Heavy scenic", value: "off", tone: "good" },
   { group: "global", label: "Water meshes", value: "1", tone: "good" },
@@ -1175,6 +1181,21 @@ export const createDebugPanel = (
       "Back arc",
       telemetry.visualMode.mountainBackArcValid ? "valid" : "check",
       telemetry.visualMode.mountainBackArcValid ? "good" : "warn",
+    );
+    setMetric(
+      "Back arc active",
+      telemetry.visualMode.mountainBackArcActive ? "yes" : "no",
+      telemetry.visualMode.mountainBackArcActive ? "good" : "muted",
+    );
+    setMetric(
+      "Side fadeout",
+      telemetry.visualMode.mountainSideFadeoutActive ? "yes" : "no",
+      telemetry.visualMode.mountainSideFadeoutActive ? "good" : "bad",
+    );
+    setMetric(
+      "Invalid verts",
+      String(telemetry.visualMode.mountainInvalidVertexCount),
+      telemetry.visualMode.mountainInvalidVertexCount === 0 ? "good" : "bad",
     );
     setMetric(
       "WebGPU probe",

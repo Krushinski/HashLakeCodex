@@ -202,6 +202,9 @@ type VisualModeTelemetry = {
   mountainExperimentVertices: number;
   mountainExperimentValid: boolean;
   mountainBackArcValid: boolean;
+  mountainBackArcActive: boolean;
+  mountainSideFadeoutActive: boolean;
+  mountainInvalidVertexCount: number;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
   waterMeshCount: number;
@@ -784,8 +787,11 @@ export const createHashlakeScene = ({
       mountainExperimentActive: mountainHarness.experimentActive,
       mountainExperimentReason: mountainHarness.reason,
       mountainExperimentVertices: mountainHarness.mountainVertices,
-      mountainExperimentValid: mountainHarness.backArcValid,
+      mountainExperimentValid: mountainHarness.experimentValid,
       mountainBackArcValid: mountainHarness.backArcValid,
+      mountainBackArcActive: mountainHarness.backArcActive,
+      mountainSideFadeoutActive: mountainHarness.sideFadeoutActive,
+      mountainInvalidVertexCount: mountainHarness.invalidVertexCount,
       webGpuProbeActive: false,
       heavyScenicActive: false,
       waterMeshCount: 1,
@@ -799,9 +805,9 @@ export const createHashlakeScene = ({
     terrainSystem.setMountainExperimentActive(mountainExperimentActive);
     const message = mountainExperimentActive
       ? "Zone 6 mountain experiment active"
-      : telemetry.backArcValid
+      : telemetry.experimentValid
         ? "Native baseline active"
-        : "Zone 6 mountain experiment invalid";
+        : "Mountain experiment invalid — baseline active";
     showDriveHudMessage(
       driveHud,
       mountainExperimentActive ? "MOUNTAIN EXPERIMENT" : "NATIVE BASELINE",
@@ -815,7 +821,7 @@ export const createHashlakeScene = ({
         detail: {
           activeMode: mountainExperimentActive ? "Mountain Experiment" : "Native Baseline",
           mountainExperimentAvailable: telemetry.experimentAvailable,
-          mountainExperimentValid: telemetry.backArcValid,
+          mountainExperimentValid: telemetry.experimentValid,
         },
       }),
     );

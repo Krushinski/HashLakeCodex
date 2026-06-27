@@ -3,6 +3,7 @@ import type { WeatherSnapshot } from "../state/weatherEngine";
 import { getWeatherPalette } from "./artDirection";
 import {
   MOUNTAIN_BACK_ARC_ZONE,
+  auditMountainBackArcVertices,
   getMountainPlacementHarnessTelemetry,
   type MountainPlacementHarnessTelemetry,
 } from "./mountainPlacementHarness";
@@ -39,42 +40,47 @@ const buildZone6Geometry = () => {
     const center = (zRatio - 0.5) * 2;
     const ridgeNoise = noise.fbm(z * 0.0061 + 8.5, z * 0.0019 - 4.1, 5);
     const shoulderNoise = noise.fbm(z * 0.004 + 11.4, z * 0.009 - 7.2, 4);
-    const centerHero = Math.exp(-Math.pow((center + 0.02) / 0.31, 2));
-    const leftHero = Math.exp(-Math.pow((center + 0.58) / 0.23, 2)) * 0.62;
-    const rightHero = Math.exp(-Math.pow((center - 0.48) / 0.24, 2)) * 0.58;
+    const heroFade = sideFade * sideFade;
+    const centerHero = Math.exp(-Math.pow((center + 0.02) / 0.28, 2)) * heroFade;
+    const leftShoulder = Math.exp(-Math.pow((center + 0.36) / 0.22, 2)) * heroFade;
+    const rightShoulder = Math.exp(-Math.pow((center - 0.34) / 0.22, 2)) * heroFade;
     const serration = Math.max(
       0,
       Math.sin(z * 0.035 + ridgeNoise * 4.2) * 0.5 + 0.5,
-    );
+    ) * heroFade;
     const ridgeProfile =
-      0.42 +
+      0.36 +
       ridgeNoise * 0.22 +
       shoulderNoise * 0.15 +
       centerHero * 0.44 +
-      leftHero * 0.28 +
-      rightHero * 0.26 +
+      leftShoulder * 0.19 +
+      rightShoulder * 0.18 +
       serration * 0.11;
     const ridgeTop =
       zone.yMin +
       (zone.yMax - zone.yMin) *
-        (0.44 + Math.max(0, Math.min(1.14, ridgeProfile)) * 0.56) *
-        (0.24 + sideFade * 0.76);
-    const baseY = zone.yMin + sideFade * 8 + shoulderNoise * 7;
+        (0.34 + Math.max(0, Math.min(1.08, ridgeProfile)) * 0.66) *
+        (0.04 + sideFade * 0.96);
+    const baseY = Math.max(zone.yMin, zone.yMin + sideFade * 6 + shoulderNoise * 4);
     const footX =
       zone.xMin +
-      noise.fbm(z * 0.006 - 12.6, 3.2, 3) * 24 +
+      (1 - sideFade) * 300 +
+      noise.fbm(z * 0.006 - 12.6, 3.2, 3) * 18 +
       Math.sin(z * 0.008) * 12;
     const faceDepth =
-      108 +
-      centerHero * 82 +
-      leftHero * 46 +
-      rightHero * 42 +
-      ridgeNoise * 38;
+      68 +
+      centerHero * 112 +
+      leftShoulder * 36 +
+      rightShoulder * 34 +
+      ridgeNoise * 24;
 
     for (let yIndex = 0; yIndex <= ySegments; yIndex += 1) {
       const yRatio = yIndex / ySegments;
       const vertical = smootherstep(0, 1, yRatio);
-      const y = baseY + (ridgeTop - baseY) * vertical;
+      const y = Math.min(
+        zone.yMax,
+        Math.max(zone.yMin, baseY + (ridgeTop - baseY) * vertical),
+      );
       const faceNoise = noise.fbm(
         z * 0.010 + y * 0.012 + 18.5,
         z * 0.004 - y * 0.017 - 3.2,
@@ -82,7 +88,7 @@ const buildZone6Geometry = () => {
       );
       const fold =
         Math.sin(z * 0.014 + vertical * 2.1 + ridgeNoise * 2.6) *
-        18 *
+        14 *
         Math.sin(Math.PI * yRatio);
       const x =
         footX +
@@ -202,6 +208,10 @@ export const createZone6MountainExperimentSystem =
     group.name = "Zone 6 native mountain back-arc experiment";
     const geometry = buildZone6Geometry();
     const material = createZone6Material();
+    const positionAttribute = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const vertexAudit = auditMountainBackArcVertices(
+      positionAttribute.array,
+    );
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = "Zone 6 bounded native mountain experiment";
     mesh.frustumCulled = false;
@@ -212,7 +222,8 @@ export const createZone6MountainExperimentSystem =
     const getTelemetry = () =>
       getMountainPlacementHarnessTelemetry({
         experimentActive: active,
-        mountainVertices: geometry.attributes.position.count,
+        mountainVertices: positionAttribute.count,
+        invalidVertexCount: vertexAudit.invalidVertexCount,
       });
 
     return {
@@ -220,7 +231,8 @@ export const createZone6MountainExperimentSystem =
       setActive: (nextActive) => {
         const telemetry = getMountainPlacementHarnessTelemetry({
           experimentActive: nextActive,
-          mountainVertices: geometry.attributes.position.count,
+          mountainVertices: positionAttribute.count,
+          invalidVertexCount: vertexAudit.invalidVertexCount,
         });
         active = telemetry.experimentActive;
         group.visible = active;

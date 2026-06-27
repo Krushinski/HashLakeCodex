@@ -77,7 +77,11 @@ const zoneMap = [
   ["3", "Raised Bank", "Grass and earth shelf above water."],
   ["4", "Near / Mid Forest Shelf", "Validated trees, rocks, bushes."],
   ["5", "Far Forest Wall", "Dark forest mass in front of mountains."],
-  ["6", "Mountain Backdrop / Back Arc", "Mountains only. Behind the far forest wall."],
+  [
+    "6",
+    "Mountain Backdrop / Back Arc",
+    "Rear mountains only. Behind the far forest wall; sides stay forest/foothills.",
+  ],
   ["7", "Sky / Clouds", "Sky dome, clouds, sun/moon, storm atmosphere."],
 ];
 
