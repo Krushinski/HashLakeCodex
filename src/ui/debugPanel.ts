@@ -50,11 +50,13 @@ type MetricTile = {
 
 type VisualModeTelemetry = {
   renderer: RendererCapabilityTelemetry;
-  activeMode: "Native Baseline" | "Native Mountain Compare";
+  activeMode: "Native Baseline" | "Mountain Experiment";
+  mountainZone: string;
   mountainExperimentAvailable: boolean;
   mountainExperimentActive: boolean;
   mountainExperimentReason: string;
   mountainExperimentVertices: number;
+  mountainExperimentValid: boolean;
   mountainBackArcValid: boolean;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
@@ -145,6 +147,8 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Render scale", value: "1.00" },
   { group: "global", label: "Visual mode", value: "Native Baseline", tone: "good" },
   { group: "global", label: "V compare", value: "unavailable", tone: "muted" },
+  { group: "global", label: "Mountain zone", value: "Zone 6", tone: "good" },
+  { group: "global", label: "Experiment valid", value: "yes", tone: "good" },
   { group: "global", label: "Mountain verts", value: "0", tone: "muted" },
   { group: "global", label: "Back arc", value: "valid", tone: "good" },
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
@@ -1155,6 +1159,12 @@ export const createDebugPanel = (
         : telemetry.visualMode.mountainExperimentAvailable
           ? "muted"
           : "muted",
+    );
+    setMetric("Mountain zone", telemetry.visualMode.mountainZone, "good");
+    setMetric(
+      "Experiment valid",
+      telemetry.visualMode.mountainExperimentValid ? "yes" : "no",
+      telemetry.visualMode.mountainExperimentValid ? "good" : "bad",
     );
     setMetric(
       "Mountain verts",

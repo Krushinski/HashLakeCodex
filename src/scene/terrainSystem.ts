@@ -14,6 +14,7 @@ export type TerrainSystem = {
   update: (weather: WeatherSnapshot, camera: THREE.PerspectiveCamera) => void;
   getStats: () => TerrainStats;
   setScenicBackdropActive: (active: boolean) => void;
+  setMountainExperimentActive: (active: boolean) => void;
 };
 
 const angleDiff = (a: number, b: number) => {
@@ -52,7 +53,7 @@ const buildRidgeRing = ({
   const indices: number[] = [];
   const viewTheta = -Math.PI / 2;
 
-  for (let thetaIndex = 0; thetaIndex <= thetaSegments; thetaIndex += 1) {
+  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
     const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
@@ -92,9 +93,10 @@ const buildRidgeRing = ({
 
   const columns = radialSegments + 1;
   for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
+    const nextThetaIndex = (thetaIndex + 1) % thetaSegments;
     for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
       const a = thetaIndex * columns + radialIndex;
-      const b = a + columns;
+      const b = nextThetaIndex * columns + radialIndex;
       indices.push(a, b, a + 1, b, b + 1, a + 1);
     }
   }
@@ -248,6 +250,7 @@ export const createTerrainSystem = (): TerrainSystem => {
   mid.frustumCulled = false;
   group.add(far, mid);
   let scenicBackdropActive = false;
+  let mountainExperimentActive = false;
 
   const vertexCount =
     far.geometry.attributes.position.count +
@@ -256,8 +259,9 @@ export const createTerrainSystem = (): TerrainSystem => {
   return {
     group,
     update: (weather, camera) => {
-      far.visible = !scenicBackdropActive;
-      mid.visible = !scenicBackdropActive;
+      const nativeVisible = !scenicBackdropActive && !mountainExperimentActive;
+      far.visible = nativeVisible;
+      mid.visible = nativeVisible;
       const palette = getWeatherPalette(weather.stormIndex);
       shared.sunDir.value.set(-0.36, 0.72 - weather.dials.skyDark * 0.28, -0.44).normalize();
       shared.sunColor.value.setHex(palette.sunColor);
@@ -275,12 +279,15 @@ export const createTerrainSystem = (): TerrainSystem => {
       shared.dark.value = weather.dials.skyDark;
     },
     getStats: () => ({
-      mountainVertices: scenicBackdropActive ? 0 : vertexCount,
+      mountainVertices: scenicBackdropActive || mountainExperimentActive ? 0 : vertexCount,
       reflectionEnabled: false,
       postEnabled: true,
     }),
     setScenicBackdropActive: (active) => {
       scenicBackdropActive = active;
+    },
+    setMountainExperimentActive: (active) => {
+      mountainExperimentActive = active;
     },
   };
 };

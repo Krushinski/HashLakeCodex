@@ -39,7 +39,7 @@ const driveControls = [
   ["L", "Legend"],
   ["X", "Toggle Drive Mode"],
   ["F", "Fullscreen"],
-  ["V", "Toggle scenic backdrop"],
+  ["V", "Toggle Zone 6 mountain experiment"],
   ["R", "Reset camera"],
   ["C", "Scenic cameras in Frame, locked chase presets in Drive"],
   ["Arrow keys", "Drive boat"],
@@ -71,6 +71,16 @@ const dataFog = [
   "Drive camera remains hard locked.",
 ];
 
+const zoneMap = [
+  ["1", "Water / Lake", "Boat, wake, BTC ripples, New Block rings."],
+  ["2", "Shore / Wet Edge", "Damp edge, reeds, small wet rocks."],
+  ["3", "Raised Bank", "Grass and earth shelf above water."],
+  ["4", "Near / Mid Forest Shelf", "Validated trees, rocks, bushes."],
+  ["5", "Far Forest Wall", "Dark forest mass in front of mountains."],
+  ["6", "Mountain Backdrop / Back Arc", "Mountains only. Behind the far forest wall."],
+  ["7", "Sky / Clouds", "Sky dome, clouds, sun/moon, storm atmosphere."],
+];
+
 const renderLegend = () => `
   <section class="legend-panel" aria-label="Hashlake legend">
     <header class="legend-panel__header">
@@ -99,6 +109,19 @@ const renderLegend = () => `
     </div>
 
     <div class="legend-tile-grid">
+      <div class="legend-section legend-tile">
+        <h2>Zone Map</h2>
+        <ul>
+          ${zoneMap
+            .map(
+              ([number, name, description]) => `
+                <li><strong>Zone ${number}</strong> ${name} - ${description}</li>
+              `,
+            )
+            .join("")}
+        </ul>
+      </div>
+
       <div class="legend-section legend-tile">
         <h2>Bitcoin Signals</h2>
         <ul>

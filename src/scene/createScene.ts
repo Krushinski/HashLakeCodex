@@ -18,7 +18,6 @@ import {
   getNearestLocation,
   isReedWetlandZone,
 } from "./lakeMap";
-import { getMountainPlacementHarnessTelemetry } from "./mountainPlacementHarness";
 import { createPostSystem } from "./postSystem";
 import { createScenicAssetSystem, type ScenicAssetStatuses } from "./scenicAssets";
 import {
@@ -35,6 +34,7 @@ import {
   applyPlanarUvs,
   makeTexturedStandardMaterial,
 } from "./proceduralMaterials";
+import { createZone6MountainExperimentSystem } from "./zone6MountainExperiment";
 
 type HashlakeSceneOptions = {
   container: HTMLElement;
@@ -194,11 +194,13 @@ type SceneTelemetry = {
 
 type VisualModeTelemetry = {
   renderer: RendererCapabilityTelemetry;
-  activeMode: "Native Baseline" | "Native Mountain Compare";
+  activeMode: "Native Baseline" | "Mountain Experiment";
+  mountainZone: string;
   mountainExperimentAvailable: boolean;
   mountainExperimentActive: boolean;
   mountainExperimentReason: string;
   mountainExperimentVertices: number;
+  mountainExperimentValid: boolean;
   mountainBackArcValid: boolean;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
@@ -600,6 +602,8 @@ export const createHashlakeScene = ({
   scene.add(shoreline);
   const terrainSystem = createTerrainSystem();
   scene.add(terrainSystem.group);
+  const mountainExperimentSystem = createZone6MountainExperimentSystem();
+  scene.add(mountainExperimentSystem.group);
   const forestSystem = createForestSystem();
   scene.add(forestSystem.group);
   const scenicAssetSystem = createScenicAssetSystem();
@@ -715,6 +719,7 @@ export const createHashlakeScene = ({
   let animationId = 0;
   let hasRenderedFrame = false;
   let isRunning = false;
+  let mountainExperimentActive = false;
 
   const resize = () => {
     const { clientWidth, clientHeight } = container;
@@ -768,16 +773,18 @@ export const createHashlakeScene = ({
   };
 
   const getVisualModeTelemetry = (): VisualModeTelemetry => {
-    const mountainHarness = getMountainPlacementHarnessTelemetry();
+    const mountainHarness = mountainExperimentSystem.getTelemetry();
     return {
       renderer: rendererCapabilities,
       activeMode: mountainHarness.experimentActive
-        ? "Native Mountain Compare"
+        ? "Mountain Experiment"
         : "Native Baseline",
+      mountainZone: mountainHarness.zoneLabel,
       mountainExperimentAvailable: mountainHarness.experimentAvailable,
       mountainExperimentActive: mountainHarness.experimentActive,
       mountainExperimentReason: mountainHarness.reason,
       mountainExperimentVertices: mountainHarness.mountainVertices,
+      mountainExperimentValid: mountainHarness.backArcValid,
       mountainBackArcValid: mountainHarness.backArcValid,
       webGpuProbeActive: false,
       heavyScenicActive: false,
@@ -785,20 +792,37 @@ export const createHashlakeScene = ({
     };
   };
 
-  const showNativeMountainCompareStatus = () => {
-    showDriveHudMessage(driveHud, "NATIVE BASELINE");
+  const setMountainExperimentActive = (active: boolean) => {
+    mountainExperimentSystem.setActive(active);
+    const telemetry = mountainExperimentSystem.getTelemetry();
+    mountainExperimentActive = telemetry.experimentActive;
+    terrainSystem.setMountainExperimentActive(mountainExperimentActive);
+    const message = mountainExperimentActive
+      ? "Zone 6 mountain experiment active"
+      : telemetry.backArcValid
+        ? "Native baseline active"
+        : "Zone 6 mountain experiment invalid";
+    showDriveHudMessage(
+      driveHud,
+      mountainExperimentActive ? "MOUNTAIN EXPERIMENT" : "NATIVE BASELINE",
+    );
     eventBus.emit({
       type: "scenic",
-      message: "Native baseline active - mountain experiment unavailable",
+      message,
     });
     window.dispatchEvent(
       new CustomEvent("hashlake:visual-mode-changed", {
         detail: {
-          activeMode: "Native Baseline",
-          mountainExperimentAvailable: false,
+          activeMode: mountainExperimentActive ? "Mountain Experiment" : "Native Baseline",
+          mountainExperimentAvailable: telemetry.experimentAvailable,
+          mountainExperimentValid: telemetry.backArcValid,
         },
       }),
     );
+  };
+
+  const toggleMountainExperiment = () => {
+    setMountainExperimentActive(!mountainExperimentActive);
   };
 
   const governQuality = (delta: number, now: number) => {
@@ -884,6 +908,7 @@ export const createHashlakeScene = ({
         (scenicAssetStatuses.mountain === "loaded" ||
           scenicAssetStatuses.mountainAlpha === "loaded"),
     );
+    terrainSystem.setMountainExperimentActive(mountainExperimentActive);
     forestSystem.setScenicTreelineActive(
       scenicAssetsActive && scenicAssetStatuses.treeline === "loaded",
     );
@@ -891,6 +916,7 @@ export const createHashlakeScene = ({
     animateWater(water, elapsed, weather, driveState, camera);
     animateShoreline(shoreline, elapsed, weather);
     terrainSystem.update(weather, camera);
+    mountainExperimentSystem.update(weather, camera);
     if (elapsed - lastForestUpdateAt >= qualityState.forestUpdateInterval) {
       forestSystem.update(elapsed, weather);
       lastForestUpdateAt = elapsed;
@@ -1091,7 +1117,7 @@ export const createHashlakeScene = ({
 
     if (isDown && key === "v") {
       event.preventDefault();
-      showNativeMountainCompareStatus();
+      toggleMountainExperiment();
       return;
     }
 
@@ -1160,7 +1186,7 @@ export const createHashlakeScene = ({
   };
   const handleKeydown = (event: KeyboardEvent) => handleKey(event, true);
   const handleKeyup = (event: KeyboardEvent) => handleKey(event, false);
-  const handleNativeMountainCompareEvent = () => showNativeMountainCompareStatus();
+  const handleNativeMountainCompareEvent = () => toggleMountainExperiment();
 
   const clearMobileDriveTouch = () => {
     driveState.mobilePointerId = null;
