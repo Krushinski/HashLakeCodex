@@ -12,7 +12,6 @@ import {
 import {
   LAKE_FEATURE_FOOTPRINTS,
   LAKE_MAP,
-  ZONE_TRUTH,
   clampBoatToWater,
   getExpandedOutline,
   getNearestLocation,
@@ -38,6 +37,11 @@ import {
   NO_VALID_MOUNTAIN_EXPERIMENT_REASON,
   createZone6MountainExperimentSystem,
 } from "./zone6MountainExperiment";
+import {
+  LAND_PERIMETER_BANDS,
+  ZONE_BAND_TABLE_VERSION,
+  type ZoneBandMaterialKey,
+} from "./zoneBands";
 
 type HashlakeSceneOptions = {
   container: HTMLElement;
@@ -190,6 +194,10 @@ type SceneTelemetry = {
   reedInstances: number;
   rockInstances: number;
   mountainVertices: number;
+  groundBandCount: number;
+  groundFlippedBands: number;
+  groundDownwardTriangles: number;
+  zoneBandTableVersion: string;
   postEnabled: boolean;
   reflectionEnabled: boolean;
   scenicAssets: ScenicAssetStatuses;
@@ -1477,6 +1485,10 @@ export const createHashlakeScene = ({
           reedInstances: forestStats.reedInstances,
           rockInstances: forestStats.rockInstances,
           mountainVertices: terrainStats.mountainVertices,
+          groundBandCount: Number(shoreline.userData.groundBandCount ?? 0),
+          groundFlippedBands: Number(shoreline.userData.groundFlippedBands ?? 0),
+          groundDownwardTriangles: Number(shoreline.userData.groundDownwardTriangles ?? 0),
+          zoneBandTableVersion: String(shoreline.userData.zoneBandTableVersion ?? "unknown"),
           postEnabled: postSystem.enabled && terrainStats.postEnabled,
           reflectionEnabled: water.reflectionEnabled || terrainStats.reflectionEnabled,
           scenicAssets: scenicAssetSystem.getStatuses(),
@@ -2084,6 +2096,87 @@ const animateBoat = (
   boat.rotation.y = getVisualRotationForHeading(driveState.yaw);
 };
 
+type TopologyAudit = {
+  averageNormalY: number;
+  downwardTriangles: number;
+  triangleCount: number;
+  flipped: boolean;
+  flippedTriangles: number;
+};
+
+const getTriangleNormalY = (
+  positions: readonly number[],
+  indexA: number,
+  indexB: number,
+  indexC: number,
+) => {
+  const a = indexA * 3;
+  const b = indexB * 3;
+  const c = indexC * 3;
+  const abx = positions[b] - positions[a];
+  const abz = positions[b + 2] - positions[a + 2];
+  const acx = positions[c] - positions[a];
+  const acz = positions[c + 2] - positions[a + 2];
+  return abz * acx - abx * acz;
+};
+
+const auditTopFacingTriangles = (
+  positions: readonly number[],
+  indices: readonly number[],
+): Omit<TopologyAudit, "flipped" | "flippedTriangles"> => {
+  let normalYTotal = 0;
+  let downwardTriangles = 0;
+  const triangleCount = Math.floor(indices.length / 3);
+
+  for (let offset = 0; offset < indices.length; offset += 3) {
+    const normalY = getTriangleNormalY(
+      positions,
+      indices[offset],
+      indices[offset + 1],
+      indices[offset + 2],
+    );
+    normalYTotal += normalY;
+    if (normalY < -0.0001) {
+      downwardTriangles += 1;
+    }
+  }
+
+  return {
+    averageNormalY: triangleCount > 0 ? normalYTotal / triangleCount : 0,
+    downwardTriangles,
+    triangleCount,
+  };
+};
+
+const orientIndicesUpward = (
+  positions: readonly number[],
+  indices: number[],
+): TopologyAudit => {
+  let flippedTriangles = 0;
+
+  for (let offset = 0; offset < indices.length; offset += 3) {
+    const normalY = getTriangleNormalY(
+      positions,
+      indices[offset],
+      indices[offset + 1],
+      indices[offset + 2],
+    );
+    if (normalY < -0.0001) {
+      const temp = indices[offset + 1];
+      indices[offset + 1] = indices[offset + 2];
+      indices[offset + 2] = temp;
+      flippedTriangles += 1;
+    }
+  }
+
+  const audit = auditTopFacingTriangles(positions, indices);
+  return {
+    ...audit,
+    flipped: flippedTriangles > 0,
+    flippedTriangles,
+  };
+};
+
 const createSlopedStripGeometry = (
   inner: readonly { x: number; z: number }[],
   outer: readonly { x: number; z: number }[],
@@ -2091,6 +2184,7 @@ const createSlopedStripGeometry = (
   outerY: number,
   seed = 0,
   wobble = 0,
+  label = "ground strip",
 ) => {
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
@@ -2149,9 +2243,14 @@ const createSlopedStripGeometry = (
     indices.push(innerA, outerA, outerB, innerA, outerB, innerB);
   }
 
+  const topology = orientIndicesUpward(positions, indices);
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
+  geometry.userData.topology = {
+    ...topology,
+    label,
+  };
   geometry.computeVertexNormals();
   return applyPlanarUvs(geometry, 92, 900, 700);
 };
@@ -2190,6 +2289,14 @@ const sandbarMoundTone: MoundToneProfile = {
   damp: [1.20, 1.02, 0.68],
   edge: [0.76, 0.65, 0.44],
   ripple: 0.0028,
+};
+
+const featureWetLipTone: MoundToneProfile = {
+  center: [1.18, 1.04, 0.73],
+  dry: [1.02, 0.9, 0.61],
+  damp: [0.82, 0.68, 0.46],
+  edge: [0.68, 0.58, 0.42],
+  ripple: 0.0014,
 };
 
 const rockMoundTone: MoundToneProfile = {
@@ -2269,161 +2376,156 @@ const createOrganicMoundedEllipseGeometry = (
     }
   }
 
+  const topology = orientIndicesUpward(positions, indices);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
+  geometry.userData.topology = {
+    ...topology,
+    label: "organic mounded landform",
+  };
   geometry.computeVertexNormals();
   return applyPlanarUvs(geometry, Math.max(34, Math.max(radiusX, radiusZ) * 0.72), radiusX, radiusZ);
 };
 
 const createShoreline = () => {
   const group = new THREE.Group();
-  group.name = "Clean lake basin terrain";
-  const wetSandMaterial = makeTexturedStandardMaterial({
-    kind: "wetSand",
-    seed: 901,
-    size: 128,
-    base: 0x887b5f,
-    accent: 0xc4b986,
-    dark: 0x4c513a,
-    color: 0xfff7de,
-    roughness: 0.96,
-    side: THREE.FrontSide,
-  });
-  const bankToeMaterial = makeTexturedStandardMaterial({
-    kind: "grass",
-    seed: 902,
-    size: 128,
-    base: 0x4b7448,
-    accent: 0x97a46d,
-    dark: 0x2c4634,
-    color: 0xeef5dc,
-    roughness: 0.93,
-    side: THREE.FrontSide,
-  });
-  const grassTransitionMaterial = makeTexturedStandardMaterial({
-    kind: "grass",
-    seed: 903,
-    size: 128,
-    base: 0x4e7545,
-    accent: 0xa1aa72,
-    dark: 0x2b4431,
-    color: 0xe8f0d8,
-    roughness: 0.92,
-    side: THREE.FrontSide,
-  });
-  const bankMaterial = makeTexturedStandardMaterial({
-    kind: "grass",
-    seed: 904,
-    size: 128,
-    base: 0x345c39,
-    accent: 0x7a8157,
-    dark: 0x213329,
-    color: 0xdde7d1,
-    roughness: 0.94,
-    side: THREE.FrontSide,
-  });
-  const forestShelfMaterial = makeTexturedStandardMaterial({
-    kind: "forestFloor",
-    seed: 905,
-    size: 128,
-    base: 0x173721,
-    accent: 0x66794b,
-    dark: 0x0b1d12,
-    color: 0xd4dec9,
-    roughness: 0.98,
-    side: THREE.FrontSide,
-  });
-  const landMaterial = makeTexturedStandardMaterial({
-    kind: "forestFloor",
-    seed: 906,
-    size: 128,
-    base: 0x102d1a,
-    accent: 0x536743,
-    dark: 0x07140d,
-    color: 0xd0dcc7,
-    roughness: 1,
-    side: THREE.FrontSide,
-  });
-  const midForestMaterial = makeTexturedStandardMaterial({
-    kind: "forestFloor",
-    seed: 907,
-    size: 128,
-    base: 0x14331f,
-    accent: 0x64794d,
-    dark: 0x08180f,
-    color: 0xd2deca,
-    roughness: 0.98,
-    side: THREE.FrontSide,
-  });
-  const landInner = getExpandedOutline(ZONE_TRUTH.forestShelfOuter);
-  [
-    wetSandMaterial,
-    bankToeMaterial,
-    grassTransitionMaterial,
-    bankMaterial,
-    forestShelfMaterial,
-    landMaterial,
-    midForestMaterial,
-  ].forEach((material) => {
+  group.name = "Phase 81 ordered zone-band terrain";
+  const materials: Partial<Record<ZoneBandMaterialKey, THREE.MeshStandardMaterial>> = {
+    wetSand: makeTexturedStandardMaterial({
+      kind: "wetSand",
+      seed: 901,
+      size: 128,
+      base: 0x6f664b,
+      accent: 0xb5a468,
+      dark: 0x3e382b,
+      color: 0xd1bd82,
+      roughness: 0.97,
+      side: THREE.FrontSide,
+    }),
+    bankToe: makeTexturedStandardMaterial({
+      kind: "grass",
+      seed: 902,
+      size: 128,
+      base: 0x3e5735,
+      accent: 0x7d8653,
+      dark: 0x263421,
+      color: 0xa2ad78,
+      roughness: 0.94,
+      side: THREE.FrontSide,
+    }),
+    shoreGrass: makeTexturedStandardMaterial({
+      kind: "grass",
+      seed: 903,
+      size: 128,
+      base: 0x4a6d3b,
+      accent: 0x93a463,
+      dark: 0x283b27,
+      color: 0xaec083,
+      roughness: 0.93,
+      side: THREE.FrontSide,
+    }),
+    raisedBank: makeTexturedStandardMaterial({
+      kind: "grass",
+      seed: 904,
+      size: 128,
+      base: 0x315536,
+      accent: 0x72804f,
+      dark: 0x1f2f24,
+      color: 0x8ea66f,
+      roughness: 0.95,
+      side: THREE.FrontSide,
+    }),
+    forestShelf: makeTexturedStandardMaterial({
+      kind: "forestFloor",
+      seed: 905,
+      size: 128,
+      base: 0x18351f,
+      accent: 0x596d44,
+      dark: 0x0b1b11,
+      color: 0x66785b,
+      roughness: 0.99,
+      side: THREE.FrontSide,
+    }),
+    midForestShelf: makeTexturedStandardMaterial({
+      kind: "forestFloor",
+      seed: 907,
+      size: 128,
+      base: 0x14301d,
+      accent: 0x526541,
+      dark: 0x08160d,
+      color: 0x536643,
+      roughness: 0.99,
+      side: THREE.FrontSide,
+    }),
+    farForest: makeTexturedStandardMaterial({
+      kind: "forestFloor",
+      seed: 906,
+      size: 128,
+      base: 0x102b19,
+      accent: 0x475c3a,
+      dark: 0x07130b,
+      color: 0x3f5238,
+      roughness: 1,
+      side: THREE.FrontSide,
+    }),
+  };
+
+  Object.values(materials).forEach((material) => {
+    if (!material) {
+      return;
+    }
     material.vertexColors = true;
   });
-  const land = new THREE.Mesh(
-    createSlopedStripGeometry(
-      landInner,
-      createRadialBoundary(landInner, LAKE_MAP.worldRadius),
-      2.24,
-      2.42,
-      22,
-      0.014,
-    ),
-    landMaterial,
-  );
-  land.receiveShadow = true;
-  group.add(land);
 
-  const wetSand = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(-6), getExpandedOutline(ZONE_TRUTH.wetEdgeWidth + 4), 0.09, 0.22, 9, 0.003),
-    wetSandMaterial,
-  );
-  wetSand.receiveShadow = true;
-  group.add(wetSand);
+  const topologyAudits: TopologyAudit[] = [];
+  for (const band of LAND_PERIMETER_BANDS) {
+    const inner = getExpandedOutline(band.startOffset);
+    const outer =
+      band.outerBoundary === "world"
+        ? createRadialBoundary(inner, LAKE_MAP.worldRadius)
+        : getExpandedOutline(band.endOffset);
+    const geometry = createSlopedStripGeometry(
+      inner,
+      outer,
+      band.startY,
+      band.endY,
+      band.seed,
+      band.wobble,
+      `${band.zone} ${band.key}`,
+    );
+    const material = materials[band.material];
+    if (!material) {
+      continue;
+    }
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `Zone ${band.zone} ${band.zoneName} - ${band.key}`;
+    mesh.userData.zoneBand = {
+      key: band.key,
+      zone: band.zone,
+      zoneName: band.zoneName,
+      startOffset: band.startOffset,
+      endOffset: band.endOffset,
+      startY: band.startY,
+      endY: band.endY,
+      material: band.material,
+      owner: band.owner,
+      waterAllowed: band.waterAllowed,
+      overlapAllowed: band.overlapAllowed,
+    };
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    topologyAudits.push(geometry.userData.topology as TopologyAudit);
+  }
 
-  const shoreline = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.wetEdgeWidth + 4), getExpandedOutline(42), 0.22, 0.72, 13, 0.010),
-    bankToeMaterial,
+  group.userData.groundBandCount = LAND_PERIMETER_BANDS.length;
+  group.userData.groundFlippedBands = topologyAudits.filter((audit) => audit.flipped).length;
+  group.userData.groundDownwardTriangles = topologyAudits.reduce(
+    (total, audit) => total + audit.downwardTriangles,
+    0,
   );
-  shoreline.receiveShadow = true;
-  group.add(shoreline);
-
-  const grassTransition = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(42), getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), 0.72, 1.02, 17, 0.014),
-    grassTransitionMaterial,
-  );
-  grassTransition.receiveShadow = true;
-  group.add(grassTransition);
-
-  const raisedBank = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.shorelineGrassOuter), getExpandedOutline(ZONE_TRUTH.raisedBankOuter), 1.02, 1.44, 29, 0.014),
-    bankMaterial,
-  );
-  raisedBank.receiveShadow = true;
-  group.add(raisedBank);
-
-  const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.44, 1.90, 37, 0.012),
-    forestShelfMaterial,
-  );
-  forestShelf.receiveShadow = true;
-  group.add(forestShelf);
-
-  const midForestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(214), landInner, 1.90, 2.24, 43, 0.014),
-    midForestMaterial,
-  );
-  midForestShelf.receiveShadow = true;
-  group.add(midForestShelf);
+  group.userData.zoneBandTableVersion = ZONE_BAND_TABLE_VERSION;
 
   return group;
 };
@@ -2529,7 +2631,7 @@ const createDestinationMarkers = () => {
   const reedsCenter = getDestinationCenter("reeds");
   const sandbarFootprint = LAKE_FEATURE_FOOTPRINTS.sandbar;
   const islandFootprint = LAKE_FEATURE_FOOTPRINTS.island;
-  const beachPocket = ZONE_TRUTH.mainlandBeach;
+  const beachPocket = LAKE_MAP.mainlandBeach;
 
   const dock = new THREE.Group();
   dock.name = "Dock area";
@@ -2586,10 +2688,30 @@ const createDestinationMarkers = () => {
   mainlandBeach.receiveShadow = true;
   group.add(mainlandBeach);
 
+  const sandbarWetLip = new THREE.Mesh(
+    createOrganicMoundedEllipseGeometry(
+      sandbarFootprint.dry.radiusX + 7,
+      sandbarFootprint.dry.radiusZ + 5,
+      59,
+      0.014,
+      0.19,
+      0.075,
+      224,
+      5,
+      featureWetLipTone,
+    ),
+    sandMaterial,
+  );
+  sandbarWetLip.name = "Zone 2 sandbar warm wet-edge overlap lip";
+  sandbarWetLip.position.set(sandbarCenter.x, 0, sandbarCenter.z);
+  sandbarWetLip.rotation.y = -sandbarFootprint.rotation;
+  sandbarWetLip.receiveShadow = true;
+  group.add(sandbarWetLip);
+
   const sandbar = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      sandbarFootprint.blocker.radiusX + 8,
-      sandbarFootprint.blocker.radiusZ + 5,
+      sandbarFootprint.dry.radiusX,
+      sandbarFootprint.dry.radiusZ,
       61,
       0.026,
       0.66,
@@ -2639,10 +2761,30 @@ const createDestinationMarkers = () => {
 
   const island = new THREE.Group();
   island.name = "Rocky island";
+  const islandWetLip = new THREE.Mesh(
+    createOrganicMoundedEllipseGeometry(
+      islandFootprint.dry.radiusX + 8,
+      islandFootprint.dry.radiusZ + 6,
+      71,
+      0.014,
+      0.2,
+      0.08,
+      224,
+      5,
+      featureWetLipTone,
+    ),
+    sandMaterial,
+  );
+  islandWetLip.name = "Zone 2 island warm wet-edge overlap lip";
+  islandWetLip.position.set(islandCenter.x, 0, islandCenter.z);
+  islandWetLip.rotation.y = -islandFootprint.rotation;
+  islandWetLip.receiveShadow = true;
+  island.add(islandWetLip);
+
   const islandBeach = new THREE.Mesh(
     createOrganicMoundedEllipseGeometry(
-      islandFootprint.blocker.radiusX + 6,
-      islandFootprint.blocker.radiusZ + 4,
+      islandFootprint.dry.radiusX,
+      islandFootprint.dry.radiusZ,
       73,
       0.024,
       0.82,

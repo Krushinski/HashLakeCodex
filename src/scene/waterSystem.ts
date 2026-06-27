@@ -120,25 +120,21 @@ const createOrganicWaterGeometry = () => {
     };
   };
 
-  const isStableWaterTile = (center: { x: number; z: number }) => {
-    const inset = step * 0.42;
+  const isContainedWaterTile = (
+    center: { x: number; z: number },
+    vertices: readonly { x: number; z: number }[],
+  ) => {
+    const inset = step * 0.18;
     const samples = [
       center,
       { x: center.x - inset, z: center.z - inset },
       { x: center.x + inset, z: center.z - inset },
       { x: center.x + inset, z: center.z + inset },
       { x: center.x - inset, z: center.z + inset },
+      ...vertices,
     ];
     const centerShoreDistance = distanceToShore(center);
-    const waterSamples = samples.reduce(
-      (count, sample) => count + (isWater(sample) ? 1 : 0),
-      0,
-    );
-
-    return (
-      (isWater(center) && centerShoreDistance > -step * 0.7) ||
-      (waterSamples >= 3 && centerShoreDistance > -step * 1.15)
-    );
+    return isWater(center) && centerShoreDistance > step * 0.18 && samples.every(isWater);
   };
 
   for (let x = minX; x < maxX; x += step) {
@@ -154,7 +150,7 @@ const createOrganicWaterGeometry = () => {
         { x: x + step, z: z + step },
         { x, z: z + step },
       ];
-      if (!isStableWaterTile(center)) {
+      if (!isContainedWaterTile(center, tileVertices)) {
         continue;
       }
 

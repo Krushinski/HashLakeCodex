@@ -140,6 +140,10 @@ export type SceneTelemetry = {
   reedInstances: number;
   rockInstances: number;
   mountainVertices: number;
+  groundBandCount: number;
+  groundFlippedBands: number;
+  groundDownwardTriangles: number;
+  zoneBandTableVersion: string;
   postEnabled: boolean;
   reflectionEnabled: boolean;
   scenicAssets: ScenicAssetStatuses;
@@ -195,6 +199,9 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
   { group: "global", label: "Heavy scenic", value: "off", tone: "good" },
   { group: "global", label: "Water meshes", value: "1", tone: "good" },
+  { group: "global", label: "Water law", value: "Zone 1 only", tone: "good" },
+  { group: "global", label: "Zone bands", value: "7 table", tone: "good" },
+  { group: "global", label: "Ground winding", value: "up", tone: "good" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
   { group: "weather", label: "Wake blocks", value: "0" },
   { group: "weather", label: "Splash blocks", value: "0" },
@@ -1334,6 +1341,15 @@ export const createDebugPanel = (
       "Water meshes",
       String(telemetry.visualMode.waterMeshCount),
       telemetry.visualMode.waterMeshCount > 1 ? "warn" : "good",
+    );
+    setMetric("Water law", "Zone 1 only", "good");
+    setMetric("Zone bands", `${telemetry.groundBandCount} table`, "good");
+    setMetric(
+      "Ground winding",
+      telemetry.groundDownwardTriangles === 0
+        ? `up / ${telemetry.groundFlippedBands} flipped`
+        : `${telemetry.groundDownwardTriangles} down`,
+      telemetry.groundDownwardTriangles === 0 ? "good" : "bad",
     );
     setMetric("Wake blocks", String(telemetry.activeWakeBlocks));
     setMetric("Splash blocks", String(telemetry.activeEffectBlocks));

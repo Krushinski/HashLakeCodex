@@ -1,4 +1,4 @@
-# Phase 80 Current Zone Map
+# Phase 81 Current Zone Map
 
 Date: 2026-06-27
 
@@ -25,7 +25,7 @@ Date: 2026-06-27
 
 Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
-Phase 80 adds `GROUND_ZONE_OWNERSHIP.md`. Zones 2-5 now have one visible ground owner per band, shared boundary elevations, and no arbitrary opaque stacking.
+Phase 81 adds `ZONE_BAND_TABLE.md`. Zones 1-7 now have a single ordered table for offsets, heights, materials, owners, and water permission. Zones 2-5 have one visible ground owner per band, shared boundary elevations, upward-facing generated triangles, and no arbitrary opaque stacking.
 
 ## Zone 1 - Water / Lake
 
@@ -33,7 +33,7 @@ Phase 80 adds `GROUND_ZONE_OWNERSHIP.md`. Zones 2-5 now have one visible ground 
 - Forbidden geometry: trees, rocks, sand/land cards, terrain patches, reflection strips, mountain/fog/forest panes, hidden lake-fill surfaces.
 - Placement rule: visible water must match `LAKE_OUTLINE` and driveable water; island/sandbar blockers come from `LAKE_FEATURE_FOOTPRINTS`.
 - Material/color rules: deep center blue/teal, smoother shallow water near shore/island/sandbar, no black under-land leakage.
-- Known current issues: water is acceptable baseline but should not be altered in Phase 78.
+- Known current issues: water is clipped to contained Zone 1 tiles; future visual water changes must not reintroduce a hidden full-world sheet.
 - Next-pass opportunity: keep water stable while future mountains/forest improve reflected composition.
 
 ## Zone 2 - Shore / Wet Edge
@@ -45,7 +45,7 @@ Phase 80 adds `GROUND_ZONE_OWNERSHIP.md`. Zones 2-5 now have one visible ground 
 - Forbidden geometry: gray triangle halos, detached island/sandbar rings, broad full-shore beach bands, conifer trees in wet edge, transparent shallow cards.
 - Placement rule: follows expanded lake outline only; island/sandbar wet behavior must be owned by their coherent footprints.
 - Material/color rules: muted damp sand/earth, darker wet edge, no water-colored land patches.
-- Known current issues: Phase 80 removed repeated gray/black seam causes by aligning shared boundaries.
+- Known current issues: Phase 81 removes the cyan/blue-gray land leak by clipping water to Zone 1, owning wet-edge material in the band table, and auditing triangle winding.
 - Next-pass opportunity: future shoreline detail can sit on this owner as props, not as new ground planes.
 
 ## Zone 3 - Raised Bank
@@ -69,7 +69,7 @@ Phase 80 adds `GROUND_ZONE_OWNERSHIP.md`. Zones 2-5 now have one visible ground 
 - Forbidden geometry: trees in water, trees on island/sandbar unless hand-authored later, debug triangles, unvalidated asset clones.
 - Placement rule: candidates must pass mainland forest/shore helpers and keep water clearance; dock/cove openings stay navigable.
 - Material/color rules: varied but muted greens, richer forest floor inland, no neon patches or black crush.
-- Known current issues: Phase 80 aligns the forest ground helper to the visible shelf elevations to avoid exposed seams.
+- Known current issues: Phase 81 aligns the forest ground helper to the visible shelf elevations to avoid exposed seams.
 - Next-pass opportunity: rebuild scenic density zone-by-zone once the mountain backdrop is stable.
 
 ## Zone 5 - Far Forest Wall

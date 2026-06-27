@@ -16,6 +16,7 @@ import {
   isReedWetlandZone,
   type LakePoint,
 } from "./lakeMap";
+import { getGroundHeightAtPoint } from "./zoneBands";
 import { makeRng } from "./scenicUtils";
 
 export type TreeAlphaAssetKey = "tallPine" | "shortPine" | "layeredConifer";
@@ -184,23 +185,7 @@ const isNearDestination = (point: LakePoint, key: "dock" | "cove", radius: numbe
 };
 
 const groundHeightAt = (point: LakePoint) => {
-  const clearance = Math.max(0, -distanceToShore(point));
-  if (clearance < 42) {
-    return THREE.MathUtils.lerp(0.72, 1.02, THREE.MathUtils.clamp((clearance - 14) / 28, 0, 1));
-  }
-  if (clearance < ZONE_TRUTH.shorelineGrassOuter) {
-    return THREE.MathUtils.lerp(1.02, 1.16, (clearance - 42) / (ZONE_TRUTH.shorelineGrassOuter - 42));
-  }
-  if (clearance < ZONE_TRUTH.raisedBankOuter) {
-    return THREE.MathUtils.lerp(1.16, 1.44, (clearance - ZONE_TRUTH.shorelineGrassOuter) / (ZONE_TRUTH.raisedBankOuter - ZONE_TRUTH.shorelineGrassOuter));
-  }
-  if (clearance < 214) {
-    return THREE.MathUtils.lerp(1.44, 1.90, (clearance - ZONE_TRUTH.forestShelfInner) / (214 - ZONE_TRUTH.forestShelfInner));
-  }
-  if (clearance < ZONE_TRUTH.forestShelfOuter) {
-    return THREE.MathUtils.lerp(1.90, 2.24, (clearance - 214) / (ZONE_TRUTH.forestShelfOuter - 214));
-  }
-  return 2.42;
+  return getGroundHeightAtPoint(point);
 };
 
 const getBandRange = (band: PlacementBand) => {

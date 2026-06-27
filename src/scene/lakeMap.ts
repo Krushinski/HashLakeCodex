@@ -377,8 +377,8 @@ export const isInSandbar = (point: LakePoint) =>
   isInEllipse(
     point,
     LAKE_FEATURE_FOOTPRINTS.sandbar.center,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.dry.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.dry.radiusZ,
     LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
   );
 
@@ -386,8 +386,8 @@ export const isInIsland = (point: LakePoint) =>
   isInEllipse(
     point,
     LAKE_FEATURE_FOOTPRINTS.island.center,
-    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
-    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.island.dry.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.island.dry.radiusZ,
     LAKE_FEATURE_FOOTPRINTS.island.rotation,
   );
 
@@ -409,15 +409,15 @@ export const distanceToShore = (point: LakePoint) => {
     getEllipseClearance(
       point,
       LAKE_FEATURE_FOOTPRINTS.island.center,
-      LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
-      LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
+      LAKE_FEATURE_FOOTPRINTS.island.dry.radiusX,
+      LAKE_FEATURE_FOOTPRINTS.island.dry.radiusZ,
       LAKE_FEATURE_FOOTPRINTS.island.rotation,
     ),
     getEllipseClearance(
       point,
       LAKE_FEATURE_FOOTPRINTS.sandbar.center,
-      LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
-      LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
+      LAKE_FEATURE_FOOTPRINTS.sandbar.dry.radiusX,
+      LAKE_FEATURE_FOOTPRINTS.sandbar.dry.radiusZ,
       LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
     ),
   );
@@ -545,8 +545,8 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
   const afterIsland = pushOutOfEllipse(
     next,
     LAKE_FEATURE_FOOTPRINTS.island.center,
-    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusX,
-    LAKE_FEATURE_FOOTPRINTS.island.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.island.dry.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.island.dry.radiusZ,
     LAKE_FEATURE_FOOTPRINTS.island.rotation,
     3,
   );
@@ -558,8 +558,8 @@ export const clampBoatToWater = (point: LakePoint): ClampResult => {
   const afterSandbar = pushOutOfEllipse(
     next,
     LAKE_FEATURE_FOOTPRINTS.sandbar.center,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusX,
-    LAKE_FEATURE_FOOTPRINTS.sandbar.blocker.radiusZ,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.dry.radiusX,
+    LAKE_FEATURE_FOOTPRINTS.sandbar.dry.radiusZ,
     LAKE_FEATURE_FOOTPRINTS.sandbar.rotation,
     3,
   );
