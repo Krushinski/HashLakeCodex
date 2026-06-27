@@ -16,8 +16,7 @@ import {
 import type { WeatherDials, WeatherSnapshot, WeatherStore } from "../state/weatherEngine";
 import { LAKE_MAP, LAKE_OUTLINE } from "../scene/lakeMap";
 import type { ScenicAssetStatuses } from "../scene/scenicAssets";
-import type { ScenicExperimentalStats } from "../scene/realismSpike";
-import type { WebGpuScenicStats } from "../scene/webgpuScenicBackdrop";
+import type { RendererCapabilityTelemetry } from "../scene/rendererTelemetry";
 import type {
   NativeTreeTypeCounts,
   TreeAlphaAssetStatuses,
@@ -47,6 +46,19 @@ type MetricTile = {
     | "weather"
     | "boat";
   tone?: "good" | "bad" | "warn" | "muted";
+};
+
+type VisualModeTelemetry = {
+  renderer: RendererCapabilityTelemetry;
+  activeMode: "Native Baseline" | "Native Mountain Compare";
+  mountainExperimentAvailable: boolean;
+  mountainExperimentActive: boolean;
+  mountainExperimentReason: string;
+  mountainExperimentVertices: number;
+  mountainBackArcValid: boolean;
+  webGpuProbeActive: boolean;
+  heavyScenicActive: boolean;
+  waterMeshCount: number;
 };
 
 type BarValue = {
@@ -86,8 +98,7 @@ export type SceneTelemetry = {
   qualityPreset: "Performance" | "Balanced" | "Scenic";
   pixelRatio: number;
   renderScale: number;
-  scenicExperimental: ScenicExperimentalStats;
-  webGpuScenic: WebGpuScenicStats;
+  visualMode: VisualModeTelemetry;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
   activeRings: number;
@@ -132,24 +143,13 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Frame ms", value: "--" },
   { group: "global", label: "Pixel ratio", value: "1.00" },
   { group: "global", label: "Render scale", value: "1.00" },
-  { group: "global", label: "Legacy spike", value: "off", tone: "muted" },
-  { group: "global", label: "Legacy verts", value: "0", tone: "muted" },
-  { group: "global", label: "Legacy forest", value: "0", tone: "muted" },
-  { group: "global", label: "Legacy fog", value: "0", tone: "muted" },
-  { group: "global", label: "Scenic Mode", value: "OFF", tone: "muted" },
-  { group: "global", label: "WebGPU scenic", value: "off", tone: "muted" },
-  { group: "global", label: "WebGPU active", value: "no", tone: "muted" },
+  { group: "global", label: "Visual mode", value: "Native Baseline", tone: "good" },
+  { group: "global", label: "V compare", value: "unavailable", tone: "muted" },
+  { group: "global", label: "Mountain verts", value: "0", tone: "muted" },
+  { group: "global", label: "Back arc", value: "valid", tone: "good" },
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
-  { group: "global", label: "Fallback", value: "active", tone: "good" },
-  { group: "global", label: "Scenic requested", value: "no", tone: "muted" },
-  { group: "global", label: "Scenic active", value: "no", tone: "muted" },
-  { group: "global", label: "Scenic terrain", value: "no", tone: "muted" },
-  { group: "global", label: "Scenic forest", value: "no", tone: "muted" },
-  { group: "global", label: "Scenic fog", value: "no", tone: "muted" },
-  { group: "global", label: "Scenic visual gate", value: "ok", tone: "muted" },
-  { group: "global", label: "P73 terrain", value: "0", tone: "muted" },
-  { group: "global", label: "P73 forest", value: "0", tone: "muted" },
-  { group: "global", label: "P73 fog", value: "off", tone: "muted" },
+  { group: "global", label: "Heavy scenic", value: "off", tone: "good" },
+  { group: "global", label: "Water meshes", value: "1", tone: "good" },
   { group: "weather", label: "Fire / FW", value: "0.00 / 0.00" },
   { group: "weather", label: "Wake blocks", value: "0" },
   { group: "weather", label: "Splash blocks", value: "0" },
@@ -527,7 +527,7 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="perf-stress">Perf Stress</button>
         <button type="button" data-debug-action="toast-block">Toast Block</button>
         <button type="button" data-debug-action="toast-stale">Toast Stale</button>
-        <button type="button" data-debug-action="scenic-toggle">Toggle Scenic</button>
+        <button type="button" data-debug-action="native-mountain-compare">V Compare</button>
         <button type="button" data-debug-action="gust">Gust</button>
         <button type="button" data-debug-action="stale">Stale Fog</button>
         <button type="button" data-debug-action="resume">Resume Live</button>
@@ -1118,10 +1118,18 @@ export const createDebugPanel = (
       worldLockMetric.classList.toggle("debug-tone-bad", !telemetry.worldRotationLocked);
     }
 
-    setMetric("Three.js", `r${telemetry.scenicExperimental.threeRevision}`, "muted");
-    setMetric("Renderer", telemetry.scenicExperimental.rendererPath, "muted");
-    setMetric("WebGL2", telemetry.scenicExperimental.webgl2 ? "supported" : "no", telemetry.scenicExperimental.webgl2 ? "good" : "warn");
-    setMetric("WebGPU", telemetry.scenicExperimental.webgpu ? "available" : "deferred", telemetry.scenicExperimental.webgpu ? "good" : "muted");
+    setMetric("Three.js", `r${telemetry.visualMode.renderer.threeRevision}`, "muted");
+    setMetric("Renderer", telemetry.visualMode.renderer.rendererPath, "muted");
+    setMetric(
+      "WebGL2",
+      telemetry.visualMode.renderer.webgl2 ? "supported" : "no",
+      telemetry.visualMode.renderer.webgl2 ? "good" : "warn",
+    );
+    setMetric(
+      "WebGPU",
+      telemetry.visualMode.renderer.webgpu ? "available" : "deferred",
+      telemetry.visualMode.renderer.webgpu ? "good" : "muted",
+    );
     setMetric(
       "Perf Governor",
       telemetry.qualityPreset,
@@ -1131,106 +1139,47 @@ export const createDebugPanel = (
     setMetric("Pixel ratio", telemetry.pixelRatio.toFixed(2));
     setMetric("Render scale", telemetry.renderScale.toFixed(2));
     setMetric(
-      "Legacy spike",
-      `${telemetry.scenicExperimental.active ? "on" : "off"} - ${telemetry.scenicExperimental.reason}`,
-      telemetry.scenicExperimental.active ? "good" : telemetry.scenicExperimental.requested ? "warn" : "muted",
+      "Visual mode",
+      telemetry.visualMode.activeMode,
+      telemetry.visualMode.heavyScenicActive ? "warn" : "good",
     );
     setMetric(
-      "Legacy verts",
-      String(telemetry.scenicExperimental.mountainVertices),
-      telemetry.scenicExperimental.active ? "good" : "muted",
-    );
-    setMetric(
-      "Legacy forest",
-      String(telemetry.scenicExperimental.forestInstances),
-      telemetry.scenicExperimental.active ? "good" : "muted",
-    );
-    setMetric(
-      "Legacy fog",
-      `${telemetry.scenicExperimental.fogLayers} layers`,
-      telemetry.scenicExperimental.active ? "good" : "muted",
-    );
-    setMetric(
-      "Scenic Mode",
-      telemetry.webGpuScenic.scenicMode,
-      telemetry.webGpuScenic.scenicMode === "ON"
+      "V compare",
+      telemetry.visualMode.mountainExperimentAvailable
+        ? telemetry.visualMode.mountainExperimentActive
+          ? "active"
+          : "available"
+        : "unavailable",
+      telemetry.visualMode.mountainExperimentActive
         ? "good"
-        : telemetry.webGpuScenic.scenicMode === "ERROR"
-          ? "bad"
-          : telemetry.webGpuScenic.scenicMode === "FALLBACK"
-            ? "warn"
-            : "muted",
+        : telemetry.visualMode.mountainExperimentAvailable
+          ? "muted"
+          : "muted",
     );
     setMetric(
-      "WebGPU scenic",
-      `${telemetry.webGpuScenic.active ? "on" : "off"} - ${telemetry.webGpuScenic.reason}`,
-      telemetry.webGpuScenic.active ? "good" : telemetry.webGpuScenic.requested ? "warn" : "muted",
+      "Mountain verts",
+      String(telemetry.visualMode.mountainExperimentVertices),
+      telemetry.visualMode.mountainExperimentActive ? "good" : "muted",
     );
     setMetric(
-      "WebGPU active",
-      telemetry.webGpuScenic.webgpuActive ? "yes" : "no",
-      telemetry.webGpuScenic.webgpuActive ? "good" : "muted",
+      "Back arc",
+      telemetry.visualMode.mountainBackArcValid ? "valid" : "check",
+      telemetry.visualMode.mountainBackArcValid ? "good" : "warn",
     );
     setMetric(
       "WebGPU probe",
-      telemetry.webGpuScenic.webgpuProbeStatus,
-      telemetry.webGpuScenic.webgpuProbeStatus === "initialized"
-        ? "good"
-        : telemetry.webGpuScenic.webgpuProbeStatus === "failed"
-          ? "bad"
-          : telemetry.webGpuScenic.webgpuProbeStatus === "probing"
-            ? "warn"
-            : "muted",
+      telemetry.visualMode.webGpuProbeActive ? "active" : "off",
+      telemetry.visualMode.webGpuProbeActive ? "warn" : "good",
     );
     setMetric(
-      "Fallback",
-      telemetry.webGpuScenic.fallbackActive ? "active" : "experimental gated",
-      telemetry.webGpuScenic.fallbackActive ? "good" : "warn",
+      "Heavy scenic",
+      telemetry.visualMode.heavyScenicActive ? "active" : "off",
+      telemetry.visualMode.heavyScenicActive ? "warn" : "good",
     );
     setMetric(
-      "Scenic requested",
-      telemetry.webGpuScenic.requested ? "yes" : "no",
-      telemetry.webGpuScenic.requested ? "good" : "muted",
-    );
-    setMetric(
-      "Scenic active",
-      telemetry.webGpuScenic.active ? "yes" : "no",
-      telemetry.webGpuScenic.active ? "good" : "muted",
-    );
-    setMetric(
-      "Scenic terrain",
-      telemetry.webGpuScenic.terrainVisible ? "yes" : "no",
-      telemetry.webGpuScenic.terrainVisible ? "good" : "muted",
-    );
-    setMetric(
-      "Scenic forest",
-      telemetry.webGpuScenic.forestVisible ? "yes" : "no",
-      telemetry.webGpuScenic.forestVisible ? "good" : "muted",
-    );
-    setMetric(
-      "Scenic fog",
-      telemetry.webGpuScenic.fogVisible ? "yes" : "no",
-      telemetry.webGpuScenic.fogVisible ? "good" : "muted",
-    );
-    setMetric(
-      "Scenic visual gate",
-      telemetry.webGpuScenic.visualRegressionDisabled ? "terrain/fog panes disabled" : "ok",
-      telemetry.webGpuScenic.visualRegressionDisabled ? "warn" : "good",
-    );
-    setMetric(
-      "P73 terrain",
-      String(telemetry.webGpuScenic.terrainVertices),
-      telemetry.webGpuScenic.active ? "good" : "muted",
-    );
-    setMetric(
-      "P73 forest",
-      String(telemetry.webGpuScenic.forestInstances),
-      telemetry.webGpuScenic.active ? "good" : "muted",
-    );
-    setMetric(
-      "P73 fog",
-      telemetry.webGpuScenic.fogMode,
-      telemetry.webGpuScenic.active ? "good" : "muted",
+      "Water meshes",
+      String(telemetry.visualMode.waterMeshCount),
+      telemetry.visualMode.waterMeshCount > 1 ? "warn" : "good",
     );
     setMetric("Wake blocks", String(telemetry.activeWakeBlocks));
     setMetric("Splash blocks", String(telemetry.activeEffectBlocks));
@@ -1391,8 +1340,8 @@ export const createDebugPanel = (
         type: "stale",
         message: "Stale data - fog rolling in",
       });
-    } else if (action === "scenic-toggle") {
-      window.dispatchEvent(new CustomEvent("hashlake:toggle-webgpu-scenic"));
+    } else if (action === "native-mountain-compare") {
+      window.dispatchEvent(new CustomEvent("hashlake:toggle-native-mountain-compare"));
     } else if (action === "gust") {
       weatherStore.triggerGust();
     } else if (action === "stale") {

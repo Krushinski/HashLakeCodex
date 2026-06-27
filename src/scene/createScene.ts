@@ -18,19 +18,13 @@ import {
   getNearestLocation,
   isReedWetlandZone,
 } from "./lakeMap";
+import { getMountainPlacementHarnessTelemetry } from "./mountainPlacementHarness";
 import { createPostSystem } from "./postSystem";
 import { createScenicAssetSystem, type ScenicAssetStatuses } from "./scenicAssets";
 import {
-  createRealismSpikeSystem,
   detectRendererCapabilities,
-  isScenicExperimentalRequested,
-  type ScenicExperimentalStats,
-} from "./realismSpike";
-import {
-  createWebGpuScenicBackdropSystem,
-  getWebGpuScenicPreference,
-  type WebGpuScenicStats,
-} from "./webgpuScenicBackdrop";
+  type RendererCapabilityTelemetry,
+} from "./rendererTelemetry";
 import { createTerrainSystem } from "./terrainSystem";
 import {
   type WaterSurface,
@@ -173,8 +167,7 @@ type SceneTelemetry = {
   qualityPreset: QualityPreset;
   pixelRatio: number;
   renderScale: number;
-  scenicExperimental: ScenicExperimentalStats;
-  webGpuScenic: WebGpuScenicStats;
+  visualMode: VisualModeTelemetry;
   activeWakeBlocks: number;
   activeEffectBlocks: number;
   activeRings: number;
@@ -197,6 +190,19 @@ type SceneTelemetry = {
   postEnabled: boolean;
   reflectionEnabled: boolean;
   scenicAssets: ScenicAssetStatuses;
+};
+
+type VisualModeTelemetry = {
+  renderer: RendererCapabilityTelemetry;
+  activeMode: "Native Baseline" | "Native Mountain Compare";
+  mountainExperimentAvailable: boolean;
+  mountainExperimentActive: boolean;
+  mountainExperimentReason: string;
+  mountainExperimentVertices: number;
+  mountainBackArcValid: boolean;
+  webGpuProbeActive: boolean;
+  heavyScenicActive: boolean;
+  waterMeshCount: number;
 };
 
 type CameraPreset = {
@@ -573,9 +579,6 @@ export const createHashlakeScene = ({
   renderer.domElement.setAttribute("aria-label", "Realtime Hashlake scene");
   container.append(renderer.domElement);
   const rendererCapabilities = detectRendererCapabilities(renderer);
-  const scenicExperimentalRequested = isScenicExperimentalRequested();
-  const initialWebGpuScenicPreference = getWebGpuScenicPreference();
-  let webGpuScenicRequested = initialWebGpuScenicPreference.requested;
 
   const sunlight = new THREE.DirectionalLight(SCENARIO_PALETTES.Serene.directionalLight, 3.6);
   sunlight.position.set(-36, 72, 45);
@@ -599,10 +602,6 @@ export const createHashlakeScene = ({
   scene.add(terrainSystem.group);
   const forestSystem = createForestSystem();
   scene.add(forestSystem.group);
-  const realismSpikeSystem = createRealismSpikeSystem(rendererCapabilities);
-  scene.add(realismSpikeSystem.group);
-  const webGpuScenicSystem = createWebGpuScenicBackdropSystem(rendererCapabilities);
-  scene.add(webGpuScenicSystem.group);
   const scenicAssetSystem = createScenicAssetSystem();
   scene.add(scenicAssetSystem.group);
   const horizonHaze = createHorizonHaze();
@@ -716,16 +715,6 @@ export const createHashlakeScene = ({
   let animationId = 0;
   let hasRenderedFrame = false;
   let isRunning = false;
-  const scenicAutoEnableEligible =
-    !initialWebGpuScenicPreference.explicitDisabled &&
-    !initialWebGpuScenicPreference.explicit &&
-    !isMobileViewport &&
-    (rendererCapabilities.webgpu || rendererCapabilities.webgl2);
-  const scenicAutoEnableAt = startedAt + 5600;
-  let scenicAutoEnabled = false;
-  let scenicAutoReduced = false;
-  let scenicAutoLowSamples = 0;
-  let lastScenicHudMode: "OFF" | "ON" | "FALLBACK" | "ERROR" | null = null;
 
   const resize = () => {
     const { clientWidth, clientHeight } = container;
@@ -778,109 +767,38 @@ export const createHashlakeScene = ({
     water.setQualityPreset(preset);
   };
 
-  const getScenicExperimentalGate = () => {
-    const eligible = rendererCapabilities.webgl2 && !isMobileViewport;
-    const autoRequested = qualityState.preset === "Scenic";
-    const requested = !webGpuScenicRequested && (scenicExperimentalRequested || autoRequested);
-    const active =
-      requested &&
-      eligible &&
-      (scenicExperimentalRequested || qualityState.preset !== "Performance");
-    const reason = active
-      ? scenicExperimentalRequested
-        ? "local debug flag"
-        : "Scenic preset eligible"
-      : !requested
-        ? "not requested"
-        : !rendererCapabilities.webgl2
-            ? "requires WebGL2"
-            : isMobileViewport
-              ? "disabled on mobile viewport"
-              : qualityState.preset === "Performance"
-                ? "Performance fallback"
-                : "capability gate closed";
+  const getVisualModeTelemetry = (): VisualModeTelemetry => {
+    const mountainHarness = getMountainPlacementHarnessTelemetry();
     return {
-      requested,
-      eligible,
-      active,
-      reason,
+      renderer: rendererCapabilities,
+      activeMode: mountainHarness.experimentActive
+        ? "Native Mountain Compare"
+        : "Native Baseline",
+      mountainExperimentAvailable: mountainHarness.experimentAvailable,
+      mountainExperimentActive: mountainHarness.experimentActive,
+      mountainExperimentReason: mountainHarness.reason,
+      mountainExperimentVertices: mountainHarness.mountainVertices,
+      mountainBackArcValid: mountainHarness.backArcValid,
+      webGpuProbeActive: false,
+      heavyScenicActive: false,
+      waterMeshCount: 1,
     };
   };
 
-  const getWebGpuScenicGate = () => {
-    const webglEligible = rendererCapabilities.webgl2 && !isMobileViewport;
-    const visualRegressionGateClosed = true;
-    const eligible = webglEligible;
-    const requested = webGpuScenicRequested;
-    const active = requested && webglEligible && !visualRegressionGateClosed;
-    const fallbackActive = !active;
-    const reason = active
-      ? rendererCapabilities.webgpu
-        ? "WebGPU probe + WebGL scenic proof"
-        : "WebGPU unavailable; WebGL scenic approximation"
-      : !requested
-        ? "not requested"
-        : !rendererCapabilities.webgl2
-            ? "requires WebGL2 fallback"
-            : isMobileViewport
-              ? "disabled on mobile viewport"
-              : visualRegressionGateClosed
-                ? "visual regression gate: native fallback active"
-                : "capability gate closed";
-    return {
-      requested,
-      eligible,
-      active,
-      fallbackActive,
-      reason,
-    };
-  };
-
-  type ScenicRequestSource = "keyboard" | "debug" | "event" | "auto" | "auto-reduced";
-
-  const setWebGpuScenicRequested = (
-    requested: boolean,
-    source: ScenicRequestSource = "event",
-  ) => {
-    webGpuScenicRequested = requested;
-    const shouldPersist = source === "keyboard" || source === "debug";
-    if (shouldPersist) {
-      try {
-        window.localStorage.setItem("hashlake.webgpuScenic", String(requested));
-      } catch {
-        // Non-critical: URL flag and in-memory state still work if storage is unavailable.
-      }
-    }
-    showDriveHudMessage(driveHud, requested ? "SCENIC MODE ON" : "FALLBACK MODE");
+  const showNativeMountainCompareStatus = () => {
+    showDriveHudMessage(driveHud, "NATIVE BASELINE");
     eventBus.emit({
       type: "scenic",
-      message:
-        source === "auto-reduced"
-          ? "Scenic reduced for performance"
-          : requested
-            ? "Scenic mode enabled"
-            : "Scenic mode disabled",
+      message: "Native baseline active - mountain experiment unavailable",
     });
-    if (
-      requested &&
-      (!rendererCapabilities.webgl2 || isMobileViewport)
-    ) {
-      eventBus.emit({
-        type: "scenic",
-        message: "Scenic unavailable - fallback active",
-      });
-    }
-    if (source !== "event") {
-      window.dispatchEvent(
-        new CustomEvent("hashlake:scenic-mode-changed", {
-          detail: { requested },
-        }),
-      );
-    }
-  };
-
-  const toggleWebGpuScenicRequested = (source: ScenicRequestSource = "event") => {
-    setWebGpuScenicRequested(!webGpuScenicRequested, source);
+    window.dispatchEvent(
+      new CustomEvent("hashlake:visual-mode-changed", {
+        detail: {
+          activeMode: "Native Baseline",
+          mountainExperimentAvailable: false,
+        },
+      }),
+    );
   };
 
   const governQuality = (delta: number, now: number) => {
@@ -899,23 +817,6 @@ export const createHashlakeScene = ({
 
     if (now < qualityState.warmupUntil) {
       return;
-    }
-
-    if (scenicAutoEnabled && webGpuScenicRequested) {
-      if (fps < 22) {
-        scenicAutoLowSamples += 1;
-      } else if (fps > 27) {
-        scenicAutoLowSamples = Math.max(0, scenicAutoLowSamples - 1);
-      } else {
-        scenicAutoLowSamples = Math.max(0, scenicAutoLowSamples - 0.5);
-      }
-
-      if (scenicAutoLowSamples >= 3) {
-        scenicAutoReduced = true;
-        scenicAutoEnabled = false;
-        scenicAutoLowSamples = 0;
-        setWebGpuScenicRequested(false, "auto-reduced");
-      }
     }
 
     const deviceCap = Math.min(window.devicePixelRatio || 1, QUALITY_MAX_PIXEL_RATIO);
@@ -975,50 +876,13 @@ export const createHashlakeScene = ({
     const delta = Math.min(0.045, Math.max(0.001, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
     governQuality(delta, now);
-    if (
-      scenicAutoEnableEligible &&
-      !scenicAutoEnabled &&
-      !scenicAutoReduced &&
-      !webGpuScenicRequested &&
-      now >= scenicAutoEnableAt &&
-      qualityState.fps >= 24 &&
-      qualityState.preset !== "Performance"
-    ) {
-      scenicAutoEnabled = true;
-      setWebGpuScenicRequested(true, "auto");
-    }
     const weather = weatherStore.getSnapshot();
     const scenicAssetStatuses = scenicAssetSystem.getStatuses();
     const scenicAssetsActive = qualityState.preset !== "Performance";
-    const scenicExperimentalGate = getScenicExperimentalGate();
-    const webGpuScenicGate = getWebGpuScenicGate();
-    realismSpikeSystem.setGate(scenicExperimentalGate);
-    webGpuScenicSystem.setGate(webGpuScenicGate);
-    const webGpuScenicStats = webGpuScenicSystem.getStats();
-    const scenicHudMode = webGpuScenicGate.active
-      ? "ON"
-      : webGpuScenicGate.requested
-        ? "FALLBACK"
-        : "OFF";
-    if (lastScenicHudMode !== scenicHudMode) {
-      if (
-        lastScenicHudMode !== null &&
-        scenicHudMode === "FALLBACK" &&
-        webGpuScenicGate.requested
-      ) {
-        showDriveHudMessage(driveHud, "FALLBACK MODE");
-        eventBus.emit({
-          type: "scenic",
-          message: "Scenic unavailable - fallback active",
-        });
-      }
-      lastScenicHudMode = scenicHudMode;
-    }
     terrainSystem.setScenicBackdropActive(
-      (webGpuScenicGate.active && webGpuScenicStats.terrainVisible) ||
-        (scenicAssetsActive &&
-          (scenicAssetStatuses.mountain === "loaded" ||
-            scenicAssetStatuses.mountainAlpha === "loaded")),
+      scenicAssetsActive &&
+        (scenicAssetStatuses.mountain === "loaded" ||
+          scenicAssetStatuses.mountainAlpha === "loaded"),
     );
     forestSystem.setScenicTreelineActive(
       scenicAssetsActive && scenicAssetStatuses.treeline === "loaded",
@@ -1027,8 +891,6 @@ export const createHashlakeScene = ({
     animateWater(water, elapsed, weather, driveState, camera);
     animateShoreline(shoreline, elapsed, weather);
     terrainSystem.update(weather, camera);
-    realismSpikeSystem.update(weather, camera, elapsed);
-    webGpuScenicSystem.update(weather, camera, elapsed);
     if (elapsed - lastForestUpdateAt >= qualityState.forestUpdateInterval) {
       forestSystem.update(elapsed, weather);
       lastForestUpdateAt = elapsed;
@@ -1229,7 +1091,7 @@ export const createHashlakeScene = ({
 
     if (isDown && key === "v") {
       event.preventDefault();
-      toggleWebGpuScenicRequested("keyboard");
+      showNativeMountainCompareStatus();
       return;
     }
 
@@ -1298,11 +1160,7 @@ export const createHashlakeScene = ({
   };
   const handleKeydown = (event: KeyboardEvent) => handleKey(event, true);
   const handleKeyup = (event: KeyboardEvent) => handleKey(event, false);
-  const handleScenicToggleEvent = () => toggleWebGpuScenicRequested("debug");
-  const handleScenicSetEvent = (event: Event) => {
-    const requested = Boolean((event as CustomEvent<{ requested?: boolean }>).detail?.requested);
-    setWebGpuScenicRequested(requested, "debug");
-  };
+  const handleNativeMountainCompareEvent = () => showNativeMountainCompareStatus();
 
   const clearMobileDriveTouch = () => {
     driveState.mobilePointerId = null;
@@ -1398,8 +1256,7 @@ export const createHashlakeScene = ({
   renderer.domElement.addEventListener("pointercancel", handlePointerUp);
   window.addEventListener("keydown", handleKeydown);
   window.addEventListener("keyup", handleKeyup);
-  window.addEventListener("hashlake:toggle-webgpu-scenic", handleScenicToggleEvent);
-  window.addEventListener("hashlake:set-webgpu-scenic", handleScenicSetEvent);
+  window.addEventListener("hashlake:toggle-native-mountain-compare", handleNativeMountainCompareEvent);
   window.addEventListener("resize", scheduleResize);
   window.addEventListener("orientationchange", scheduleResize);
   window.addEventListener("pageshow", scheduleResize);
@@ -1424,8 +1281,7 @@ export const createHashlakeScene = ({
       window.visualViewport?.removeEventListener("resize", scheduleResize);
       window.removeEventListener("keydown", handleKeydown);
       window.removeEventListener("keyup", handleKeyup);
-      window.removeEventListener("hashlake:toggle-webgpu-scenic", handleScenicToggleEvent);
-      window.removeEventListener("hashlake:set-webgpu-scenic", handleScenicSetEvent);
+      window.removeEventListener("hashlake:toggle-native-mountain-compare", handleNativeMountainCompareEvent);
       renderer.domElement.removeEventListener("webglcontextlost", handleContextLost);
       renderer.domElement.removeEventListener("webglcontextrestored", handleContextRestored);
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
@@ -1487,8 +1343,7 @@ export const createHashlakeScene = ({
           qualityPreset: qualityState.preset,
           pixelRatio: qualityState.pixelRatio,
           renderScale: qualityState.effectScale,
-          scenicExperimental: realismSpikeSystem.getStats(),
-          webGpuScenic: webGpuScenicSystem.getStats(),
+          visualMode: getVisualModeTelemetry(),
           activeWakeBlocks: getActiveWakeBlocks(),
           activeEffectBlocks: effectStats.splashBlocks,
           activeRings: effectStats.rings,
