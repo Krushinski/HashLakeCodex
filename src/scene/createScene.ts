@@ -205,6 +205,8 @@ type VisualModeTelemetry = {
   mountainBackArcActive: boolean;
   mountainSideFadeoutActive: boolean;
   mountainInvalidVertexCount: number;
+  mountainFoothillAnchor: boolean;
+  mountainBaseTouchesFoothill: boolean;
   mountainGrounded: boolean;
   mountainFloatingGapDetected: boolean;
   mountainBottomSilhouetteValid: boolean;
@@ -212,6 +214,9 @@ type VisualModeTelemetry = {
   mountainStageOrderValid: boolean;
   mountainArtifactFree: boolean;
   mountainCameraCheckValid: boolean;
+  mountainLakeShoreOverlap: boolean;
+  mountainSecondLakeArtifact: boolean;
+  mountainGlassPaneArtifact: boolean;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
   waterMeshCount: number;
@@ -799,6 +804,8 @@ export const createHashlakeScene = ({
       mountainBackArcActive: mountainHarness.backArcActive,
       mountainSideFadeoutActive: mountainHarness.sideFadeoutActive,
       mountainInvalidVertexCount: mountainHarness.invalidVertexCount,
+      mountainFoothillAnchor: mountainHarness.foothillAnchor,
+      mountainBaseTouchesFoothill: mountainHarness.mountainBaseTouchesFoothill,
       mountainGrounded: mountainHarness.grounded,
       mountainFloatingGapDetected: mountainHarness.floatingGapDetected,
       mountainBottomSilhouetteValid: mountainHarness.bottomSilhouetteValid,
@@ -806,6 +813,9 @@ export const createHashlakeScene = ({
       mountainStageOrderValid: mountainHarness.stageOrderValid,
       mountainArtifactFree: mountainHarness.artifactFree,
       mountainCameraCheckValid: mountainHarness.cameraCheckValid,
+      mountainLakeShoreOverlap: mountainHarness.lakeShoreOverlap,
+      mountainSecondLakeArtifact: mountainHarness.secondLakeArtifact,
+      mountainGlassPaneArtifact: mountainHarness.glassPaneArtifact,
       webGpuProbeActive: false,
       heavyScenicActive: false,
       waterMeshCount: 1,

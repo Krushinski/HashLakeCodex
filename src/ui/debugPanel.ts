@@ -61,6 +61,8 @@ type VisualModeTelemetry = {
   mountainBackArcActive: boolean;
   mountainSideFadeoutActive: boolean;
   mountainInvalidVertexCount: number;
+  mountainFoothillAnchor: boolean;
+  mountainBaseTouchesFoothill: boolean;
   mountainGrounded: boolean;
   mountainFloatingGapDetected: boolean;
   mountainBottomSilhouetteValid: boolean;
@@ -68,6 +70,9 @@ type VisualModeTelemetry = {
   mountainStageOrderValid: boolean;
   mountainArtifactFree: boolean;
   mountainCameraCheckValid: boolean;
+  mountainLakeShoreOverlap: boolean;
+  mountainSecondLakeArtifact: boolean;
+  mountainGlassPaneArtifact: boolean;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
   waterMeshCount: number;
@@ -165,6 +170,8 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Back arc active", value: "no", tone: "muted" },
   { group: "global", label: "Side fadeout", value: "yes", tone: "good" },
   { group: "global", label: "Invalid verts", value: "0", tone: "good" },
+  { group: "global", label: "Foothill anchor", value: "no", tone: "bad" },
+  { group: "global", label: "Base seated", value: "no", tone: "bad" },
   { group: "global", label: "Grounded", value: "no", tone: "bad" },
   { group: "global", label: "Floating gap", value: "yes", tone: "bad" },
   { group: "global", label: "Bottom silhouette", value: "invalid", tone: "bad" },
@@ -172,6 +179,9 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Stage order", value: "unproven", tone: "warn" },
   { group: "global", label: "Artifact check", value: "failed", tone: "bad" },
   { group: "global", label: "Camera check", value: "unproven", tone: "warn" },
+  { group: "global", label: "Lake overlap", value: "yes", tone: "bad" },
+  { group: "global", label: "Second lake", value: "risk", tone: "bad" },
+  { group: "global", label: "Pane/banner", value: "risk", tone: "bad" },
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
   { group: "global", label: "Heavy scenic", value: "off", tone: "good" },
   { group: "global", label: "Water meshes", value: "1", tone: "good" },
@@ -1220,6 +1230,16 @@ export const createDebugPanel = (
       telemetry.visualMode.mountainInvalidVertexCount === 0 ? "good" : "bad",
     );
     setMetric(
+      "Foothill anchor",
+      telemetry.visualMode.mountainFoothillAnchor ? "yes" : "no",
+      telemetry.visualMode.mountainFoothillAnchor ? "good" : "bad",
+    );
+    setMetric(
+      "Base seated",
+      telemetry.visualMode.mountainBaseTouchesFoothill ? "yes" : "no",
+      telemetry.visualMode.mountainBaseTouchesFoothill ? "good" : "bad",
+    );
+    setMetric(
       "Grounded",
       telemetry.visualMode.mountainGrounded ? "yes" : "no",
       telemetry.visualMode.mountainGrounded ? "good" : "bad",
@@ -1253,6 +1273,21 @@ export const createDebugPanel = (
       "Camera check",
       telemetry.visualMode.mountainCameraCheckValid ? "pass" : "unproven",
       telemetry.visualMode.mountainCameraCheckValid ? "good" : "warn",
+    );
+    setMetric(
+      "Lake overlap",
+      telemetry.visualMode.mountainLakeShoreOverlap ? "yes" : "no",
+      telemetry.visualMode.mountainLakeShoreOverlap ? "bad" : "good",
+    );
+    setMetric(
+      "Second lake",
+      telemetry.visualMode.mountainSecondLakeArtifact ? "risk" : "no",
+      telemetry.visualMode.mountainSecondLakeArtifact ? "bad" : "good",
+    );
+    setMetric(
+      "Pane/banner",
+      telemetry.visualMode.mountainGlassPaneArtifact ? "risk" : "no",
+      telemetry.visualMode.mountainGlassPaneArtifact ? "bad" : "good",
     );
     setMetric(
       "WebGPU probe",

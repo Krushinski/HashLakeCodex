@@ -39,7 +39,7 @@ const driveControls = [
   ["L", "Legend"],
   ["X", "Toggle Drive Mode"],
   ["F", "Fullscreen"],
-  ["V", "Safe Zone 6 mountain compare"],
+  ["V", "Toggle grounded Zone 6 mountain V2"],
   ["R", "Reset camera"],
   ["C", "Scenic cameras in Frame, locked chase presets in Drive"],
   ["Arrow keys", "Drive boat"],
@@ -80,7 +80,7 @@ const zoneMap = [
   [
     "6",
     "Mountain Backdrop / Back Arc",
-    "Grounded rear mountains only. Behind the far forest wall; sides stay forest/foothills.",
+    "Grounded rear mountains only. Zone 6a foothills, Zone 6b ridges; sides stay forest/foothills.",
   ],
   ["7", "Sky / Clouds", "Sky dome, clouds, sun/moon, storm atmosphere."],
 ];

@@ -12,6 +12,8 @@ export type MountainPlacementHarnessTelemetry = {
   backArcActive: boolean;
   sideFadeoutActive: boolean;
   invalidVertexCount: number;
+  foothillAnchor: boolean;
+  mountainBaseTouchesFoothill: boolean;
   grounded: boolean;
   floatingGapDetected: boolean;
   bottomSilhouetteValid: boolean;
@@ -19,18 +21,25 @@ export type MountainPlacementHarnessTelemetry = {
   stageOrderValid: boolean;
   artifactFree: boolean;
   cameraCheckValid: boolean;
+  lakeShoreOverlap: boolean;
+  secondLakeArtifact: boolean;
+  glassPaneArtifact: boolean;
 };
 
 export type MountainVisualValidationAudit = {
   vertexCount: number;
   invalidVertexCount: number;
   hasFoothillAnchor: boolean;
+  mountainBaseTouchesFoothill: boolean;
   floatingGapDetected: boolean;
   bottomSilhouetteValid: boolean;
   forestOcclusionValid: boolean;
   stageOrderValid: boolean;
   artifactFree: boolean;
   cameraCheckValid: boolean;
+  lakeShoreOverlap: boolean;
+  secondLakeArtifact: boolean;
+  glassPaneArtifact: boolean;
   invalidReason?: string;
 };
 
@@ -40,7 +49,7 @@ export const MOUNTAIN_BACK_ARC_ZONE = {
   xMax: 2240,
   zMin: -680,
   zMax: 680,
-  yMin: 16,
+  yMin: 0.75,
   yMax: 315,
   sideFadeWidth: 260,
   minimumWaterClearance: 620,
@@ -88,12 +97,16 @@ const getDefaultInvalidAudit = (): MountainVisualValidationAudit => ({
   vertexCount: 0,
   invalidVertexCount: 0,
   hasFoothillAnchor: false,
+  mountainBaseTouchesFoothill: false,
   floatingGapDetected: true,
   bottomSilhouetteValid: false,
   forestOcclusionValid: false,
   stageOrderValid: false,
   artifactFree: false,
   cameraCheckValid: false,
+  lakeShoreOverlap: true,
+  secondLakeArtifact: true,
+  glassPaneArtifact: true,
   invalidReason: "No grounded foothill-anchored Zone 6 experiment exists",
 });
 
@@ -118,7 +131,10 @@ export const getMountainPlacementHarnessTelemetry = ({
     ...audit,
     invalidVertexCount: audit?.invalidVertexCount ?? invalidVertexCount,
   };
-  const grounded = validation.hasFoothillAnchor && !validation.floatingGapDetected;
+  const grounded =
+    validation.hasFoothillAnchor &&
+    validation.mountainBaseTouchesFoothill &&
+    !validation.floatingGapDetected;
   const experimentValid =
     backArcValid &&
     sideFadeoutActive &&
@@ -128,7 +144,10 @@ export const getMountainPlacementHarnessTelemetry = ({
     validation.forestOcclusionValid &&
     validation.stageOrderValid &&
     validation.artifactFree &&
-    validation.cameraCheckValid;
+    validation.cameraCheckValid &&
+    !validation.lakeShoreOverlap &&
+    !validation.secondLakeArtifact &&
+    !validation.glassPaneArtifact;
   const nextExperimentActive = experimentActive && experimentValid;
   const invalidReasons = [
     !backArcValid ? "Zone 6 bounds invalid" : "",
@@ -137,12 +156,16 @@ export const getMountainPlacementHarnessTelemetry = ({
       ? `vertex audit failed (${validation.invalidVertexCount})`
       : "",
     !validation.hasFoothillAnchor ? "missing foothill anchor" : "",
+    !validation.mountainBaseTouchesFoothill ? "mountain base not seated into foothill" : "",
     validation.floatingGapDetected ? "floating gap under mountain base" : "",
     !validation.bottomSilhouetteValid ? "flat/floating bottom silhouette" : "",
     !validation.forestOcclusionValid ? "far forest does not occlude base" : "",
     !validation.stageOrderValid ? "scene stage order not proven" : "",
     !validation.artifactFree ? "artifact check failed" : "",
     !validation.cameraCheckValid ? "camera proof not approved" : "",
+    validation.lakeShoreOverlap ? "lake/shore overlap" : "",
+    validation.secondLakeArtifact ? "second-lake artifact risk" : "",
+    validation.glassPaneArtifact ? "glass-pane/banner artifact risk" : "",
     validation.invalidReason ?? "",
   ].filter(Boolean);
   const invalidReason = experimentValid ? "" : invalidReasons[0] ?? "invalid";
@@ -158,6 +181,8 @@ export const getMountainPlacementHarnessTelemetry = ({
     backArcActive: nextExperimentActive,
     sideFadeoutActive,
     invalidVertexCount: validation.invalidVertexCount,
+    foothillAnchor: validation.hasFoothillAnchor,
+    mountainBaseTouchesFoothill: validation.mountainBaseTouchesFoothill,
     grounded,
     floatingGapDetected: validation.floatingGapDetected,
     bottomSilhouetteValid: validation.bottomSilhouetteValid,
@@ -165,5 +190,8 @@ export const getMountainPlacementHarnessTelemetry = ({
     stageOrderValid: validation.stageOrderValid,
     artifactFree: validation.artifactFree,
     cameraCheckValid: validation.cameraCheckValid,
+    lakeShoreOverlap: validation.lakeShoreOverlap,
+    secondLakeArtifact: validation.secondLakeArtifact,
+    glassPaneArtifact: validation.glassPaneArtifact,
   };
 };
