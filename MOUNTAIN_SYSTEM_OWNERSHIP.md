@@ -1,8 +1,8 @@
-# Phase 80 Mountain System Ownership
+# Phase 83 Mountain System Ownership
 
 Date: 2026-06-27
 
-This document is the current contract for HashLake mountain rendering. It exists because Phase 78 left two different mountain systems reachable through `V`: the native full ridge rings and a visually invalid Zone 6 experiment that could appear as a detached floating island.
+This document is the current contract for HashLake mountain rendering. It exists because multiple recent phases proved that coordinate-valid mountain meshes can still be visually invalid from the real Drive and `V` camera angles.
 
 ## Diagnosis Before Code Changes
 
@@ -14,7 +14,9 @@ This document is the current contract for HashLake mountain rendering. It exists
 - When `V` was off, the native terrain rings rendered unless a scenic GLB asset hid them.
 - When `V` was on and the experiment reported valid, the experiment rendered and native terrain was hidden.
 - The Phase 78 experiment is visually invalid because it can appear as a floating, detached mountain object with a visible underside/skirt from the user proof angles.
-- WebGPU scenic code and older scenic asset loaders are not valid mountain owners for Phase 80. They must not be activated by `V`.
+- The Phase 82 experiment was also visually invalid. It stayed inside nominal bounds, but from the real `V`/Drive angle it read as a floating island/plate behind the forest.
+- The Phase 82 native back-arc attempt was also visually invalid. It produced an oversized floating/pane-base read from the same gameplay angle.
+- WebGPU scenic code and older scenic asset loaders are not valid mountain owners for Phase 83. They must not be activated by `V`.
 
 ## Ownership Contract
 
@@ -32,6 +34,7 @@ It must obey:
 - rear/back-arc dominance
 - strong east/west side fadeout
 - no high mountain wall crowding the side shorelines
+- no floating/pane underside from Drive, Helicopter, or `V` proof angles
 - no hidden under-lake land
 - no second lake, pane, banner, floating island, or underside artifact
 
@@ -45,7 +48,9 @@ This mode exists to prove what the lake, forest, shore, and sky look like with m
 
 `zone6MountainExperiment` is the only allowed future experiment owner.
 
-For Phase 80 there is a ready Zone 6 experiment slot, but no valid experiment art is loaded. The slot must remain empty, non-rendering, non-updating, and the art must remain invalid in Debug.
+There is a ready Zone 6 experiment slot, but no valid experiment art is loaded. The slot must remain empty, non-rendering, non-updating, and the art must remain invalid in Debug.
+
+For Phase 83 this rule is stricter: the experiment slot may be ready, but experiment art is not loaded, not valid, not visible, and not reachable from `V`.
 
 A future experiment is allowed only if it passes the Zone 6 gates:
 
@@ -57,22 +62,34 @@ A future experiment is allowed only if it passes the Zone 6 gates:
 - no visible underside, pane, banner strip, second lake, or glass plane
 - proof screenshots from Helicopter, Drive, side-angle, east, west, and OJ/high views
 
+## Camera-Based Invalidity Rules
+
+A mountain is invalid even if its vertices are inside the Zone 6 coordinate bounds when any required proof camera shows:
+
+- sky or empty space underneath the mountain
+- a flat/pane underside
+- an island-in-the-sky silhouette
+- a glass banner or long thin strip
+- a terrain wall that reads like a backdrop card rather than landform
+- a second-lake or water-reflection artifact
+- far forest incorrectly overlaid by mountain material
+- mountain geometry visible in front of Zone 5 forest shelf
+- failure from known `V`, Drive, Helicopter Truth, side, east, west, or OJ/high camera angles
+
+Future mountain experiments require screenshot proof before Debug can ever report `Experiment art valid: yes`.
+
 ## V Truth Toggle
 
 `V` is a diagnostic truth toggle, not an art toggle.
 
-Current Phase 80 states:
+Current Phase 83 states:
 
 1. Native Baseline Mountains
 2. No Mountains / Zone Proof View
 
 Because no valid experiment art exists, `V` must show: `Zone 6 experiment slot ready - no valid mountain art loaded.`
 
-If a future valid experiment exists, `V` may cycle:
-
-1. Native Baseline Mountains
-2. No Mountains / Zone Proof View
-3. Valid Zone 6 Experiment
+In Phase 83, `V` must not cycle to experiment mode even if a future code path accidentally marks the slot valid. Experiment mode stays disabled until a later phase explicitly re-enables it with visual proof.
 
 `V` must never activate:
 

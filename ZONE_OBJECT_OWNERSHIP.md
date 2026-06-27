@@ -1,6 +1,6 @@
 # Zone Object Ownership
 
-Phase 82 rule: every visible thing has one zone owner. If an object cannot prove its zone, it must be hidden, rejected, or left as a disabled experiment.
+Phase 83 rule: every visible thing has one zone owner. If an object cannot prove its zone, it must be hidden, rejected, or left as a disabled experiment.
 
 ## Zone Table
 
@@ -32,14 +32,16 @@ Phase 82 rule: every visible thing has one zone owner. If an object cannot prove
 | Island | Zone 1 obstacle / local land | Dry island footprint inside lake | Mainland shore or mountain zone | Island mound logic | `isInIsland` excludes water and clips ripples | Gray edge teeth if wet edge gets separate ownership |
 | Sandbar | Zone 1 obstacle / local land | Dry sandbar footprint inside lake | Mainland shore or mountain zone | Sandbar mound logic | `isInSandbar` excludes water and clips ripples | Ring/halo artifacts if sand alpha exceeds footprint |
 | Dock | Zone 2-3 destination | Shore pocket only | Open water except pilings, forest shelf, mountain zone | Destination placement + local y | Destination key placement must remain shore-adjacent | Floating dock pieces if local y changes |
-| Native mountains | Zone 6 | Clean back-arc grid behind Zone 5 and the far forest clearance | Zone 5 forest shelf, lake, shore, side/east/west foreground | Fixed foothill base behind forest wall | `xMin/xMax/zMin/zMax` place the mesh behind `LAKE_MAP.mapBounds.maxX` with side fade | Swallowing forest if the back-arc x gate moves inward |
-| Mountain experiment slot | Zone 6 | Harness bounds `MOUNTAIN_BACK_ARC_ZONE` only | Any vertex outside harness bounds; second-lake or pane artifacts | Internal foothill/base geometry | `auditMountainBackArcVertices` plus visual audit flags | False valid art if audit flags are set without screenshots |
+| Native mountains | Zone 6 | Restored conservative native ridge baseline from pre-Phase-82 mountain code | Zone 5 forest shelf, lake, shore, side/east/west foreground | Native terrain mesh base; visual proof required | Rear/back-arc dominance plus `V` comparison screenshots; no experiment involvement | Full rings can still crowd if future edits raise side arcs |
+| Mountain experiment slot | Zone 6 | Empty harness only; no art loaded or visible in Phase 83 | Any rendered experiment mesh, vertex outside bounds, second-lake or pane artifacts | N/A until future art exists | Slot-ready may be true, but art-loaded/visible/valid must stay false | False valid art if coordinates are treated as enough without camera proof |
 | Sky and clouds | Zone 7 | Above and behind all scene geometry | Ground/water ownership, transparent landscape panes | Sky shader/cloud mesh logic | No land/water/collision ownership | Fog/cloud layers reading as mountain panes |
 | Legacy scenic / WebGPU / hidden fallbacks | None unless explicitly active | Disabled by default | Any live visual path without a valid owner | N/A | Must stay off or report fallback/error in Debug | Covered-but-still-rendering performance hogs |
 
-## Phase 82 Enforcement
+## Phase 83 Enforcement
 
 - Tree instances are counted as certified only after `certifyTreeInstance` confirms Zone 4/5 land, valid sampled ground height, and no mountain-owned clearance.
-- Native mountains no longer use free circular rings. They are clean Zone 6 back-arc ridges that sit behind the far forest clearance.
-- The `V` key remains diagnostic: native baseline, no-mountains zone proof, and the Zone 6 experiment only when the harness says it is valid.
+- Phase 82 tree certification remains active.
+- The invalid Phase 82 mountain experiment is removed from rendering.
+- Native mountains are restored to the pre-Phase-82 conservative ridge baseline while future Zone 6 art is blocked.
+- The `V` key remains diagnostic with exactly two states: native baseline and no-mountains zone proof.
 - The boot/fallback shell remains independent of all zone ownership so a scene failure does not become a blank screen.

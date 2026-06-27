@@ -208,7 +208,7 @@ type SceneTelemetry = {
 
 type VisualModeTelemetry = {
   renderer: RendererCapabilityTelemetry;
-  activeMode: "Native Baseline" | "No Mountains / Zone Proof" | "Mountain Experiment";
+  activeMode: "Native Baseline" | "No Mountains / Zone Proof";
   mountainOwner: string;
   nativeMountainsVisible: boolean;
   experimentMountainsVisible: boolean;
@@ -241,7 +241,7 @@ type VisualModeTelemetry = {
   waterMeshCount: number;
 };
 
-type MountainTruthMode = "native" | "zone-proof" | "experiment";
+type MountainTruthMode = "native" | "zone-proof";
 
 type CameraPreset = {
   name: string;
@@ -810,20 +810,13 @@ export const createHashlakeScene = ({
 
   const getVisualModeTelemetry = (): VisualModeTelemetry => {
     const mountainHarness = mountainExperimentSystem.getTelemetry();
-    const experimentMountainsVisible =
-      mountainTruthMode === "experiment" && mountainHarness.experimentActive;
-    const nativeMountainsVisible = mountainTruthMode === "native" && !experimentMountainsVisible;
+    const experimentMountainsVisible = false;
+    const nativeMountainsVisible = mountainTruthMode === "native";
     const zoneProofActive = mountainTruthMode === "zone-proof";
-    const activeMode = experimentMountainsVisible
-      ? "Mountain Experiment"
-      : zoneProofActive
-        ? "No Mountains / Zone Proof"
-        : "Native Baseline";
-    const mountainOwner = experimentMountainsVisible
-      ? "zone6MountainExperiment"
-      : nativeMountainsVisible
-        ? "terrainSystem zone6 back-arc ridges"
-        : "none - zone proof";
+    const activeMode = zoneProofActive ? "No Mountains / Zone Proof" : "Native Baseline";
+    const mountainOwner = nativeMountainsVisible
+      ? "terrainSystem restored native ridge baseline"
+      : "none - zone proof";
     return {
       renderer: rendererCapabilities,
       activeMode,
@@ -861,31 +854,17 @@ export const createHashlakeScene = ({
   };
 
   const applyMountainTruthMode = (nextMode: MountainTruthMode) => {
-    const initialTelemetry = mountainExperimentSystem.getTelemetry();
-    mountainTruthMode =
-      nextMode === "experiment" && !initialTelemetry.experimentValid
-        ? "zone-proof"
-        : nextMode;
-    mountainExperimentSystem.setActive(mountainTruthMode === "experiment");
+    mountainTruthMode = nextMode;
+    mountainExperimentSystem.setActive(false);
     const telemetry = mountainExperimentSystem.getTelemetry();
-    const experimentVisible =
-      mountainTruthMode === "experiment" && telemetry.experimentActive;
     terrainSystem.setNativeMountainsSuppressed(mountainTruthMode !== "native");
     const zoneProofActive = mountainTruthMode === "zone-proof";
-    const message = experimentVisible
-      ? "Zone 6 mountain experiment active"
-      : zoneProofActive
-      ? telemetry.experimentValid
-        ? "No Mountains / Zone Proof - valid Zone 6 art slot available on next V"
-        : NO_VALID_MOUNTAIN_EXPERIMENT_REASON
+    const message = zoneProofActive
+      ? NO_VALID_MOUNTAIN_EXPERIMENT_REASON
       : "Native baseline mountains active";
     showDriveHudMessage(
       driveHud,
-      experimentVisible
-        ? "MOUNTAIN EXPERIMENT"
-        : zoneProofActive
-          ? "ZONE PROOF"
-          : "NATIVE BASELINE",
+      zoneProofActive ? "ZONE PROOF" : "NATIVE BASELINE",
     );
     eventBus.emit({
       type: "scenic",
@@ -894,31 +873,20 @@ export const createHashlakeScene = ({
     window.dispatchEvent(
       new CustomEvent("hashlake:visual-mode-changed", {
         detail: {
-          activeMode: experimentVisible
-            ? "Mountain Experiment"
-            : zoneProofActive
-              ? "No Mountains / Zone Proof"
-              : "Native Baseline",
+          activeMode: zoneProofActive ? "No Mountains / Zone Proof" : "Native Baseline",
           mountainExperimentAvailable: telemetry.experimentAvailable,
           mountainExperimentValid: telemetry.experimentValid,
-          mountainOwner: experimentVisible
-            ? "zone6MountainExperiment"
-            : zoneProofActive
-              ? "none - zone proof"
-              : "terrainSystem zone6 back-arc ridges",
+          mountainOwner: zoneProofActive
+            ? "none - zone proof"
+            : "terrainSystem restored native ridge baseline",
         },
       }),
     );
   };
 
   const cycleMountainTruthMode = () => {
-    const telemetry = mountainExperimentSystem.getTelemetry();
     if (mountainTruthMode === "native") {
       applyMountainTruthMode("zone-proof");
-      return;
-    }
-    if (mountainTruthMode === "zone-proof" && telemetry.experimentValid) {
-      applyMountainTruthMode("experiment");
       return;
     }
     applyMountainTruthMode("native");
@@ -1015,9 +983,7 @@ export const createHashlakeScene = ({
     animateWater(water, elapsed, weather, driveState, camera);
     animateShoreline(shoreline, elapsed, weather);
     terrainSystem.update(weather, camera);
-    if (mountainTruthMode === "experiment") {
-      mountainExperimentSystem.update(weather, camera);
-    }
+    mountainExperimentSystem.setActive(false);
     if (elapsed - lastForestUpdateAt >= qualityState.forestUpdateInterval) {
       forestSystem.update(elapsed, weather);
       lastForestUpdateAt = elapsed;

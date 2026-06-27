@@ -50,7 +50,7 @@ type MetricTile = {
 
 type VisualModeTelemetry = {
   renderer: RendererCapabilityTelemetry;
-  activeMode: "Native Baseline" | "No Mountains / Zone Proof" | "Mountain Experiment";
+  activeMode: "Native Baseline" | "No Mountains / Zone Proof";
   mountainOwner: string;
   nativeMountainsVisible: boolean;
   experimentMountainsVisible: boolean;
@@ -180,6 +180,8 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Zone proof", value: "no", tone: "muted" },
   { group: "global", label: "Mountain zone", value: "Zone 6", tone: "good" },
   { group: "global", label: "Experiment slot", value: "ready", tone: "good" },
+  { group: "global", label: "Experiment art loaded", value: "no", tone: "muted" },
+  { group: "global", label: "Experiment art visible", value: "no", tone: "muted" },
   { group: "global", label: "Experiment art valid", value: "no", tone: "bad" },
   { group: "global", label: "Invalid reason", value: "--", tone: "muted" },
   { group: "global", label: "Mountain verts", value: "0", tone: "muted" },
@@ -1236,10 +1238,21 @@ export const createDebugPanel = (
       telemetry.visualMode.mountainExperimentSlotReady ? "ready" : "not ready",
       telemetry.visualMode.mountainExperimentSlotReady ? "good" : "bad",
     );
+    const experimentArtLoaded = telemetry.visualMode.mountainExperimentVertices > 0;
+    setMetric(
+      "Experiment art loaded",
+      experimentArtLoaded ? "yes" : "no",
+      experimentArtLoaded ? "warn" : "muted",
+    );
+    setMetric(
+      "Experiment art visible",
+      telemetry.visualMode.mountainExperimentActive ? "yes" : "no",
+      telemetry.visualMode.mountainExperimentActive ? "bad" : "muted",
+    );
     setMetric(
       "Experiment art valid",
       telemetry.visualMode.mountainExperimentValid ? "yes" : "no",
-      telemetry.visualMode.mountainExperimentValid ? "good" : "bad",
+      telemetry.visualMode.mountainExperimentValid ? "good" : experimentArtLoaded ? "bad" : "muted",
     );
     setMetric(
       "Invalid reason",

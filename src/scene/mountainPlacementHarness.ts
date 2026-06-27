@@ -150,9 +150,10 @@ export const getMountainPlacementHarnessTelemetry = ({
     !validation.lakeShoreOverlap &&
     !validation.secondLakeArtifact &&
     !validation.glassPaneArtifact;
-  const nextExperimentActive = experimentActive && experimentValid;
+  const nextExperimentActive = experimentActive && mountainVertices > 0 && experimentValid;
   const invalidReasons = [
     validation.invalidReason ?? "",
+    mountainVertices <= 0 ? "no valid mountain art loaded" : "",
     !backArcValid ? "Zone 6 bounds invalid" : "",
     !sideFadeoutActive ? "side fadeout invalid" : "",
     validation.invalidVertexCount > 0
@@ -173,7 +174,7 @@ export const getMountainPlacementHarnessTelemetry = ({
   const invalidReason = experimentValid ? "" : invalidReasons[0] ?? "invalid";
   return {
     experimentSlotReady,
-    experimentAvailable: experimentValid,
+    experimentAvailable: mountainVertices > 0 && experimentValid,
     experimentActive: nextExperimentActive,
     experimentValid,
     reason: experimentValid ? "Grounded Zone 6 mountain experiment valid" : invalidReason,
