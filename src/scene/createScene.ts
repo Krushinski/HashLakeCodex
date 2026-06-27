@@ -186,7 +186,10 @@ type SceneTelemetry = {
   instancedTreeInstances: number;
   individualTreeInstances: number;
   treeTypeCounts: NativeTreeTypeCounts;
+  treePlacementValidCandidates: number;
   rejectedTreeCandidates: number;
+  ungroundedTreeInstances: number;
+  mountainOverlappedTreeInstances: number;
   treeAlphaInstances: number;
   treeAlphaAssets: TreeAlphaAssetStatuses;
   forestBandInstances: number;
@@ -819,7 +822,7 @@ export const createHashlakeScene = ({
     const mountainOwner = experimentMountainsVisible
       ? "zone6MountainExperiment"
       : nativeMountainsVisible
-        ? "terrainSystem native ridge rings"
+        ? "terrainSystem zone6 back-arc ridges"
         : "none - zone proof";
     return {
       renderer: rendererCapabilities,
@@ -872,7 +875,9 @@ export const createHashlakeScene = ({
     const message = experimentVisible
       ? "Zone 6 mountain experiment active"
       : zoneProofActive
-      ? NO_VALID_MOUNTAIN_EXPERIMENT_REASON
+      ? telemetry.experimentValid
+        ? "No Mountains / Zone Proof - valid Zone 6 art slot available on next V"
+        : NO_VALID_MOUNTAIN_EXPERIMENT_REASON
       : "Native baseline mountains active";
     showDriveHudMessage(
       driveHud,
@@ -900,7 +905,7 @@ export const createHashlakeScene = ({
             ? "zone6MountainExperiment"
             : zoneProofActive
               ? "none - zone proof"
-              : "terrainSystem native ridge rings",
+              : "terrainSystem zone6 back-arc ridges",
         },
       }),
     );
@@ -1477,7 +1482,10 @@ export const createHashlakeScene = ({
           instancedTreeInstances: forestStats.instancedTreeInstances,
           individualTreeInstances: forestStats.individualTreeInstances,
           treeTypeCounts: forestStats.treeTypeCounts,
+          treePlacementValidCandidates: forestStats.treePlacementValidCandidates,
           rejectedTreeCandidates: forestStats.rejectedTreeCandidates,
+          ungroundedTreeInstances: forestStats.ungroundedTreeInstances,
+          mountainOverlappedTreeInstances: forestStats.mountainOverlappedTreeInstances,
           treeAlphaInstances: forestStats.treeAlphaInstances,
           treeAlphaAssets: forestStats.treeAlphaAssets,
           forestBandInstances: forestStats.forestBandInstances,

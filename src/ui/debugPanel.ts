@@ -132,7 +132,10 @@ export type SceneTelemetry = {
   instancedTreeInstances: number;
   individualTreeInstances: number;
   treeTypeCounts: NativeTreeTypeCounts;
+  treePlacementValidCandidates: number;
   rejectedTreeCandidates: number;
+  ungroundedTreeInstances: number;
+  mountainOverlappedTreeInstances: number;
   treeAlphaInstances: number;
   treeAlphaAssets: TreeAlphaAssetStatuses;
   forestBandInstances: number;
@@ -214,7 +217,10 @@ const metricTiles: MetricTile[] = [
   { group: "weather", label: "Instanced trees", value: "0" },
   { group: "weather", label: "Individual trees", value: "0", tone: "muted" },
   { group: "weather", label: "Tree types", value: "T0 S0 M0 L0 B0 F0 Y0", tone: "muted" },
+  { group: "weather", label: "Tree certified", value: "0", tone: "good" },
   { group: "weather", label: "Tree rejects", value: "0", tone: "muted" },
+  { group: "weather", label: "Ungrounded trees", value: "0", tone: "good" },
+  { group: "weather", label: "Mountain tree overlap", value: "0", tone: "good" },
   { group: "weather", label: "Tree alpha", value: "fallback", tone: "muted" },
   { group: "weather", label: "Tree samples", value: "0" },
   { group: "weather", label: "Forest band", value: "0" },
@@ -1371,10 +1377,21 @@ export const createDebugPanel = (
       telemetry.individualTreeInstances > 0 ? "warn" : "muted",
     );
     setMetric("Tree types", formatTreeTypeCounts(telemetry.treeTypeCounts), "muted");
+    setMetric("Tree certified", String(telemetry.treePlacementValidCandidates), "good");
     setMetric(
       "Tree rejects",
       String(telemetry.rejectedTreeCandidates),
       telemetry.rejectedTreeCandidates > 0 ? "warn" : "good",
+    );
+    setMetric(
+      "Ungrounded trees",
+      String(telemetry.ungroundedTreeInstances),
+      telemetry.ungroundedTreeInstances > 0 ? "bad" : "good",
+    );
+    setMetric(
+      "Mountain tree overlap",
+      String(telemetry.mountainOverlappedTreeInstances),
+      telemetry.mountainOverlappedTreeInstances > 0 ? "bad" : "good",
     );
     const treeAlphaLoaded = Object.values(telemetry.treeAlphaAssets).filter((status) => status === "loaded").length;
     const treeAlphaErrors = Object.values(telemetry.treeAlphaAssets).filter((status) => status === "error").length;

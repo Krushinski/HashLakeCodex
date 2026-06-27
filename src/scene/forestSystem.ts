@@ -48,7 +48,10 @@ type ForestStats = {
   instancedTreeInstances: number;
   individualTreeInstances: number;
   treeTypeCounts: NativeTreeTypeCounts;
+  treePlacementValidCandidates: number;
   rejectedTreeCandidates: number;
+  ungroundedTreeInstances: number;
+  mountainOverlappedTreeInstances: number;
   treeAlphaInstances: number;
   treeAlphaAssets: TreeAlphaAssetStatuses;
   reedInstances: number;
@@ -365,6 +368,9 @@ export const createForestSystem = (): ForestSystem => {
   const up = new THREE.Vector3(0, 1, 0);
   const color = new THREE.Color();
   let rejectedTreeCandidates = 0;
+  let treePlacementValidCandidates = 0;
+  let ungroundedTreeInstances = 0;
+  let mountainOverlappedTreeInstances = 0;
 
   const trunkMaterial = new THREE.MeshStandardMaterial({
     color: 0x4c3020,
@@ -440,6 +446,31 @@ export const createForestSystem = (): ForestSystem => {
     }
   };
 
+  const certifyTreeInstance = (instance: TreeInstance) => {
+    const range = getBandRange(instance.band);
+    const expectedGround = groundHeightAt(instance.point);
+    const shoreClearance = -distanceToShore(instance.point);
+    const grounded =
+      Number.isFinite(instance.groundY) &&
+      Math.abs(instance.groundY - expectedGround) <= 0.02 &&
+      instance.groundY >= 1.36 &&
+      instance.groundY <= 2.56;
+    const forestOwned =
+      isMainlandForestZone(instance.point, range.min, range.max) &&
+      shoreClearance >= ZONE_TRUTH.forestTreeMinShoreClearance &&
+      shoreClearance <= ZONE_TRUTH.farForestMaxShoreClearance + 1;
+    const mountainOwned =
+      shoreClearance > ZONE_TRUTH.farForestMaxShoreClearance + 1 ||
+      instance.point.x > LAKE_MAP.mapBounds.maxX + ZONE_TRUTH.farForestMaxShoreClearance + 96;
+
+    return {
+      grounded,
+      forestOwned,
+      mountainOwned,
+      valid: grounded && forestOwned && !mountainOwned,
+    };
+  };
+
   const makeInstances = (
     count: number,
     key: NativeTreeTypeKey,
@@ -455,6 +486,18 @@ export const createForestSystem = (): ForestSystem => {
         rejectedTreeCandidates += 1;
         continue;
       }
+      const certification = certifyTreeInstance(instance);
+      if (!certification.valid) {
+        rejectedTreeCandidates += 1;
+        continue;
+      }
+      if (!certification.grounded) {
+        ungroundedTreeInstances += 1;
+      }
+      if (certification.mountainOwned) {
+        mountainOverlappedTreeInstances += 1;
+      }
+      treePlacementValidCandidates += 1;
       instances.push(instance);
     }
     return instances;
@@ -908,7 +951,10 @@ export const createForestSystem = (): ForestSystem => {
         instancedTreeInstances: nativeTreeInstances,
         individualTreeInstances: 0,
         treeTypeCounts,
+        treePlacementValidCandidates,
         rejectedTreeCandidates,
+        ungroundedTreeInstances,
+        mountainOverlappedTreeInstances,
         treeAlphaInstances: 0,
         treeAlphaAssets: { ...treeAlphaStatuses },
         reedInstances: validReedCount,

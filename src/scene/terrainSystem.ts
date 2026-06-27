@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { WeatherSnapshot } from "../state/weatherEngine";
 import { getWeatherPalette } from "./artDirection";
 import { GLSL_NOISE, makeNoise2D } from "./scenicUtils";
+import { LAKE_MAP } from "./lakeMap";
 
 type TerrainStats = {
   mountainVertices: number;
@@ -24,28 +25,33 @@ const smoothstep = (edge0: number, edge1: number, value: number) => {
   return x * x * (3 - 2 * x);
 };
 
-const angleDiff = (a: number, b: number) => {
-  let delta = a - b;
-  while (delta > Math.PI) {
-    delta -= Math.PI * 2;
-  }
-  while (delta < -Math.PI) {
-    delta += Math.PI * 2;
-  }
-  return delta;
+const pushMountainIndices = (
+  indices: number[],
+  columns: number,
+  row: number,
+  nextRow: number,
+  col: number,
+) => {
+  const a = row * columns + col;
+  const b = nextRow * columns + col;
+  indices.push(a, b, a + 1, b, b + 1, a + 1);
 };
 
-const buildRidgeRing = ({
-  rInner,
-  rOuter,
+const buildZone6BackArcRidge = ({
+  xMin,
+  xMax,
+  zMin,
+  zMax,
   peakMin,
   peakMax,
   seed,
   ridgeFrequency,
   hero,
 }: {
-  rInner: number;
-  rOuter: number;
+  xMin: number;
+  xMax: number;
+  zMin: number;
+  zMax: number;
   peakMin: number;
   peakMax: number;
   seed: number;
@@ -53,64 +59,53 @@ const buildRidgeRing = ({
   hero: boolean;
 }) => {
   const noise = makeNoise2D(seed);
-  const thetaSegments = 128;
-  const radialSegments = 10;
+  const xSegments = hero ? 18 : 10;
+  const zSegments = hero ? 72 : 56;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
-  const viewTheta = -Math.PI / 2;
 
-  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
-    const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
-    const cos = Math.cos(theta);
-    const sin = Math.sin(theta);
-    const rearAlignment = Math.cos(angleDiff(theta, viewTheta));
-    const rearArc = smoothstep(-0.04, 0.72, rearAlignment);
-    const shoulderArc = smoothstep(-0.42, 0.32, rearAlignment);
-    const heightMask = hero
-      ? 0.09 + rearArc * 0.98
-      : 0.09 + shoulderArc * 0.15 + rearArc * 0.78;
-    let ridge =
-      noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 4) * 0.9 + 0.55;
-    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.92 : 1.68);
-    const jag =
-      (Math.sin(theta * 13.0 + seed) * 0.5 + 0.5) *
-      Math.max(0, noise.fbm(cos * 8.2 + seed, sin * 8.2 + 2.4, 3));
-    ridge += jag * (hero ? 0.16 : 0.08);
-
-    if (hero) {
-      const centerPeak = angleDiff(theta, viewTheta + 0.1);
-      const sidePeak = angleDiff(theta, viewTheta - 0.62);
-      ridge += 0.55 * Math.exp(-(centerPeak * centerPeak) / (0.34 * 0.34));
-      ridge += 0.38 * Math.exp(-(sidePeak * sidePeak) / (0.26 * 0.26));
-      ridge = Math.min(ridge, 1.35);
-    }
-
-    const peakHeight = (peakMin + (peakMax - peakMin) * ridge) * heightMask;
-    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
-      const radial = radialIndex / radialSegments;
-      const radius = rInner + (rOuter - rInner) * radial;
-      const rise =
-        Math.pow(Math.sin(Math.PI * Math.min(radial / 0.78, 1) * 0.5), 1.25) *
-        (radial < 0.78 ? 1 : 1 - (radial - 0.78) / 0.3);
+  for (let xIndex = 0; xIndex <= xSegments; xIndex += 1) {
+    const xT = xIndex / xSegments;
+    const x = xMin + (xMax - xMin) * xT;
+    const rise = Math.pow(Math.sin(Math.PI * xT), hero ? 1.04 : 1.25);
+    const frontSeat = smoothstep(0.0, 0.18, xT);
+    const rearSeat = 1 - smoothstep(0.82, 1.0, xT);
+    for (let zIndex = 0; zIndex <= zSegments; zIndex += 1) {
+      const zT = zIndex / zSegments;
+      const z = zMin + (zMax - zMin) * zT;
+      const sideFade = Math.pow(Math.sin(Math.PI * zT), 0.66);
+      const broad =
+        noise.fbm(z * 0.0028 + seed, x * 0.0022 + 4.7, 4) * 0.76 + 0.46;
+      const ridgeNoise = Math.pow(Math.max(0, Math.min(1, broad)), hero ? 1.74 : 1.46);
+      const ridgeLine =
+        0.55 +
+        0.45 *
+          Math.sin(
+            z * (hero ? 0.0044 : 0.0058) +
+              noise.fbm(x * 0.0022, z * 0.0026, 3) * ridgeFrequency +
+              seed,
+          );
+      const peakHeight =
+        (peakMin + (peakMax - peakMin) * Math.max(ridgeNoise, ridgeLine * 0.62)) *
+        sideFade *
+        frontSeat *
+        rearSeat;
       const detail =
-        noise.fbm(cos * radius * 0.004 + 31, sin * radius * 0.004 + 17, 4) *
+        noise.fbm(x * 0.004 + 31, z * 0.004 + 17, 4) *
         peakHeight *
         (hero ? 0.28 : 0.2) *
         Math.max(rise, 0);
-      const y = Math.max(0, peakHeight * Math.max(rise, 0) + detail);
-      vertices.push(cos * radius, y, sin * radius);
+      const y = 2.25 + Math.max(0, peakHeight * Math.max(rise, 0) + detail);
+      vertices.push(x, y, z);
       elevs.push(y / peakMax);
     }
   }
 
-  const columns = radialSegments + 1;
-  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
-    const nextThetaIndex = (thetaIndex + 1) % thetaSegments;
-    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-      const a = thetaIndex * columns + radialIndex;
-      const b = nextThetaIndex * columns + radialIndex;
-      indices.push(a, b, a + 1, b, b + 1, a + 1);
+  const columns = zSegments + 1;
+  for (let xIndex = 0; xIndex < xSegments; xIndex += 1) {
+    for (let zIndex = 0; zIndex < zSegments; zIndex += 1) {
+      pushMountainIndices(indices, columns, xIndex, xIndex + 1, zIndex);
     }
   }
 
@@ -231,14 +226,16 @@ export const createTerrainSystem = (): TerrainSystem => {
     dark: { value: 0 },
   };
   const group = new THREE.Group();
-  group.name = "HashLake3-adapted ridge terrain";
+  group.name = "Zone 6 back-arc native ridge terrain";
 
   const far = new THREE.Mesh(
-    buildRidgeRing({
-      rInner: 1040,
-      rOuter: 1820,
-      peakMin: 170,
-      peakMax: 548,
+    buildZone6BackArcRidge({
+      xMin: LAKE_MAP.mapBounds.maxX + 760,
+      xMax: LAKE_MAP.mapBounds.maxX + 1480,
+      zMin: LAKE_MAP.mapBounds.minZ - 330,
+      zMax: LAKE_MAP.mapBounds.maxZ + 330,
+      peakMin: 116,
+      peakMax: 352,
       seed: 21,
       ridgeFrequency: 2.4,
       hero: true,
@@ -246,19 +243,21 @@ export const createTerrainSystem = (): TerrainSystem => {
     createTerrainMaterial(shared, 1.12, 0.9),
   );
   const mid = new THREE.Mesh(
-    buildRidgeRing({
-      rInner: 820,
-      rOuter: 1220,
-      peakMin: 54,
-      peakMax: 222,
+    buildZone6BackArcRidge({
+      xMin: LAKE_MAP.mapBounds.maxX + 560,
+      xMax: LAKE_MAP.mapBounds.maxX + 980,
+      zMin: LAKE_MAP.mapBounds.minZ - 300,
+      zMax: LAKE_MAP.mapBounds.maxZ + 300,
+      peakMin: 22,
+      peakMax: 88,
       seed: 53,
       ridgeFrequency: 3.1,
       hero: false,
     }),
     createTerrainMaterial(shared, 0.86, 1),
   );
-  far.name = "Far HashLake ridge";
-  mid.name = "Mid HashLake ridge";
+  far.name = "Zone 6 far perimeter ridge";
+  mid.name = "Zone 6 foothill perimeter ridge";
   far.frustumCulled = false;
   mid.frustumCulled = false;
   group.add(far, mid);
