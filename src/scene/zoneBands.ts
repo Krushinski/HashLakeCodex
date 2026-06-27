@@ -39,8 +39,11 @@ export type GroundBandSpec = ZoneBandSpec & {
   owner: "createShoreline";
   seed: number;
   wobble: number;
-  outerBoundary: "outline" | "world";
+  outerBoundary: "outline";
 };
+
+export const RIBBON_CAKE_OUTER_OFFSET =
+  ZONE_TRUTH.farForestMaxShoreClearance + 72;
 
 const groundBand = (
   zoneBand: ZoneBandSpec,
@@ -155,18 +158,46 @@ export const ZONE_BAND_TABLE: readonly ZoneBandSpec[] = [
     visualRole: "Darker mid-forest shelf before far forest massing.",
   },
   {
-    key: "farForestGround",
+    key: "farForestGroundInner",
     zone: 5,
     zoneName: "Far Forest Wall",
     startOffset: ZONE_TRUTH.forestShelfOuter,
-    endOffset: LAKE_MAP.worldRadius,
+    endOffset: 320,
     startY: 2.24,
+    endY: 2.31,
+    material: "farForest",
+    owner: "createShoreline",
+    overlapAllowed: false,
+    waterAllowed: false,
+    visualRole: "Inner far-forest floor ribbon beneath the far forest wall.",
+  },
+  {
+    key: "farForestGroundMid",
+    zone: 5,
+    zoneName: "Far Forest Wall",
+    startOffset: 320,
+    endOffset: 376,
+    startY: 2.31,
+    endY: 2.37,
+    material: "farForest",
+    owner: "createShoreline",
+    overlapAllowed: false,
+    waterAllowed: false,
+    visualRole: "Middle far-forest floor ribbon beneath the far forest wall.",
+  },
+  {
+    key: "farForestGroundOuter",
+    zone: 5,
+    zoneName: "Far Forest Wall",
+    startOffset: 376,
+    endOffset: RIBBON_CAKE_OUTER_OFFSET,
+    startY: 2.37,
     endY: 2.42,
     material: "farForest",
     owner: "createShoreline",
     overlapAllowed: false,
     waterAllowed: false,
-    visualRole: "Outer land floor beneath the far forest wall.",
+    visualRole: "Outer far-forest floor ribbon beneath the far forest wall.",
   },
   {
     key: "farForestInstances",
@@ -219,7 +250,9 @@ export const LAND_PERIMETER_BANDS: readonly GroundBandSpec[] = [
   groundBand(ZONE_BAND_TABLE[4], 29, 0.014, "outline"),
   groundBand(ZONE_BAND_TABLE[5], 37, 0.012, "outline"),
   groundBand(ZONE_BAND_TABLE[6], 43, 0.014, "outline"),
-  groundBand(ZONE_BAND_TABLE[7], 22, 0.014, "world"),
+  groundBand(ZONE_BAND_TABLE[7], 22, 0.011, "outline"),
+  groundBand(ZONE_BAND_TABLE[8], 31, 0.011, "outline"),
+  groundBand(ZONE_BAND_TABLE[9], 47, 0.011, "outline"),
 ] as const;
 
 export const getGroundHeightForShoreClearance = (clearance: number) => {
@@ -240,4 +273,4 @@ export const getGroundHeightForShoreClearance = (clearance: number) => {
 export const getGroundHeightAtPoint = (point: LakePoint) =>
   getGroundHeightForShoreClearance(Math.max(0, -distanceToShore(point)));
 
-export const ZONE_BAND_TABLE_VERSION = "phase82-certified-object-ownership";
+export const ZONE_BAND_TABLE_VERSION = "phase84-ribbon-cake-ground-reset";

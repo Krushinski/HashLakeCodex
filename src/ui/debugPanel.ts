@@ -144,6 +144,9 @@ export type SceneTelemetry = {
   rockInstances: number;
   mountainVertices: number;
   groundBandCount: number;
+  groundRibbonValid: boolean;
+  groundBadBandSegments: number;
+  groundContourLocked: boolean;
   groundFlippedBands: number;
   groundDownwardTriangles: number;
   zoneBandTableVersion: string;
@@ -172,6 +175,9 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Frame ms", value: "--" },
   { group: "global", label: "Pixel ratio", value: "1.00" },
   { group: "global", label: "Render scale", value: "1.00" },
+  { group: "global", label: "Ribbon cake", value: "valid", tone: "good" },
+  { group: "global", label: "Bad band segs", value: "0", tone: "good" },
+  { group: "global", label: "Contour lock", value: "yes", tone: "good" },
   { group: "global", label: "Visual mode", value: "Native Baseline", tone: "good" },
   { group: "global", label: "V state", value: "native", tone: "good" },
   { group: "global", label: "Mountain owner", value: "terrainSystem", tone: "good" },
@@ -1362,6 +1368,21 @@ export const createDebugPanel = (
       telemetry.visualMode.waterMeshCount > 1 ? "warn" : "good",
     );
     setMetric("Water law", "Zone 1 only", "good");
+    setMetric(
+      "Ribbon cake",
+      telemetry.groundRibbonValid ? "valid" : "invalid",
+      telemetry.groundRibbonValid ? "good" : "bad",
+    );
+    setMetric(
+      "Bad band segs",
+      String(telemetry.groundBadBandSegments),
+      telemetry.groundBadBandSegments === 0 ? "good" : "bad",
+    );
+    setMetric(
+      "Contour lock",
+      telemetry.groundContourLocked ? "yes" : "no",
+      telemetry.groundContourLocked ? "good" : "bad",
+    );
     setMetric("Zone bands", `${telemetry.groundBandCount} table`, "good");
     setMetric(
       "Ground winding",

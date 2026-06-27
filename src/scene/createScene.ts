@@ -13,6 +13,7 @@ import {
   LAKE_FEATURE_FOOTPRINTS,
   LAKE_MAP,
   clampBoatToWater,
+  distanceToShore,
   getExpandedOutline,
   getNearestLocation,
   isReedWetlandZone,
@@ -198,6 +199,9 @@ type SceneTelemetry = {
   rockInstances: number;
   mountainVertices: number;
   groundBandCount: number;
+  groundRibbonValid: boolean;
+  groundBadBandSegments: number;
+  groundContourLocked: boolean;
   groundFlippedBands: number;
   groundDownwardTriangles: number;
   zoneBandTableVersion: string;
@@ -1460,6 +1464,9 @@ export const createHashlakeScene = ({
           rockInstances: forestStats.rockInstances,
           mountainVertices: terrainStats.mountainVertices,
           groundBandCount: Number(shoreline.userData.groundBandCount ?? 0),
+          groundRibbonValid: Boolean(shoreline.userData.groundRibbonValid),
+          groundBadBandSegments: Number(shoreline.userData.groundBadBandSegments ?? 0),
+          groundContourLocked: Boolean(shoreline.userData.groundContourLocked),
           groundFlippedBands: Number(shoreline.userData.groundFlippedBands ?? 0),
           groundDownwardTriangles: Number(shoreline.userData.groundDownwardTriangles ?? 0),
           zoneBandTableVersion: String(shoreline.userData.zoneBandTableVersion ?? "unknown"),
@@ -2229,17 +2236,33 @@ const createSlopedStripGeometry = (
   return applyPlanarUvs(geometry, 92, 900, 700);
 };
 
-const createRadialBoundary = (
+const auditRibbonBand = (
   inner: readonly { x: number; z: number }[],
-  radius: number,
-) =>
-  inner.map((point) => {
-    const length = Math.max(1, Math.hypot(point.x, point.z));
-    return {
-      x: (point.x / length) * radius,
-      z: (point.z / length) * radius,
-    };
-  });
+  outer: readonly { x: number; z: number }[],
+  waterAllowed: boolean,
+) => {
+  const count = Math.min(inner.length, outer.length);
+  let badSegments = 0;
+
+  for (let index = 0; index < count; index += 1) {
+    const innerPoint = inner[index];
+    const outerPoint = outer[index];
+    const innerClearance = -distanceToShore(innerPoint);
+    const outerClearance = -distanceToShore(outerPoint);
+    const segmentWidth = Math.hypot(outerPoint.x - innerPoint.x, outerPoint.z - innerPoint.z);
+    const landWaterOverlap =
+      !waterAllowed &&
+      (distanceToShore(innerPoint) > 1.5 || distanceToShore(outerPoint) > 1.5);
+    const reversed = outerClearance + 2 < innerClearance;
+    const collapsed = segmentWidth < 2;
+
+    if (landWaterOverlap || reversed || collapsed) {
+      badSegments += 1;
+    }
+  }
+
+  return badSegments;
+};
 
 type MoundToneProfile = {
   center: [number, number, number];
@@ -2454,12 +2477,14 @@ const createShoreline = () => {
   });
 
   const topologyAudits: TopologyAudit[] = [];
+  let badRibbonSegments = 0;
+  let contourLocked = true;
+
   for (const band of LAND_PERIMETER_BANDS) {
     const inner = getExpandedOutline(band.startOffset);
-    const outer =
-      band.outerBoundary === "world"
-        ? createRadialBoundary(inner, LAKE_MAP.worldRadius)
-        : getExpandedOutline(band.endOffset);
+    const outer = getExpandedOutline(band.endOffset);
+    contourLocked = contourLocked && band.outerBoundary === "outline";
+    badRibbonSegments += auditRibbonBand(inner, outer, band.waterAllowed);
     const geometry = createSlopedStripGeometry(
       inner,
       outer,
@@ -2499,6 +2524,12 @@ const createShoreline = () => {
     (total, audit) => total + audit.downwardTriangles,
     0,
   );
+  group.userData.groundBadBandSegments = badRibbonSegments;
+  group.userData.groundContourLocked = contourLocked;
+  group.userData.groundRibbonValid =
+    contourLocked &&
+    badRibbonSegments === 0 &&
+    Number(group.userData.groundDownwardTriangles) === 0;
   group.userData.zoneBandTableVersion = ZONE_BAND_TABLE_VERSION;
 
   return group;
