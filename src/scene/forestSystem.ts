@@ -192,15 +192,15 @@ const groundHeightAt = (point: LakePoint) => {
     return THREE.MathUtils.lerp(1.02, 1.16, (clearance - 42) / (ZONE_TRUTH.shorelineGrassOuter - 42));
   }
   if (clearance < ZONE_TRUTH.raisedBankOuter) {
-    return THREE.MathUtils.lerp(1.16, 1.42, (clearance - ZONE_TRUTH.shorelineGrassOuter) / (ZONE_TRUTH.raisedBankOuter - ZONE_TRUTH.shorelineGrassOuter));
+    return THREE.MathUtils.lerp(1.16, 1.44, (clearance - ZONE_TRUTH.shorelineGrassOuter) / (ZONE_TRUTH.raisedBankOuter - ZONE_TRUTH.shorelineGrassOuter));
   }
   if (clearance < 214) {
-    return THREE.MathUtils.lerp(1.48, 1.88, (clearance - ZONE_TRUTH.forestShelfInner) / (214 - ZONE_TRUTH.forestShelfInner));
+    return THREE.MathUtils.lerp(1.44, 1.90, (clearance - ZONE_TRUTH.forestShelfInner) / (214 - ZONE_TRUTH.forestShelfInner));
   }
   if (clearance < ZONE_TRUTH.forestShelfOuter) {
-    return THREE.MathUtils.lerp(1.88, 2.30, (clearance - 214) / (ZONE_TRUTH.forestShelfOuter - 214));
+    return THREE.MathUtils.lerp(1.90, 2.24, (clearance - 214) / (ZONE_TRUTH.forestShelfOuter - 214));
   }
-  return 2.36;
+  return 2.42;
 };
 
 const getBandRange = (band: PlacementBand) => {

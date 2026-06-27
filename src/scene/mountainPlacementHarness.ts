@@ -1,6 +1,7 @@
 import { LAKE_MAP } from "./lakeMap";
 
 export type MountainPlacementHarnessTelemetry = {
+  experimentSlotReady: boolean;
   experimentAvailable: boolean;
   experimentActive: boolean;
   experimentValid: boolean;
@@ -126,6 +127,7 @@ export const getMountainPlacementHarnessTelemetry = ({
     MOUNTAIN_BACK_ARC_ZONE.sideFadeWidth > 0 &&
     MOUNTAIN_BACK_ARC_ZONE.sideFadeWidth * 2 <
       MOUNTAIN_BACK_ARC_ZONE.zMax - MOUNTAIN_BACK_ARC_ZONE.zMin;
+  const experimentSlotReady = backArcValid && sideFadeoutActive;
   const validation = {
     ...getDefaultInvalidAudit(),
     ...audit,
@@ -170,6 +172,7 @@ export const getMountainPlacementHarnessTelemetry = ({
   ].filter(Boolean);
   const invalidReason = experimentValid ? "" : invalidReasons[0] ?? "invalid";
   return {
+    experimentSlotReady,
     experimentAvailable: experimentValid,
     experimentActive: nextExperimentActive,
     experimentValid,

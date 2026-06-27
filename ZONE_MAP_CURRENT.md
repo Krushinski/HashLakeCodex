@@ -1,4 +1,4 @@
-# Phase 79 Current Zone Map
+# Phase 80 Current Zone Map
 
 Date: 2026-06-27
 
@@ -25,6 +25,8 @@ Date: 2026-06-27
 
 Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
+Phase 80 adds `GROUND_ZONE_OWNERSHIP.md`. Zones 2-5 now have one visible ground owner per band, shared boundary elevations, and no arbitrary opaque stacking.
+
 ## Zone 1 - Water / Lake
 
 - Allowed geometry: one main shader water surface, boat, stern wake blocks, BTC splash/ripple particles, New Block rings, water/weather effects.
@@ -36,33 +38,45 @@ Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle:
 
 ## Zone 2 - Shore / Wet Edge
 
+- Visible ground owner: `createShoreline()` wet sand and bank-toe strips.
+- Expected elevation: `0.09 -> 0.72`.
+- Overlap: none for opaque ground; reeds and rocks may sit above the owned surface only where validated.
 - Allowed geometry: opaque wet edge, narrow sand/wet transition, reeds only in `isReedWetlandZone`, small wet rocks where validated.
 - Forbidden geometry: gray triangle halos, detached island/sandbar rings, broad full-shore beach bands, conifer trees in wet edge, transparent shallow cards.
 - Placement rule: follows expanded lake outline only; island/sandbar wet behavior must be owned by their coherent footprints.
 - Material/color rules: muted damp sand/earth, darker wet edge, no water-colored land patches.
-- Known current issues: previous phases repeatedly created gray tile/triangle leakage here.
-- Next-pass opportunity: formalize generated edge meshes from one source polygon and avoid duplicate rings.
+- Known current issues: Phase 80 removed repeated gray/black seam causes by aligning shared boundaries.
+- Next-pass opportunity: future shoreline detail can sit on this owner as props, not as new ground planes.
 
 ## Zone 3 - Raised Bank
 
+- Visible ground owner: `createShoreline()` grass transition and raised bank strips.
+- Expected elevation: `0.72 -> 1.44`.
+- Overlap: none for opaque ground; shoreline rocks and future roots may sit above it.
 - Allowed geometry: raised grass/earth shelf, shoreline rocks, bushes, future roots, dock/cove land attachments.
 - Forbidden geometry: water overlays, sand halos, mountain bases, far-forest walls, hidden under-lake platforms.
 - Placement rule: outside wet edge and visibly above the water plane; must stay connected to mainland or named island/sandbar feature.
 - Material/color rules: shore grass near water, darker earth/green farther out, no flat gray filler.
-- Known current issues: needs to stay clear and boring after cleanup.
+- Known current issues: keep this band clear and boring; it is the lake container lip.
 - Next-pass opportunity: low-poly bank caps or shoreline assets can sit here if validated by `lakeMap.ts`.
 
 ## Zone 4 - Near / Mid Forest Shelf
 
+- Visible ground owner: `createShoreline()` forest shelf and mid forest shelf strips.
+- Expected elevation: `1.44 -> 2.24`.
+- Overlap: no second floor; `forestSystem` trees, rocks, canopy, and understory may sit on the owned surface.
 - Allowed geometry: native instanced trees, rocks, bushes, understory masses, cabin/dock props only where destination zones allow.
 - Forbidden geometry: trees in water, trees on island/sandbar unless hand-authored later, debug triangles, unvalidated asset clones.
 - Placement rule: candidates must pass mainland forest/shore helpers and keep water clearance; dock/cove openings stay navigable.
 - Material/color rules: varied but muted greens, richer forest floor inland, no neon patches or black crush.
-- Known current issues: density and shape are baseline only after Phase 73 cleanup.
+- Known current issues: Phase 80 aligns the forest ground helper to the visible shelf elevations to avoid exposed seams.
 - Next-pass opportunity: rebuild scenic density zone-by-zone once the mountain backdrop is stable.
 
 ## Zone 5 - Far Forest Wall
 
+- Visible ground owner: `createShoreline()` outer land ring; forest mass is owned by `forestSystem`.
+- Expected elevation: `2.24 -> 2.42+`.
+- Overlap: canopy/tree instances only; no opaque terrain overlay, reflection plane, or hidden scenic layer.
 - Allowed geometry: dense native instanced silhouette trees and canopy mass on validated far mainland forest shelf.
 - Forbidden geometry: transparent reflection strips, billboard panes crossing water, unvalidated 80k instance experiments, forest walls in the lake.
 - Placement rule: behind near/mid shelf and in front of mountains; must never overlap water or shoreline.
@@ -89,11 +103,11 @@ Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle:
 - Known current issues: sky is good enough for the cleanup baseline.
 - Next-pass opportunity: later tune only after terrain/forest composition stops lying.
 
-## Phase 79 Mountain Harness Summary
+## Phase 80 Mountain Harness Summary
 
 - Active visual modes: `Native Baseline` and `No Mountains / Zone Proof`.
-- `V` behavior: toggles native mountains on/off for zone proof. Because Phase 79 has no valid replacement experiment loaded, Debug and toasts report `No valid mountain experiment loaded - baseline/zone proof only.`
+- `V` behavior: toggles native mountains on/off for zone proof. Because Phase 80 has a ready but empty experiment slot, Debug and toasts report `Zone 6 experiment slot ready - no valid mountain art loaded.`
 - Native owner: `src/scene/terrainSystem.ts` owns `Far HashLake ridge` and `Mid HashLake ridge`.
-- Experiment owner: `src/scene/zone6MountainExperiment.ts` owns an empty, non-rendering experiment slot until a future experiment passes all gates.
-- Validity: Debug reports mountain owner, native mountain visibility, experiment mountain visibility, zone proof state, bounds, active back arc, side fadeout, invalid vertices, foothill anchor, base seated, grounded yes/no, floating gap yes/no, bottom silhouette, forest occlusion, stage order, artifact check, camera check, lake overlap, second-lake risk, pane/banner risk, and invalid reason.
+- Experiment owner: `src/scene/zone6MountainExperiment.ts` owns an empty, non-rendering experiment slot until a future experiment passes all gates. Debug separates `Experiment slot` from `Experiment art valid`.
+- Validity: Debug reports mountain owner, native mountain visibility, experiment mountain visibility, zone proof state, slot readiness, bounds, active back arc, side fadeout, invalid vertices, foothill anchor, base seated, grounded yes/no, floating gap yes/no, bottom silhouette, forest occlusion, stage order, artifact check, camera check, lake overlap, second-lake risk, pane/banner risk, and invalid reason.
 - WebGPU scenic: quarantined; not part of the active mode contract and never activated by `V`.

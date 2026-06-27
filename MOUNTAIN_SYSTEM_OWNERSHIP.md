@@ -1,4 +1,4 @@
-# Phase 79 Mountain System Ownership
+# Phase 80 Mountain System Ownership
 
 Date: 2026-06-27
 
@@ -14,7 +14,7 @@ This document is the current contract for HashLake mountain rendering. It exists
 - When `V` was off, the native terrain rings rendered unless a scenic GLB asset hid them.
 - When `V` was on and the experiment reported valid, the experiment rendered and native terrain was hidden.
 - The Phase 78 experiment is visually invalid because it can appear as a floating, detached mountain object with a visible underside/skirt from the user proof angles.
-- WebGPU scenic code and older scenic asset loaders are not valid mountain owners for Phase 79. They must not be activated by `V`.
+- WebGPU scenic code and older scenic asset loaders are not valid mountain owners for Phase 80. They must not be activated by `V`.
 
 ## Ownership Contract
 
@@ -45,7 +45,7 @@ This mode exists to prove what the lake, forest, shore, and sky look like with m
 
 `zone6MountainExperiment` is the only allowed future experiment owner.
 
-For Phase 79 there is no valid experiment loaded. The experiment slot must remain empty, non-rendering, non-updating, and invalid in Debug.
+For Phase 80 there is a ready Zone 6 experiment slot, but no valid experiment art is loaded. The slot must remain empty, non-rendering, non-updating, and the art must remain invalid in Debug.
 
 A future experiment is allowed only if it passes the Zone 6 gates:
 
@@ -61,12 +61,12 @@ A future experiment is allowed only if it passes the Zone 6 gates:
 
 `V` is a diagnostic truth toggle, not an art toggle.
 
-Current Phase 79 states:
+Current Phase 80 states:
 
 1. Native Baseline Mountains
 2. No Mountains / Zone Proof View
 
-Because no valid experiment exists, `V` must show: `No valid mountain experiment loaded - baseline/zone proof only.`
+Because no valid experiment art exists, `V` must show: `Zone 6 experiment slot ready - no valid mountain art loaded.`
 
 If a future valid experiment exists, `V` may cycle:
 
@@ -99,4 +99,3 @@ Forbidden:
 - second lake artifacts
 - glass panes or banner strips
 - mountains intersecting water, shore, raised bank, or forest shelves
-

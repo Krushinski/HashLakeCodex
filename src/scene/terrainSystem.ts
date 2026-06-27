@@ -65,11 +65,11 @@ const buildRidgeRing = ({
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
     const rearAlignment = Math.cos(angleDiff(theta, viewTheta));
-    const rearArc = smoothstep(-0.04, 0.74, rearAlignment);
+    const rearArc = smoothstep(-0.04, 0.72, rearAlignment);
     const shoulderArc = smoothstep(-0.42, 0.32, rearAlignment);
     const heightMask = hero
-      ? 0.08 + rearArc * 0.92
-      : 0.08 + shoulderArc * 0.18 + rearArc * 0.74;
+      ? 0.09 + rearArc * 0.98
+      : 0.09 + shoulderArc * 0.15 + rearArc * 0.78;
     let ridge =
       noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 4) * 0.9 + 0.55;
     ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.92 : 1.68);
@@ -238,7 +238,7 @@ export const createTerrainSystem = (): TerrainSystem => {
       rInner: 1040,
       rOuter: 1820,
       peakMin: 170,
-      peakMax: 520,
+      peakMax: 548,
       seed: 21,
       ridgeFrequency: 2.4,
       hero: true,
@@ -250,7 +250,7 @@ export const createTerrainSystem = (): TerrainSystem => {
       rInner: 820,
       rOuter: 1220,
       peakMin: 54,
-      peakMax: 210,
+      peakMax: 222,
       seed: 53,
       ridgeFrequency: 3.1,
       hero: false,

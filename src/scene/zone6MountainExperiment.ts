@@ -14,7 +14,7 @@ export type Zone6MountainExperimentSystem = {
 };
 
 export const NO_VALID_MOUNTAIN_EXPERIMENT_REASON =
-  "No valid mountain experiment loaded - baseline/zone proof only.";
+  "Zone 6 experiment slot ready - no valid mountain art loaded.";
 
 const EMPTY_EXPERIMENT_AUDIT: MountainVisualValidationAudit = {
   vertexCount: 0,
@@ -59,4 +59,3 @@ export const createZone6MountainExperimentSystem =
       getTelemetry,
     };
   };
-

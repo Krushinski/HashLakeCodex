@@ -203,6 +203,7 @@ type VisualModeTelemetry = {
   experimentMountainsVisible: boolean;
   zoneProofActive: boolean;
   mountainZone: string;
+  mountainExperimentSlotReady: boolean;
   mountainExperimentAvailable: boolean;
   mountainExperimentActive: boolean;
   mountainExperimentReason: string;
@@ -820,6 +821,7 @@ export const createHashlakeScene = ({
       experimentMountainsVisible,
       zoneProofActive,
       mountainZone: mountainHarness.zoneLabel,
+      mountainExperimentSlotReady: mountainHarness.experimentSlotReady,
       mountainExperimentAvailable: mountainHarness.experimentAvailable,
       mountainExperimentActive: experimentMountainsVisible,
       mountainExperimentReason: mountainHarness.reason,
@@ -1000,7 +1002,9 @@ export const createHashlakeScene = ({
     animateWater(water, elapsed, weather, driveState, camera);
     animateShoreline(shoreline, elapsed, weather);
     terrainSystem.update(weather, camera);
-    mountainExperimentSystem.update(weather, camera);
+    if (mountainTruthMode === "experiment") {
+      mountainExperimentSystem.update(weather, camera);
+    }
     if (elapsed - lastForestUpdateAt >= qualityState.forestUpdateInterval) {
       forestSystem.update(elapsed, weather);
       lastForestUpdateAt = elapsed;
@@ -2103,26 +2107,37 @@ const createSlopedStripGeometry = (
     colors.push(tone, tone * (0.985 + bandT * 0.018), tone * (0.92 + elevation * 0.045));
   };
 
+  const getSharedBoundaryNoise = (
+    point: { x: number; z: number },
+    boundaryY: number,
+  ) => {
+    if (wobble <= 0) {
+      return 0;
+    }
+    const elevationKey = Math.round(boundaryY * 1000) * 0.001;
+    const broad =
+      Math.sin(point.x * 0.018 + point.z * 0.013 + elevationKey * 7.1) +
+      Math.cos(point.x * -0.011 + point.z * 0.024 + elevationKey * 5.3) * 0.42;
+    const fine =
+      Math.sin(point.x * 0.041 - point.z * 0.029 + elevationKey * 3.7) * 0.18;
+    return (broad + fine) * wobble;
+  };
+
   for (let index = 0; index < count; index += 1) {
-    const t = index / count;
-    const innerNoise =
-      (Math.sin(t * Math.PI * 12.0 + seed * 0.31) +
-        Math.sin(t * Math.PI * 27.0 + seed * 0.17) * 0.35) *
-      wobble;
-    const outerNoise =
-      (Math.sin(t * Math.PI * 10.0 + seed * 0.23) +
-        Math.cos(t * Math.PI * 24.0 + seed * 0.19) * 0.28) *
-      wobble;
+    const innerPoint = inner[index];
+    const outerPoint = outer[index];
+    const innerNoise = getSharedBoundaryNoise(innerPoint, innerY);
+    const outerNoise = getSharedBoundaryNoise(outerPoint, outerY);
     positions.push(
-      inner[index].x,
+      innerPoint.x,
       innerY + innerNoise,
-      inner[index].z,
-      outer[index].x,
+      innerPoint.z,
+      outerPoint.x,
       outerY + outerNoise,
-      outer[index].z,
+      outerPoint.z,
     );
-    pushTone(inner[index], 0, innerY + innerNoise);
-    pushTone(outer[index], 1, outerY + outerNoise);
+    pushTone(innerPoint, 0, innerY + innerNoise);
+    pushTone(outerPoint, 1, outerY + outerNoise);
   }
 
   for (let index = 0; index < count; index += 1) {
@@ -2274,7 +2289,7 @@ const createShoreline = () => {
     dark: 0x4c513a,
     color: 0xfff7de,
     roughness: 0.96,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
   const bankToeMaterial = makeTexturedStandardMaterial({
     kind: "grass",
@@ -2285,7 +2300,7 @@ const createShoreline = () => {
     dark: 0x2c4634,
     color: 0xeef5dc,
     roughness: 0.93,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
   const grassTransitionMaterial = makeTexturedStandardMaterial({
     kind: "grass",
@@ -2296,7 +2311,7 @@ const createShoreline = () => {
     dark: 0x2b4431,
     color: 0xe8f0d8,
     roughness: 0.92,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
   const bankMaterial = makeTexturedStandardMaterial({
     kind: "grass",
@@ -2307,7 +2322,7 @@ const createShoreline = () => {
     dark: 0x213329,
     color: 0xdde7d1,
     roughness: 0.94,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
   const forestShelfMaterial = makeTexturedStandardMaterial({
     kind: "forestFloor",
@@ -2318,7 +2333,7 @@ const createShoreline = () => {
     dark: 0x0b1d12,
     color: 0xd4dec9,
     roughness: 0.98,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
   const landMaterial = makeTexturedStandardMaterial({
     kind: "forestFloor",
@@ -2329,7 +2344,7 @@ const createShoreline = () => {
     dark: 0x07140d,
     color: 0xd0dcc7,
     roughness: 1,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
   const midForestMaterial = makeTexturedStandardMaterial({
     kind: "forestFloor",
@@ -2340,7 +2355,7 @@ const createShoreline = () => {
     dark: 0x08180f,
     color: 0xd2deca,
     roughness: 0.98,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
   const landInner = getExpandedOutline(ZONE_TRUTH.forestShelfOuter);
   [
@@ -2358,10 +2373,10 @@ const createShoreline = () => {
     createSlopedStripGeometry(
       landInner,
       createRadialBoundary(landInner, LAKE_MAP.worldRadius),
-      1.96,
-      2.38,
+      2.24,
+      2.42,
       22,
-      0.018,
+      0.014,
     ),
     landMaterial,
   );
@@ -2397,7 +2412,7 @@ const createShoreline = () => {
   group.add(raisedBank);
 
   const forestShelf = new THREE.Mesh(
-    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.48, 1.90, 37, 0.012),
+    createSlopedStripGeometry(getExpandedOutline(ZONE_TRUTH.forestShelfInner), getExpandedOutline(214), 1.44, 1.90, 37, 0.012),
     forestShelfMaterial,
   );
   forestShelf.receiveShadow = true;

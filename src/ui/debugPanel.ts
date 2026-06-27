@@ -56,6 +56,7 @@ type VisualModeTelemetry = {
   experimentMountainsVisible: boolean;
   zoneProofActive: boolean;
   mountainZone: string;
+  mountainExperimentSlotReady: boolean;
   mountainExperimentAvailable: boolean;
   mountainExperimentActive: boolean;
   mountainExperimentReason: string;
@@ -171,7 +172,8 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Experiment mountains", value: "no", tone: "muted" },
   { group: "global", label: "Zone proof", value: "no", tone: "muted" },
   { group: "global", label: "Mountain zone", value: "Zone 6", tone: "good" },
-  { group: "global", label: "Experiment valid", value: "yes", tone: "good" },
+  { group: "global", label: "Experiment slot", value: "ready", tone: "good" },
+  { group: "global", label: "Experiment art valid", value: "no", tone: "bad" },
   { group: "global", label: "Invalid reason", value: "--", tone: "muted" },
   { group: "global", label: "Mountain verts", value: "0", tone: "muted" },
   { group: "global", label: "Back arc", value: "valid", tone: "good" },
@@ -1217,7 +1219,12 @@ export const createDebugPanel = (
     );
     setMetric("Mountain zone", telemetry.visualMode.mountainZone, "good");
     setMetric(
-      "Experiment valid",
+      "Experiment slot",
+      telemetry.visualMode.mountainExperimentSlotReady ? "ready" : "not ready",
+      telemetry.visualMode.mountainExperimentSlotReady ? "good" : "bad",
+    );
+    setMetric(
+      "Experiment art valid",
       telemetry.visualMode.mountainExperimentValid ? "yes" : "no",
       telemetry.visualMode.mountainExperimentValid ? "good" : "bad",
     );
