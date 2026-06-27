@@ -1,4 +1,4 @@
-# Phase 78 Current Zone Map
+# Phase 79 Current Zone Map
 
 Date: 2026-06-27
 
@@ -23,7 +23,7 @@ Date: 2026-06-27
 | 6 | Mountain Backdrop / Back Arc | Grounded rear mountains only. Behind Zone 5 and outside the lake play area. |
 | 7 | Sky / Clouds | Sky dome, clouds, sun/moon, storm atmosphere. |
 
-Debug and Legend both expose the Zone 6 relationship. `V` is a safe compare tool: it can show only the native baseline or the grounded Zone 6 Mountain Experiment V2 after placement, grounding, occlusion, artifact, and camera checks pass.
+Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
 ## Zone 1 - Water / Lake
 
@@ -70,15 +70,15 @@ Debug and Legend both expose the Zone 6 relationship. `V` is a safe compare tool
 - Known current issues: can look sparse or toy-like, but must stay real geometry.
 - Next-pass opportunity: future forest massing can be rebuilt here after the mountain back-arc is safe.
 
-## Zone 6 - Mountain Backdrop Ring / Back Arc
+## Zone 6 - Mountain Backdrop / Back Arc
 
-- Allowed geometry: distant terrain meshes inside `MOUNTAIN_BACK_ARC_ZONE` from `src/scene/mountainPlacementHarness.ts`, behind the far forest wall, with a visible foothill/base connection. Phase 78 adds a removable native V2 experiment built from a Zone 6a foothill anchor and Zone 6b ridgelines.
+- Allowed geometry: distant rear-arc terrain behind the far forest wall, with side fadeouts and visible foothill/base connection. Baseline mountains are owned by `src/scene/terrainSystem.ts`; future experiments must fit `MOUNTAIN_BACK_ARC_ZONE` from `src/scene/mountainPlacementHarness.ts`.
 - Forbidden geometry: vertical glass panes, terrain walls, horizontal pale bands, snow slabs floating over trees, zeppelin/blob undersides, visible sky gaps under mountain bases, any mesh intersecting water/shore/bank/forest shelf.
 - Placement rule: back-arc bounds are x `1520..2240`, z `-680..680`, y `0.75..315`, with mandatory side fadeouts and generated-vertex auditing. The back arc must remain beyond `LAKE_MAP.mapBounds.maxX + 620`, behind the visible far forest wall used by the main Drive and Helicopter views.
 - Grounding rule: a valid experiment needs a foothill anchor, no floating gap, no long flat bottom silhouette, far-forest occlusion at the base, proven stage order, artifact-free checks, and camera proof from Helicopter/Drive/OJ views.
 - Material/color rules: alpine rock/green/snow only on terrain surfaces; no flat single-pane material strips.
-- Known current issues: Phase 66-73 experiments caused false second lake, glass-pane mountains, and banner strips. Phase 75 proved the seam fix but made the V experiment too wide. Phase 76 fixed horizontal containment but falsely marked a floating mountain blob as valid. Phase 77 made that impossible by failing closed.
-- Next-pass opportunity: improve the V2 ridgeline art only if it continues to pass the full grounded validator.
+- Known current issues: Phase 66-73 experiments caused false second lake, glass-pane mountains, and banner strips. Phase 75 proved the seam fix but made the V experiment too wide. Phase 76 fixed horizontal containment but falsely marked a floating mountain blob as valid. Phase 77/78 still left a floating experiment reachable through `V`, so Phase 79 disables it completely.
+- Next-pass opportunity: build a small replacement experiment only after baseline/zone-proof ownership is stable and the proof angles show no floating objects.
 
 ## Zone 7 - Sky / Clouds
 
@@ -89,9 +89,11 @@ Debug and Legend both expose the Zone 6 relationship. `V` is a safe compare tool
 - Known current issues: sky is good enough for the cleanup baseline.
 - Next-pass opportunity: later tune only after terrain/forest composition stops lying.
 
-## Phase 78 Mountain Harness Summary
+## Phase 79 Mountain Harness Summary
 
-- Active visual modes: `Native Baseline` and `Mountain Experiment` when V2 validates.
-- `V` behavior: toggles the isolated Zone 6 Mountain Experiment V2. Invalid experiments fall back to native baseline and report `Mountain experiment invalid - baseline active`.
-- Validity: Debug reports bounds, active back arc, side fadeout, invalid vertices, foothill anchor, base seated, grounded yes/no, floating gap yes/no, bottom silhouette, forest occlusion, stage order, artifact check, camera check, lake overlap, second-lake risk, pane/banner risk, and invalid reason.
-- WebGPU scenic: quarantined; not part of the active mode contract.
+- Active visual modes: `Native Baseline` and `No Mountains / Zone Proof`.
+- `V` behavior: toggles native mountains on/off for zone proof. Because Phase 79 has no valid replacement experiment loaded, Debug and toasts report `No valid mountain experiment loaded - baseline/zone proof only.`
+- Native owner: `src/scene/terrainSystem.ts` owns `Far HashLake ridge` and `Mid HashLake ridge`.
+- Experiment owner: `src/scene/zone6MountainExperiment.ts` owns an empty, non-rendering experiment slot until a future experiment passes all gates.
+- Validity: Debug reports mountain owner, native mountain visibility, experiment mountain visibility, zone proof state, bounds, active back arc, side fadeout, invalid vertices, foothill anchor, base seated, grounded yes/no, floating gap yes/no, bottom silhouette, forest occlusion, stage order, artifact check, camera check, lake overlap, second-lake risk, pane/banner risk, and invalid reason.
+- WebGPU scenic: quarantined; not part of the active mode contract and never activated by `V`.

@@ -150,6 +150,7 @@ export const getMountainPlacementHarnessTelemetry = ({
     !validation.glassPaneArtifact;
   const nextExperimentActive = experimentActive && experimentValid;
   const invalidReasons = [
+    validation.invalidReason ?? "",
     !backArcValid ? "Zone 6 bounds invalid" : "",
     !sideFadeoutActive ? "side fadeout invalid" : "",
     validation.invalidVertexCount > 0
@@ -166,7 +167,6 @@ export const getMountainPlacementHarnessTelemetry = ({
     validation.lakeShoreOverlap ? "lake/shore overlap" : "",
     validation.secondLakeArtifact ? "second-lake artifact risk" : "",
     validation.glassPaneArtifact ? "glass-pane/banner artifact risk" : "",
-    validation.invalidReason ?? "",
   ].filter(Boolean);
   const invalidReason = experimentValid ? "" : invalidReasons[0] ?? "invalid";
   return {

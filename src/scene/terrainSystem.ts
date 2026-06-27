@@ -14,7 +14,14 @@ export type TerrainSystem = {
   update: (weather: WeatherSnapshot, camera: THREE.PerspectiveCamera) => void;
   getStats: () => TerrainStats;
   setScenicBackdropActive: (active: boolean) => void;
-  setMountainExperimentActive: (active: boolean) => void;
+  setNativeMountainsSuppressed: (active: boolean) => void;
+};
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const smoothstep = (edge0: number, edge1: number, value: number) => {
+  const x = clamp01((value - edge0) / (edge1 - edge0));
+  return x * x * (3 - 2 * x);
 };
 
 const angleDiff = (a: number, b: number) => {
@@ -57,6 +64,12 @@ const buildRidgeRing = ({
     const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
+    const rearAlignment = Math.cos(angleDiff(theta, viewTheta));
+    const rearArc = smoothstep(-0.04, 0.74, rearAlignment);
+    const shoulderArc = smoothstep(-0.42, 0.32, rearAlignment);
+    const heightMask = hero
+      ? 0.08 + rearArc * 0.92
+      : 0.08 + shoulderArc * 0.18 + rearArc * 0.74;
     let ridge =
       noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 4) * 0.9 + 0.55;
     ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.92 : 1.68);
@@ -73,7 +86,7 @@ const buildRidgeRing = ({
       ridge = Math.min(ridge, 1.35);
     }
 
-    const peakHeight = peakMin + (peakMax - peakMin) * ridge;
+    const peakHeight = (peakMin + (peakMax - peakMin) * ridge) * heightMask;
     for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
       const radial = radialIndex / radialSegments;
       const radius = rInner + (rOuter - rInner) * radial;
@@ -250,7 +263,7 @@ export const createTerrainSystem = (): TerrainSystem => {
   mid.frustumCulled = false;
   group.add(far, mid);
   let scenicBackdropActive = false;
-  let mountainExperimentActive = false;
+  let nativeMountainsSuppressed = false;
 
   const vertexCount =
     far.geometry.attributes.position.count +
@@ -259,7 +272,7 @@ export const createTerrainSystem = (): TerrainSystem => {
   return {
     group,
     update: (weather, camera) => {
-      const nativeVisible = !scenicBackdropActive && !mountainExperimentActive;
+      const nativeVisible = !scenicBackdropActive && !nativeMountainsSuppressed;
       far.visible = nativeVisible;
       mid.visible = nativeVisible;
       const palette = getWeatherPalette(weather.stormIndex);
@@ -279,15 +292,15 @@ export const createTerrainSystem = (): TerrainSystem => {
       shared.dark.value = weather.dials.skyDark;
     },
     getStats: () => ({
-      mountainVertices: scenicBackdropActive || mountainExperimentActive ? 0 : vertexCount,
+      mountainVertices: scenicBackdropActive || nativeMountainsSuppressed ? 0 : vertexCount,
       reflectionEnabled: false,
       postEnabled: true,
     }),
     setScenicBackdropActive: (active) => {
       scenicBackdropActive = active;
     },
-    setMountainExperimentActive: (active) => {
-      mountainExperimentActive = active;
+    setNativeMountainsSuppressed: (active) => {
+      nativeMountainsSuppressed = active;
     },
   };
 };

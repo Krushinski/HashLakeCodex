@@ -50,7 +50,11 @@ type MetricTile = {
 
 type VisualModeTelemetry = {
   renderer: RendererCapabilityTelemetry;
-  activeMode: "Native Baseline" | "Mountain Experiment";
+  activeMode: "Native Baseline" | "No Mountains / Zone Proof" | "Mountain Experiment";
+  mountainOwner: string;
+  nativeMountainsVisible: boolean;
+  experimentMountainsVisible: boolean;
+  zoneProofActive: boolean;
   mountainZone: string;
   mountainExperimentAvailable: boolean;
   mountainExperimentActive: boolean;
@@ -161,7 +165,11 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "Pixel ratio", value: "1.00" },
   { group: "global", label: "Render scale", value: "1.00" },
   { group: "global", label: "Visual mode", value: "Native Baseline", tone: "good" },
-  { group: "global", label: "V compare", value: "unavailable", tone: "muted" },
+  { group: "global", label: "V state", value: "native", tone: "good" },
+  { group: "global", label: "Mountain owner", value: "terrainSystem", tone: "good" },
+  { group: "global", label: "Native mountains", value: "yes", tone: "good" },
+  { group: "global", label: "Experiment mountains", value: "no", tone: "muted" },
+  { group: "global", label: "Zone proof", value: "no", tone: "muted" },
   { group: "global", label: "Mountain zone", value: "Zone 6", tone: "good" },
   { group: "global", label: "Experiment valid", value: "yes", tone: "good" },
   { group: "global", label: "Invalid reason", value: "--", tone: "muted" },
@@ -562,7 +570,7 @@ const renderTemplate = () => `
         <button type="button" data-debug-action="perf-stress">Perf Stress</button>
         <button type="button" data-debug-action="toast-block">Toast Block</button>
         <button type="button" data-debug-action="toast-stale">Toast Stale</button>
-        <button type="button" data-debug-action="native-mountain-compare">V Compare</button>
+        <button type="button" data-debug-action="native-mountain-compare">V Truth</button>
         <button type="button" data-debug-action="gust">Gust</button>
         <button type="button" data-debug-action="stale">Stale Fog</button>
         <button type="button" data-debug-action="resume">Resume Live</button>
@@ -1179,17 +1187,33 @@ export const createDebugPanel = (
       telemetry.visualMode.heavyScenicActive ? "warn" : "good",
     );
     setMetric(
-      "V compare",
-      telemetry.visualMode.mountainExperimentAvailable
-        ? telemetry.visualMode.mountainExperimentActive
-          ? "active"
-          : "available"
-        : "unavailable",
-      telemetry.visualMode.mountainExperimentActive
-        ? "good"
-        : telemetry.visualMode.mountainExperimentAvailable
-          ? "muted"
-          : "muted",
+      "V state",
+      telemetry.visualMode.zoneProofActive
+        ? "zone proof"
+        : telemetry.visualMode.experimentMountainsVisible
+          ? "experiment"
+          : "native",
+      telemetry.visualMode.zoneProofActive ? "warn" : "good",
+    );
+    setMetric(
+      "Mountain owner",
+      telemetry.visualMode.mountainOwner,
+      telemetry.visualMode.zoneProofActive ? "warn" : "good",
+    );
+    setMetric(
+      "Native mountains",
+      telemetry.visualMode.nativeMountainsVisible ? "yes" : "no",
+      telemetry.visualMode.nativeMountainsVisible ? "good" : "muted",
+    );
+    setMetric(
+      "Experiment mountains",
+      telemetry.visualMode.experimentMountainsVisible ? "yes" : "no",
+      telemetry.visualMode.experimentMountainsVisible ? "good" : "muted",
+    );
+    setMetric(
+      "Zone proof",
+      telemetry.visualMode.zoneProofActive ? "yes" : "no",
+      telemetry.visualMode.zoneProofActive ? "warn" : "muted",
     );
     setMetric("Mountain zone", telemetry.visualMode.mountainZone, "good");
     setMetric(
