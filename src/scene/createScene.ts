@@ -205,6 +205,13 @@ type VisualModeTelemetry = {
   mountainBackArcActive: boolean;
   mountainSideFadeoutActive: boolean;
   mountainInvalidVertexCount: number;
+  mountainGrounded: boolean;
+  mountainFloatingGapDetected: boolean;
+  mountainBottomSilhouetteValid: boolean;
+  mountainForestOcclusionValid: boolean;
+  mountainStageOrderValid: boolean;
+  mountainArtifactFree: boolean;
+  mountainCameraCheckValid: boolean;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
   waterMeshCount: number;
@@ -792,6 +799,13 @@ export const createHashlakeScene = ({
       mountainBackArcActive: mountainHarness.backArcActive,
       mountainSideFadeoutActive: mountainHarness.sideFadeoutActive,
       mountainInvalidVertexCount: mountainHarness.invalidVertexCount,
+      mountainGrounded: mountainHarness.grounded,
+      mountainFloatingGapDetected: mountainHarness.floatingGapDetected,
+      mountainBottomSilhouetteValid: mountainHarness.bottomSilhouetteValid,
+      mountainForestOcclusionValid: mountainHarness.forestOcclusionValid,
+      mountainStageOrderValid: mountainHarness.stageOrderValid,
+      mountainArtifactFree: mountainHarness.artifactFree,
+      mountainCameraCheckValid: mountainHarness.cameraCheckValid,
       webGpuProbeActive: false,
       heavyScenicActive: false,
       waterMeshCount: 1,

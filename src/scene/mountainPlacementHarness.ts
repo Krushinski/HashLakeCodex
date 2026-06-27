@@ -5,12 +5,33 @@ export type MountainPlacementHarnessTelemetry = {
   experimentActive: boolean;
   experimentValid: boolean;
   reason: string;
+  invalidReason: string;
   zoneLabel: string;
   mountainVertices: number;
   backArcValid: boolean;
   backArcActive: boolean;
   sideFadeoutActive: boolean;
   invalidVertexCount: number;
+  grounded: boolean;
+  floatingGapDetected: boolean;
+  bottomSilhouetteValid: boolean;
+  forestOcclusionValid: boolean;
+  stageOrderValid: boolean;
+  artifactFree: boolean;
+  cameraCheckValid: boolean;
+};
+
+export type MountainVisualValidationAudit = {
+  vertexCount: number;
+  invalidVertexCount: number;
+  hasFoothillAnchor: boolean;
+  floatingGapDetected: boolean;
+  bottomSilhouetteValid: boolean;
+  forestOcclusionValid: boolean;
+  stageOrderValid: boolean;
+  artifactFree: boolean;
+  cameraCheckValid: boolean;
+  invalidReason?: string;
 };
 
 export const MOUNTAIN_BACK_ARC_ZONE = {
@@ -63,36 +84,86 @@ export const auditMountainBackArcVertices = (positions: ArrayLike<number>) => {
   };
 };
 
+const getDefaultInvalidAudit = (): MountainVisualValidationAudit => ({
+  vertexCount: 0,
+  invalidVertexCount: 0,
+  hasFoothillAnchor: false,
+  floatingGapDetected: true,
+  bottomSilhouetteValid: false,
+  forestOcclusionValid: false,
+  stageOrderValid: false,
+  artifactFree: false,
+  cameraCheckValid: false,
+  invalidReason: "No grounded foothill-anchored Zone 6 experiment exists",
+});
+
 export const getMountainPlacementHarnessTelemetry = ({
   experimentActive = false,
   mountainVertices = 0,
   invalidVertexCount = 0,
+  audit,
 }: {
   experimentActive?: boolean;
   mountainVertices?: number;
   invalidVertexCount?: number;
+  audit?: Partial<MountainVisualValidationAudit>;
 } = {}): MountainPlacementHarnessTelemetry => {
   const backArcValid = validateMountainBackArc();
   const sideFadeoutActive =
     MOUNTAIN_BACK_ARC_ZONE.sideFadeWidth > 0 &&
     MOUNTAIN_BACK_ARC_ZONE.sideFadeWidth * 2 <
       MOUNTAIN_BACK_ARC_ZONE.zMax - MOUNTAIN_BACK_ARC_ZONE.zMin;
-  const experimentValid = backArcValid && sideFadeoutActive && invalidVertexCount === 0;
+  const validation = {
+    ...getDefaultInvalidAudit(),
+    ...audit,
+    invalidVertexCount: audit?.invalidVertexCount ?? invalidVertexCount,
+  };
+  const grounded = validation.hasFoothillAnchor && !validation.floatingGapDetected;
+  const experimentValid =
+    backArcValid &&
+    sideFadeoutActive &&
+    validation.invalidVertexCount === 0 &&
+    grounded &&
+    validation.bottomSilhouetteValid &&
+    validation.forestOcclusionValid &&
+    validation.stageOrderValid &&
+    validation.artifactFree &&
+    validation.cameraCheckValid;
   const nextExperimentActive = experimentActive && experimentValid;
+  const invalidReasons = [
+    !backArcValid ? "Zone 6 bounds invalid" : "",
+    !sideFadeoutActive ? "side fadeout invalid" : "",
+    validation.invalidVertexCount > 0
+      ? `vertex audit failed (${validation.invalidVertexCount})`
+      : "",
+    !validation.hasFoothillAnchor ? "missing foothill anchor" : "",
+    validation.floatingGapDetected ? "floating gap under mountain base" : "",
+    !validation.bottomSilhouetteValid ? "flat/floating bottom silhouette" : "",
+    !validation.forestOcclusionValid ? "far forest does not occlude base" : "",
+    !validation.stageOrderValid ? "scene stage order not proven" : "",
+    !validation.artifactFree ? "artifact check failed" : "",
+    !validation.cameraCheckValid ? "camera proof not approved" : "",
+    validation.invalidReason ?? "",
+  ].filter(Boolean);
+  const invalidReason = experimentValid ? "" : invalidReasons[0] ?? "invalid";
   return {
     experimentAvailable: experimentValid,
     experimentActive: nextExperimentActive,
     experimentValid,
-    reason: experimentValid
-      ? "Zone 6 back-arc harness valid"
-      : invalidVertexCount > 0
-        ? `Zone 6 vertex audit failed (${invalidVertexCount})`
-      : "Zone 6 back-arc harness invalid",
+    reason: experimentValid ? "Grounded Zone 6 mountain experiment valid" : invalidReason,
+    invalidReason,
     zoneLabel: "Zone 6 Mountain Backdrop / Back Arc",
     mountainVertices: nextExperimentActive ? mountainVertices : 0,
     backArcValid,
     backArcActive: nextExperimentActive,
     sideFadeoutActive,
-    invalidVertexCount,
+    invalidVertexCount: validation.invalidVertexCount,
+    grounded,
+    floatingGapDetected: validation.floatingGapDetected,
+    bottomSilhouetteValid: validation.bottomSilhouetteValid,
+    forestOcclusionValid: validation.forestOcclusionValid,
+    stageOrderValid: validation.stageOrderValid,
+    artifactFree: validation.artifactFree,
+    cameraCheckValid: validation.cameraCheckValid,
   };
 };

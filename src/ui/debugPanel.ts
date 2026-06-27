@@ -61,6 +61,13 @@ type VisualModeTelemetry = {
   mountainBackArcActive: boolean;
   mountainSideFadeoutActive: boolean;
   mountainInvalidVertexCount: number;
+  mountainGrounded: boolean;
+  mountainFloatingGapDetected: boolean;
+  mountainBottomSilhouetteValid: boolean;
+  mountainForestOcclusionValid: boolean;
+  mountainStageOrderValid: boolean;
+  mountainArtifactFree: boolean;
+  mountainCameraCheckValid: boolean;
   webGpuProbeActive: boolean;
   heavyScenicActive: boolean;
   waterMeshCount: number;
@@ -152,11 +159,19 @@ const metricTiles: MetricTile[] = [
   { group: "global", label: "V compare", value: "unavailable", tone: "muted" },
   { group: "global", label: "Mountain zone", value: "Zone 6", tone: "good" },
   { group: "global", label: "Experiment valid", value: "yes", tone: "good" },
+  { group: "global", label: "Invalid reason", value: "--", tone: "muted" },
   { group: "global", label: "Mountain verts", value: "0", tone: "muted" },
   { group: "global", label: "Back arc", value: "valid", tone: "good" },
   { group: "global", label: "Back arc active", value: "no", tone: "muted" },
   { group: "global", label: "Side fadeout", value: "yes", tone: "good" },
   { group: "global", label: "Invalid verts", value: "0", tone: "good" },
+  { group: "global", label: "Grounded", value: "no", tone: "bad" },
+  { group: "global", label: "Floating gap", value: "yes", tone: "bad" },
+  { group: "global", label: "Bottom silhouette", value: "invalid", tone: "bad" },
+  { group: "global", label: "Forest occlusion", value: "no", tone: "bad" },
+  { group: "global", label: "Stage order", value: "unproven", tone: "warn" },
+  { group: "global", label: "Artifact check", value: "failed", tone: "bad" },
+  { group: "global", label: "Camera check", value: "unproven", tone: "warn" },
   { group: "global", label: "WebGPU probe", value: "idle", tone: "muted" },
   { group: "global", label: "Heavy scenic", value: "off", tone: "good" },
   { group: "global", label: "Water meshes", value: "1", tone: "good" },
@@ -1173,6 +1188,13 @@ export const createDebugPanel = (
       telemetry.visualMode.mountainExperimentValid ? "good" : "bad",
     );
     setMetric(
+      "Invalid reason",
+      telemetry.visualMode.mountainExperimentValid
+        ? "--"
+        : telemetry.visualMode.mountainExperimentReason,
+      telemetry.visualMode.mountainExperimentValid ? "muted" : "bad",
+    );
+    setMetric(
       "Mountain verts",
       String(telemetry.visualMode.mountainExperimentVertices),
       telemetry.visualMode.mountainExperimentActive ? "good" : "muted",
@@ -1196,6 +1218,41 @@ export const createDebugPanel = (
       "Invalid verts",
       String(telemetry.visualMode.mountainInvalidVertexCount),
       telemetry.visualMode.mountainInvalidVertexCount === 0 ? "good" : "bad",
+    );
+    setMetric(
+      "Grounded",
+      telemetry.visualMode.mountainGrounded ? "yes" : "no",
+      telemetry.visualMode.mountainGrounded ? "good" : "bad",
+    );
+    setMetric(
+      "Floating gap",
+      telemetry.visualMode.mountainFloatingGapDetected ? "yes" : "no",
+      telemetry.visualMode.mountainFloatingGapDetected ? "bad" : "good",
+    );
+    setMetric(
+      "Bottom silhouette",
+      telemetry.visualMode.mountainBottomSilhouetteValid ? "valid" : "invalid",
+      telemetry.visualMode.mountainBottomSilhouetteValid ? "good" : "bad",
+    );
+    setMetric(
+      "Forest occlusion",
+      telemetry.visualMode.mountainForestOcclusionValid ? "yes" : "no",
+      telemetry.visualMode.mountainForestOcclusionValid ? "good" : "bad",
+    );
+    setMetric(
+      "Stage order",
+      telemetry.visualMode.mountainStageOrderValid ? "valid" : "unproven",
+      telemetry.visualMode.mountainStageOrderValid ? "good" : "warn",
+    );
+    setMetric(
+      "Artifact check",
+      telemetry.visualMode.mountainArtifactFree ? "pass" : "failed",
+      telemetry.visualMode.mountainArtifactFree ? "good" : "bad",
+    );
+    setMetric(
+      "Camera check",
+      telemetry.visualMode.mountainCameraCheckValid ? "pass" : "unproven",
+      telemetry.visualMode.mountainCameraCheckValid ? "good" : "warn",
     );
     setMetric(
       "WebGPU probe",
