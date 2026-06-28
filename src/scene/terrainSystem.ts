@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import type { WeatherSnapshot } from "../state/weatherEngine";
 import { getWeatherPalette } from "./artDirection";
+import { getExpandedOutline, type LakePoint } from "./lakeMap";
 import { GLSL_NOISE, makeNoise2D } from "./scenicUtils";
+import { RIBBON_CAKE_OUTER_OFFSET } from "./zoneBands";
 
 type TerrainStats = {
   mountainVertices: number;
@@ -35,17 +37,56 @@ const angleDiff = (a: number, b: number) => {
   return delta;
 };
 
+const getRayPolygonIntersection = (theta: number, polygon: readonly LakePoint[]) => {
+  const dx = Math.cos(theta);
+  const dz = Math.sin(theta);
+  let hit = 0;
+
+  for (let index = 0; index < polygon.length; index += 1) {
+    const start = polygon[index];
+    const end = polygon[(index + 1) % polygon.length];
+    const sx = end.x - start.x;
+    const sz = end.z - start.z;
+    const denom = dx * sz - dz * sx;
+    if (Math.abs(denom) < 0.00001) {
+      continue;
+    }
+
+    const t = (start.x * sz - start.z * sx) / denom;
+    const u = (start.x * dz - start.z * dx) / denom;
+    if (t > hit && u >= -0.0001 && u <= 1.0001) {
+      hit = t;
+    }
+  }
+
+  return hit;
+};
+
+const contourCache = new Map<number, readonly LakePoint[]>();
+
+const getContourPoint = (offset: number, theta: number) => {
+  if (!contourCache.has(offset)) {
+    contourCache.set(offset, getExpandedOutline(offset));
+  }
+  const outline = contourCache.get(offset) ?? [];
+  const radius = getRayPolygonIntersection(theta, outline);
+  return {
+    x: Math.cos(theta) * radius,
+    z: Math.sin(theta) * radius,
+  };
+};
+
 const buildRidgeRing = ({
-  rInner,
-  rOuter,
+  innerOffset,
+  outerOffset,
   peakMin,
   peakMax,
   seed,
   ridgeFrequency,
   hero,
 }: {
-  rInner: number;
-  rOuter: number;
+  innerOffset: number;
+  outerOffset: number;
   peakMin: number;
   peakMax: number;
   seed: number;
@@ -104,7 +145,10 @@ const buildRidgeRing = ({
     const peakHeight = (peakMin + (peakMax - peakMin) * ridge) * heightMask;
     for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
       const radial = radialIndex / radialSegments;
-      const radius = rInner + (rOuter - rInner) * radial;
+      const innerPoint = getContourPoint(innerOffset, theta);
+      const outerPoint = getContourPoint(outerOffset, theta);
+      const x = innerPoint.x + (outerPoint.x - innerPoint.x) * radial;
+      const z = innerPoint.z + (outerPoint.z - innerPoint.z) * radial;
       const ridgeSpine = Math.sin(Math.PI * Math.min(radial / 0.82, 1) * 0.5);
       const outerFalloff = radial < 0.82 ? 1 : 1 - (radial - 0.82) / 0.26;
       const heroLowerScoop = hero ? 0.50 + smoothstep(0.34, 0.74, radial) * 0.50 : 1;
@@ -124,7 +168,7 @@ const buildRidgeRing = ({
         Math.max(0, rise) *
         Math.max(0, 1 - Math.abs(radial - 0.54) * 1.9);
       const detail =
-        noise.fbm(cos * radius * 0.004 + 31, sin * radius * 0.004 + 17, 4) *
+        noise.fbm(x * 0.004 + 31, z * 0.004 + 17, 4) *
         peakHeight *
         (hero ? 0.50 : 0.46) *
         Math.max(rise, 0);
@@ -162,7 +206,7 @@ const buildRidgeRing = ({
           : 0;
       const seatedY = Math.max(0, y - basalCut);
       const baseSeat = radial < 0.08 ? -18 * (1 - smoothstep(0.0, 0.08, radial)) : 0;
-      vertices.push(cos * radius, seatedY + baseSeat, sin * radius);
+      vertices.push(x, seatedY + baseSeat, z);
       elevs.push(Math.max(0, seatedY) / peakMax);
     }
   }
@@ -189,8 +233,8 @@ const buildFoothillSealRing = () => {
   const noise = makeNoise2D(89);
   const thetaSegments = 224;
   const radialSegments = 8;
-  const rInner = 700;
-  const rOuter = 1240;
+  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 8;
+  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 420;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
@@ -204,7 +248,10 @@ const buildFoothillSealRing = () => {
 
     for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
       const radial = radialIndex / radialSegments;
-      const radius = rInner + (rOuter - rInner) * radial;
+      const innerPoint = getContourPoint(innerOffset, theta);
+      const outerPoint = getContourPoint(outerOffset, theta);
+      const x = innerPoint.x + (outerPoint.x - innerPoint.x) * radial;
+      const z = innerPoint.z + (outerPoint.z - innerPoint.z) * radial;
       const baseRise = smoothstep(0.05, 0.84, radial);
       const crease =
         Math.max(0, Math.sin(theta * 18.0 + radial * 4.0 + 1.7)) *
@@ -214,12 +261,12 @@ const buildFoothillSealRing = () => {
         Math.max(0, 1 - Math.abs(radial - 0.60) * 2.8);
       const y =
         1.9 +
-        baseRise * 188 +
+        baseRise * 146 +
         lowRoll * 14 +
-        ridgeRoll * 34 * baseRise +
-        crease * 58 +
-        bench * 34;
-      vertices.push(cos * radius, Math.max(1.8, y), sin * radius);
+        ridgeRoll * 27 * baseRise +
+        crease * 42 +
+        bench * 24;
+      vertices.push(x, Math.max(1.8, y), z);
       elevs.push(baseRise);
     }
   }
@@ -499,10 +546,10 @@ export const createTerrainSystem = (): TerrainSystem => {
 
   const far = new THREE.Mesh(
     buildRidgeRing({
-      rInner: 1040,
-      rOuter: 1820,
-      peakMin: 168,
-      peakMax: 585,
+      innerOffset: RIBBON_CAKE_OUTER_OFFSET + 390,
+      outerOffset: RIBBON_CAKE_OUTER_OFFSET + 1020,
+      peakMin: 148,
+      peakMax: 505,
       seed: 21,
       ridgeFrequency: 2.4,
       hero: true,
@@ -511,10 +558,10 @@ export const createTerrainSystem = (): TerrainSystem => {
   );
   const mid = new THREE.Mesh(
     buildRidgeRing({
-      rInner: 880,
-      rOuter: 1320,
-      peakMin: 190,
-      peakMax: 530,
+      innerOffset: RIBBON_CAKE_OUTER_OFFSET + 130,
+      outerOffset: RIBBON_CAKE_OUTER_OFFSET + 520,
+      peakMin: 158,
+      peakMax: 430,
       seed: 53,
       ridgeFrequency: 3.85,
       hero: false,

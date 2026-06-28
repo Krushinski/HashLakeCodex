@@ -11,6 +11,22 @@ Date: 2026-06-27
 - Collision, minimap, ripple blocking, driveable water, tree placement, rock placement, reeds, island, and sandbar must agree with `lakeMap.ts`.
 - Any future mountain, forest, or Blender experiment must name its target zone before rendering.
 
+## Map Direction Convention
+
+Use the minimap orientation for all compass references:
+
+- North = top of minimap, primary mountain/backdrop side.
+- South = bottom of minimap, foreground/sandbar/reeds side.
+- East = right side of minimap, cove side.
+- West = left side of minimap, dock/reeds side.
+
+Going forward, issue reports may use compass plus zone number, such as:
+
+- `Zone 5, north-east quadrant`
+- `Zone 6, north back-arc`
+- `Zone 2, south-west reeds pocket`
+- `Zone 4, east cove approach`
+
 ## Stupid Simple Zone Map
 
 | Zone | Name | Plain-English Meaning |
