@@ -53,8 +53,8 @@ const buildRidgeRing = ({
   hero: boolean;
 }) => {
   const noise = makeNoise2D(seed);
-  const thetaSegments = 160;
-  const radialSegments = 12;
+  const thetaSegments = 192;
+  const radialSegments = 14;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
@@ -68,18 +68,28 @@ const buildRidgeRing = ({
     const rearArc = smoothstep(-0.04, 0.72, rearAlignment);
     const shoulderArc = smoothstep(-0.42, 0.32, rearAlignment);
     const heightMask = hero
-      ? 0.09 + rearArc * 0.98
-      : 0.09 + shoulderArc * 0.15 + rearArc * 0.78;
+      ? 0.09 + rearArc * 1.02
+      : 0.14 + shoulderArc * 0.30 + rearArc * 0.86;
     let ridge =
       noise.fbm(cos * ridgeFrequency + 9.2, sin * ridgeFrequency + 4.7, 5) * 0.82 + 0.58;
-    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.72 : 1.58);
+    ridge = Math.pow(Math.max(0, Math.min(1, ridge)), hero ? 1.86 : 1.46);
     const jag =
       (Math.sin(theta * 13.0 + seed) * 0.5 + 0.5) *
-      Math.max(0, noise.fbm(cos * 8.2 + seed, sin * 8.2 + 2.4, 3));
+      Math.max(0, noise.fbm(cos * 8.2 + seed, sin * 8.2 + 2.4, 4));
     const knife =
       Math.max(0, Math.sin(theta * (hero ? 17.0 : 12.0) + seed * 0.41)) *
-      Math.max(0, noise.fbm(cos * 12.0 - seed, sin * 12.0 + seed, 3));
-    ridge += jag * (hero ? 0.20 : 0.10) + Math.pow(knife, 1.35) * (hero ? 0.18 : 0.06);
+      Math.max(0, noise.fbm(cos * 12.0 - seed, sin * 12.0 + seed, 4));
+    const saw =
+      Math.pow(Math.max(0, Math.sin(theta * (hero ? 31.0 : 20.0) + seed * 0.19)), 2.4) *
+      Math.max(0, noise.fbm(cos * 18.0 + seed * 0.4, sin * 18.0 - seed * 0.2, 3));
+    const tooth =
+      Math.pow(Math.max(0, Math.sin(theta * (hero ? 43.0 : 27.0) + seed * 0.11)), 3.2) *
+      Math.max(0, noise.fbm(cos * 24.0 - seed * 0.3, sin * 24.0 + seed * 0.5, 3));
+    ridge +=
+      jag * (hero ? 0.34 : 0.32) +
+      Math.pow(knife, 1.12) * (hero ? 0.36 : 0.34) +
+      saw * (hero ? 0.24 : 0.26) +
+      tooth * (hero ? 0.22 : 0.18);
 
     if (hero) {
       const centerPeak = angleDiff(theta, viewTheta + 0.1);
@@ -88,7 +98,7 @@ const buildRidgeRing = ({
       ridge += 0.72 * Math.exp(-(centerPeak * centerPeak) / (0.25 * 0.25));
       ridge += 0.42 * Math.exp(-(sidePeak * sidePeak) / (0.22 * 0.22));
       ridge += 0.34 * Math.exp(-(rightPeak * rightPeak) / (0.30 * 0.30));
-      ridge = Math.min(ridge, 1.55);
+      ridge = Math.min(ridge, 1.96);
     }
 
     const peakHeight = (peakMin + (peakMax - peakMin) * ridge) * heightMask;
@@ -97,25 +107,61 @@ const buildRidgeRing = ({
       const radius = rInner + (rOuter - rInner) * radial;
       const ridgeSpine = Math.sin(Math.PI * Math.min(radial / 0.82, 1) * 0.5);
       const outerFalloff = radial < 0.82 ? 1 : 1 - (radial - 0.82) / 0.26;
-      const rise = Math.pow(ridgeSpine, hero ? 1.05 : 1.18) * outerFalloff;
+      const heroLowerScoop = hero ? 0.50 + smoothstep(0.34, 0.74, radial) * 0.50 : 1;
+      const rise = Math.pow(ridgeSpine, hero ? 1.22 : 1.08) * outerFalloff * heroLowerScoop;
+      const crag =
+        Math.max(0, Math.sin(theta * (hero ? 29.0 : 22.0) + radial * 8.0 + seed * 0.31)) *
+        Math.max(0, noise.fbm(cos * 16.0 + radial * 3.5, sin * 16.0 - radial * 2.5, 3));
+      const buttress =
+        Math.max(0, Math.sin(theta * (hero ? 9.0 : 7.0) + radial * 3.2 + seed * 0.72)) *
+        Math.max(0, noise.fbm(cos * 5.6 + radial * 2.2, sin * 5.6 - radial * 1.9, 3));
+      const facetSignA = Math.sin(theta * (hero ? 11.0 : 9.0) + seed * 0.33) > 0.0 ? 1 : -1;
+      const facetSignB = Math.sin(theta * (hero ? 19.0 : 15.0) + radial * 3.0 + seed * 0.61) > 0.0 ? 1 : -1;
+      const facetPlane =
+        (facetSignA * 0.65 + facetSignB * 0.35) *
+        peakHeight *
+        (hero ? 0.060 : 0.085) *
+        Math.max(0, rise) *
+        Math.max(0, 1 - Math.abs(radial - 0.54) * 1.9);
       const detail =
         noise.fbm(cos * radius * 0.004 + 31, sin * radius * 0.004 + 17, 4) *
         peakHeight *
-        (hero ? 0.34 : 0.20) *
+        (hero ? 0.50 : 0.46) *
         Math.max(rise, 0);
       const ravine =
         Math.max(0, Math.sin(theta * (hero ? 21.0 : 14.0) + radial * 5.2 + seed)) *
         Math.max(0, 1 - Math.abs(radial - 0.58) * 2.1) *
         peakHeight *
-        (hero ? 0.10 : 0.04);
+        (hero ? 0.16 : 0.115);
+      const verticalCut =
+        Math.max(0, Math.sin(theta * (hero ? 37.0 : 24.0) + seed * 0.68)) *
+        Math.max(0, 1 - Math.abs(radial - 0.48) * 2.7) *
+        peakHeight *
+        (hero ? 0.115 : 0.085);
       const ledge =
         Math.sin(radial * 18.0 + theta * 4.0 + seed) *
         peakHeight *
-        (hero ? 0.035 : 0.018) *
+        (hero ? 0.052 : 0.046) *
         Math.max(0, rise);
-      const y = Math.max(0, peakHeight * Math.max(rise, 0) + detail - ravine + ledge);
-      vertices.push(cos * radius, y, sin * radius);
-      elevs.push(y / peakMax);
+      const y = Math.max(
+        0,
+        peakHeight * Math.max(rise, 0) +
+          detail -
+          ravine -
+          verticalCut +
+          ledge +
+          facetPlane +
+          crag * peakHeight * (hero ? 0.110 : 0.140) * Math.max(rise, 0) +
+          buttress * peakHeight * (hero ? 0.080 : 0.115) * Math.max(0, rise),
+      );
+      const basalCut =
+        hero
+          ? peakHeight *
+            (1 - smoothstep(0.26, 0.64, radial)) *
+            (0.30 + rearArc * 0.28)
+          : 0;
+      vertices.push(cos * radius, Math.max(0, y - basalCut), sin * radius);
+      elevs.push(Math.max(0, y - basalCut) / peakMax);
     }
   }
 
@@ -136,6 +182,172 @@ const buildRidgeRing = ({
   geometry.computeVertexNormals();
   return geometry;
 };
+
+const buildFoothillSealRing = () => {
+  const noise = makeNoise2D(89);
+  const thetaSegments = 224;
+  const radialSegments = 8;
+  const rInner = 700;
+  const rOuter = 1240;
+  const vertices: number[] = [];
+  const elevs: number[] = [];
+  const indices: number[] = [];
+
+  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
+    const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const lowRoll = noise.fbm(cos * 2.1 + 6, sin * 2.1 - 9, 3);
+    const ridgeRoll = noise.fbm(cos * 6.4 - 14, sin * 6.4 + 11, 3);
+
+    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
+      const radial = radialIndex / radialSegments;
+      const radius = rInner + (rOuter - rInner) * radial;
+      const baseRise = smoothstep(0.05, 0.84, radial);
+      const crease =
+        Math.max(0, Math.sin(theta * 18.0 + radial * 4.0 + 1.7)) *
+        Math.max(0, 1 - Math.abs(radial - 0.72) * 2.4);
+      const bench =
+        Math.max(0, Math.sin(theta * 11.0 + radial * 5.2 + 0.9)) *
+        Math.max(0, 1 - Math.abs(radial - 0.60) * 2.8);
+      const y =
+        12 +
+        baseRise * 178 +
+        lowRoll * 14 +
+        ridgeRoll * 34 * baseRise +
+        crease * 58 +
+        bench * 34;
+      vertices.push(cos * radius, Math.max(1, y), sin * radius);
+      elevs.push(baseRise);
+    }
+  }
+
+  const columns = radialSegments + 1;
+  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
+    const nextThetaIndex = (thetaIndex + 1) % thetaSegments;
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      const a = thetaIndex * columns + radialIndex;
+      const b = nextThetaIndex * columns + radialIndex;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+const createFoothillSealMaterial = (
+  shared: {
+    sunDir: { value: THREE.Vector3 };
+    sunColor: { value: THREE.Color };
+    horizon: { value: THREE.Color };
+    ambient: { value: THREE.Color };
+    cameraPosition: { value: THREE.Vector3 };
+    hazeDensity: { value: number };
+    fire: { value: number };
+    dark: { value: number };
+  },
+) =>
+  new THREE.ShaderMaterial({
+    uniforms: {
+      uSunDir: shared.sunDir,
+      uSunColor: shared.sunColor,
+      uHorizon: shared.horizon,
+      uAmbient: shared.ambient,
+      uCamPos: shared.cameraPosition,
+      uHazeDen: shared.hazeDensity,
+      uFire: shared.fire,
+      uDark: shared.dark,
+    },
+    vertexShader: `
+      varying vec3 vWorldPos;
+      varying vec3 vNormal;
+      varying float vElev;
+      attribute float elev;
+
+      void main() {
+        vElev = elev;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPosition.xyz;
+        vNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vWorldPos;
+      varying vec3 vNormal;
+      varying float vElev;
+      uniform vec3 uSunDir;
+      uniform vec3 uSunColor;
+      uniform vec3 uHorizon;
+      uniform vec3 uAmbient;
+      uniform vec3 uCamPos;
+      uniform float uHazeDen;
+      uniform float uFire;
+      uniform float uDark;
+      ${GLSL_NOISE}
+
+      void main() {
+        vec3 normal = normalize(vNormal);
+        float grain = bl_fbm(vWorldPos.xz * 0.018);
+        float broad = bl_fbm(vWorldPos.xz * 0.003 + 18.0);
+        float fractureA = bl_fbm(vec2(vWorldPos.x * 0.020 + vWorldPos.y * 0.012, vWorldPos.z * 0.024 - vWorldPos.y * 0.018));
+        float fractureB = bl_fbm(vec2(vWorldPos.x * -0.030 + vWorldPos.y * 0.018, vWorldPos.z * 0.014 + vWorldPos.y * 0.026));
+        float chipMask = smoothstep(0.36, 0.78, fractureA) * smoothstep(0.26, 0.72, 1.0 - fractureB);
+        float rib = smoothstep(
+          0.52,
+          0.985,
+          sin(vWorldPos.x * 0.088 + vWorldPos.z * 0.030 + vWorldPos.y * 0.156 + grain * 6.8) * 0.5 + 0.5
+        ) * (0.35 + chipMask * 0.65);
+        float shadowCrack = smoothstep(
+          0.66,
+          0.994,
+          sin(vWorldPos.x * -0.104 + vWorldPos.z * 0.062 + vWorldPos.y * 0.236 + grain * 8.8) * 0.5 + 0.5
+        ) * smoothstep(0.44, 0.84, fractureB);
+        float ledge = smoothstep(
+          0.60,
+          0.988,
+          sin(vWorldPos.x * -0.066 + vWorldPos.z * 0.076 + vWorldPos.y * 0.098 + broad * 7.2) * 0.5 + 0.5
+        ) * smoothstep(0.38, 0.82, fractureA);
+        float brightSlash = smoothstep(
+          0.84,
+          0.996,
+          sin(vWorldPos.x * 0.164 + vWorldPos.z * -0.074 + vWorldPos.y * 0.196 + grain * 9.4) * 0.5 + 0.5
+        ) * smoothstep(0.54, 0.92, chipMask);
+        float narrowSnow = smoothstep(
+          0.88,
+          0.998,
+          sin(vWorldPos.x * 0.066 + vWorldPos.z * 0.050 + vWorldPos.y * 0.176 + broad * 6.0) * 0.5 + 0.5
+        );
+        float cliffFace = smoothstep(0.24, 0.80, 1.0 - normal.y);
+        float highFace = smoothstep(0.22, 0.78, vElev);
+        vec3 lowForest = vec3(0.010, 0.040, 0.025);
+        vec3 moss = vec3(0.038, 0.090, 0.044);
+        vec3 granite = vec3(0.660, 0.650, 0.570);
+        vec3 graniteLight = vec3(1.000, 0.960, 0.720);
+        vec3 graniteDark = vec3(0.034, 0.056, 0.058);
+        vec3 albedo = mix(lowForest, moss, smoothstep(0.10, 0.88, broad));
+        albedo = mix(albedo, granite, clamp(highFace * 1.08 + cliffFace * 0.62, 0.0, 0.98));
+        albedo = mix(albedo, graniteDark, rib * (0.20 + highFace * 0.28));
+        albedo = mix(albedo, vec3(0.018, 0.038, 0.042), shadowCrack * cliffFace * (0.14 + highFace * 0.24));
+        albedo = mix(albedo, graniteLight, ledge * (0.42 + highFace * 0.58) * (0.22 + cliffFace * 0.78));
+        albedo = mix(albedo, vec3(1.00, 0.98, 0.78), brightSlash * highFace * cliffFace * 0.48);
+        albedo = mix(albedo, vec3(0.88, 0.88, 0.80), narrowSnow * highFace * cliffFace * 0.10);
+        float diffuse = max(dot(normal, uSunDir), 0.0);
+        vec3 color = albedo * (uAmbient * 0.54 + uSunColor * diffuse * 0.56);
+        color *= 0.88 + vElev * 0.54;
+        color += albedo * vec3(1.0, 0.28, 0.06) * uFire * 0.30;
+        color = mix(color, color * vec3(0.74, 0.80, 0.88), uDark * 0.22);
+        float haze = 1.0 - exp(-pow(distance(vWorldPos, uCamPos) * uHazeDen, 1.32));
+        color = mix(color, uHorizon, clamp(haze, 0.0, 0.24));
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+  });
 
 const createTerrainMaterial = (
   shared: {
@@ -199,31 +411,63 @@ const createTerrainMaterial = (
         float slope = clamp(normal.y, 0.0, 1.0);
         float roughNoise = bl_fbm(vWorldPos.xz * 0.010);
         float broadNoise = bl_fbm(vWorldPos.xz * 0.0024 + 7.0);
-        float cliff = smoothstep(0.74, 0.18, slope);
-        float strata = sin(vWorldPos.y * 0.050 + bl_fbm(vWorldPos.xz * 0.005 + 31.0) * 5.6) * 0.5 + 0.5;
+        float cliff = smoothstep(0.84, 0.22, slope);
+        float facetNoiseA = bl_fbm(vec2(vWorldPos.x * 0.018 + vWorldPos.y * 0.014, vWorldPos.z * 0.026 - vWorldPos.y * 0.020) + 11.0);
+        float facetNoiseB = bl_fbm(vec2(vWorldPos.x * -0.024 + vWorldPos.y * 0.020, vWorldPos.z * 0.018 + vWorldPos.y * 0.030) + 23.0);
+        float fractureMask = smoothstep(0.34, 0.76, facetNoiseA) * smoothstep(0.28, 0.76, 1.0 - facetNoiseB);
+        float strata = smoothstep(
+          0.38,
+          0.78,
+          sin(vWorldPos.y * 0.045 + vWorldPos.x * 0.012 + vWorldPos.z * -0.018 + bl_fbm(vWorldPos.xz * 0.005 + 31.0) * 4.1) * 0.5 + 0.5
+        ) * (0.26 + fractureMask * 0.48);
         float verticalGrain = bl_fbm(vec2(vWorldPos.x * 0.018 + vWorldPos.y * 0.026, vWorldPos.z * 0.010 + vWorldPos.y * 0.018));
         float faceBreakup = bl_fbm(vec2(vWorldPos.x * 0.014 + vWorldPos.y * 0.012, vWorldPos.z * 0.014));
         float alpineRibs = smoothstep(
-          0.50,
-          0.94,
-          sin(vWorldPos.x * 0.034 + vWorldPos.z * 0.018 + vWorldPos.y * 0.072 + faceBreakup * 4.0) * 0.5 + 0.5
-        ) * cliff;
+          0.54,
+          0.975,
+          sin(vWorldPos.x * 0.088 + vWorldPos.z * 0.038 + vWorldPos.y * 0.150 + faceBreakup * 7.4) * 0.5 + 0.5
+        ) * cliff * (0.34 + fractureMask * 0.66);
         float screeLines = smoothstep(
-          0.64,
-          0.98,
-          sin(vWorldPos.x * -0.018 + vWorldPos.z * 0.036 + vWorldPos.y * 0.044 + roughNoise * 3.0) * 0.5 + 0.5
-        ) * cliff;
-        vec3 graniteWarm = vec3(0.58, 0.58, 0.53);
-        vec3 graniteCool = vec3(0.34, 0.40, 0.41);
-        vec3 graniteDark = vec3(0.12, 0.19, 0.17);
+          0.62,
+          0.992,
+          sin(vWorldPos.x * -0.060 + vWorldPos.z * 0.086 + vWorldPos.y * 0.082 + roughNoise * 5.8) * 0.5 + 0.5
+        ) * cliff * smoothstep(0.42, 0.82, facetNoiseA);
+        float heroEdge = smoothstep(
+          0.76,
+          0.992,
+          sin(vWorldPos.x * 0.130 + vWorldPos.z * -0.060 + vWorldPos.y * 0.192 + faceBreakup * 8.2) * 0.5 + 0.5
+        ) * cliff * smoothstep(0.18, 0.82, vElev) * smoothstep(0.36, 0.82, fractureMask);
+        float knifeHighlight = smoothstep(
+          0.86,
+          0.995,
+          sin(vWorldPos.x * 0.172 + vWorldPos.z * -0.084 + vWorldPos.y * 0.236 + faceBreakup * 9.4) * 0.5 + 0.5
+        ) * cliff * smoothstep(0.22, 0.76, vElev) * smoothstep(0.46, 0.88, facetNoiseB);
+        float verticalCleavage = smoothstep(
+          0.54,
+          0.985,
+          sin(vWorldPos.x * 0.032 + vWorldPos.z * -0.086 + vWorldPos.y * 0.190 + verticalGrain * 4.8) * 0.5 + 0.5
+        ) * cliff * (0.38 + smoothstep(0.42, 0.86, facetNoiseB) * 0.62);
+        float facePlane = smoothstep(
+          0.48,
+          0.94,
+          sin(vWorldPos.x * -0.022 + vWorldPos.z * 0.106 + vWorldPos.y * 0.044 + broadNoise * 5.0) * 0.5 + 0.5
+        ) * cliff * smoothstep(0.30, 0.72, facetNoiseA);
+        vec3 graniteWarm = vec3(0.82, 0.78, 0.66);
+        vec3 graniteCool = vec3(0.50, 0.56, 0.55);
+        vec3 graniteDark = vec3(0.060, 0.105, 0.108);
         vec3 rock = mix(graniteWarm, graniteCool, roughNoise);
-        rock = mix(rock, graniteDark, cliff * (0.26 + 0.30 * (1.0 - broadNoise)));
-        rock = mix(rock, rock * vec3(1.22, 1.16, 0.94), strata * cliff * 0.30);
+        rock = mix(rock, graniteDark, cliff * (0.14 + 0.18 * (1.0 - broadNoise)));
+        rock = mix(rock, rock * vec3(1.18, 1.12, 0.94), strata * cliff * 0.18);
         rock = mix(rock, rock * vec3(0.66, 0.75, 0.80), verticalGrain * cliff * 0.26);
-        rock = mix(rock, rock * vec3(0.47, 0.55, 0.54), alpineRibs * 0.38);
-        rock = mix(rock, rock * vec3(1.32, 1.25, 1.03), screeLines * (1.0 - alpineRibs) * 0.16);
+        rock = mix(rock, rock * vec3(0.38, 0.48, 0.52), alpineRibs * 0.34);
+        rock = mix(rock, rock * vec3(0.46, 0.54, 0.58), verticalCleavage * 0.28);
+        rock = mix(rock, rock * vec3(1.76, 1.58, 1.20), facePlane * 0.34);
+        rock = mix(rock, rock * vec3(2.18, 1.92, 1.36), screeLines * (1.0 - alpineRibs * 0.55) * 0.48);
+        rock = mix(rock, vec3(1.00, 0.95, 0.70), heroEdge * 0.52);
+        rock = mix(rock, vec3(1.00, 1.00, 0.78), knifeHighlight * 0.56);
         rock *= 0.82 + 0.34 * broadNoise + 0.18 * faceBreakup;
-        float forest = smoothstep(0.30, 0.10, vElev) * smoothstep(0.34, 0.72, slope) * uForest;
+        float forest = smoothstep(0.10, 0.026, vElev) * smoothstep(0.58, 0.88, slope) * uForest;
+        forest *= 1.0 - smoothstep(0.08, 0.26, cliff);
         vec3 forestColor = vec3(0.050, 0.128, 0.066)
           * (0.86 + 0.40 * bl_fbm(vWorldPos.xz * 0.020 + 3.0));
         forestColor = mix(forestColor, forestColor * vec3(1.16, 1.12, 0.82), broadNoise * 0.12);
@@ -232,8 +476,8 @@ const createTerrainMaterial = (
           * smoothstep(0.16, 0.58, slope);
         float sunCap = smoothstep(uSnowLine - 0.24, uSnowLine + 0.04, vElev + strata * 0.05)
           * smoothstep(0.22, 0.70, slope);
-        albedo = mix(albedo, vec3(0.82, 0.82, 0.76), snow * 0.24);
-        albedo = mix(albedo, vec3(0.74, 0.72, 0.58), sunCap * 0.10);
+        albedo = mix(albedo, vec3(0.90, 0.89, 0.82), snow * 0.30);
+        albedo = mix(albedo, vec3(0.88, 0.83, 0.62), sunCap * 0.17);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uSunColor * diffuse * 1.30 + uAmbient * (0.45 + 0.52 * slope));
@@ -244,7 +488,7 @@ const createTerrainMaterial = (
         float valleyShade = smoothstep(0.08, 0.52, vElev);
         float shadowBand = smoothstep(0.22, 0.82, bl_fbm(vec2(vWorldPos.x * 0.006, vWorldPos.y * 0.013) + 12.0));
         float verticalShadow = smoothstep(0.20, 0.86, bl_fbm(vec2(vWorldPos.x * 0.004 + vWorldPos.y * 0.018, vWorldPos.z * 0.006) + 18.0));
-        color *= (0.68 + valleyShade * 0.36) * (0.86 + shadowBand * 0.12) * (0.78 + verticalShadow * 0.24);
+        color *= (0.88 + valleyShade * 0.24) * (0.96 + shadowBand * 0.08) * (0.92 + verticalShadow * 0.14);
         color += albedo * vec3(1.0, 0.32, 0.07) * uFire * 0.42;
         color = mix(color, color * vec3(0.82, 0.86, 0.93), uDark * 0.16);
 
@@ -274,8 +518,8 @@ export const createTerrainSystem = (): TerrainSystem => {
     buildRidgeRing({
       rInner: 1040,
       rOuter: 1820,
-      peakMin: 170,
-      peakMax: 548,
+      peakMin: 168,
+      peakMax: 585,
       seed: 21,
       ridgeFrequency: 2.4,
       hero: true,
@@ -284,25 +528,32 @@ export const createTerrainSystem = (): TerrainSystem => {
   );
   const mid = new THREE.Mesh(
     buildRidgeRing({
-      rInner: 820,
-      rOuter: 1220,
-      peakMin: 54,
-      peakMax: 222,
+      rInner: 880,
+      rOuter: 1320,
+      peakMin: 190,
+      peakMax: 530,
       seed: 53,
-      ridgeFrequency: 3.1,
+      ridgeFrequency: 3.85,
       hero: false,
     }),
-    createTerrainMaterial(shared, 0.86, 1),
+    createTerrainMaterial(shared, 0.42, 0.02),
+  );
+  const foothillSeal = new THREE.Mesh(
+    buildFoothillSealRing(),
+    createFoothillSealMaterial(shared),
   );
   far.name = "Far HashLake ridge";
   mid.name = "Mid HashLake ridge";
+  foothillSeal.name = "Native mountain base foothill seal";
   far.frustumCulled = false;
   mid.frustumCulled = false;
-  group.add(far, mid);
+  foothillSeal.frustumCulled = false;
+  group.add(foothillSeal, far, mid);
   let scenicBackdropActive = false;
   let nativeMountainsSuppressed = false;
 
   const vertexCount =
+    foothillSeal.geometry.attributes.position.count +
     far.geometry.attributes.position.count +
     mid.geometry.attributes.position.count;
 
@@ -310,6 +561,7 @@ export const createTerrainSystem = (): TerrainSystem => {
     group,
     update: (weather, camera) => {
       const nativeVisible = !scenicBackdropActive && !nativeMountainsSuppressed;
+      foothillSeal.visible = nativeVisible;
       far.visible = nativeVisible;
       mid.visible = nativeVisible;
       const palette = getWeatherPalette(weather.stormIndex);
