@@ -203,9 +203,15 @@ const buildRidgeRing = ({
           ? peakHeight *
             (1 - smoothstep(0.26, 0.64, radial)) *
             (0.30 + rearArc * 0.28)
-          : 0;
+          : peakHeight *
+            (1 - smoothstep(0.12, 0.38, radial)) *
+            (0.18 + rearArc * 0.16);
       const seatedY = Math.max(0, y - basalCut);
-      const baseSeat = radial < 0.08 ? -18 * (1 - smoothstep(0.0, 0.08, radial)) : 0;
+      const baseSeat = hero
+        ? radial < 0.08
+          ? -18 * (1 - smoothstep(0.0, 0.08, radial))
+          : 0
+        : -38 * (1 - smoothstep(0.0, 0.24, radial));
       vertices.push(x, seatedY + baseSeat, z);
       elevs.push(Math.max(0, seatedY) / peakMax);
     }
