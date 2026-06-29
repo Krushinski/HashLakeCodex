@@ -289,6 +289,67 @@ const buildFoothillSealRing = () => {
   return geometry;
 };
 
+const buildForestedFoothillRiseRing = () => {
+  const noise = makeNoise2D(137);
+  const thetaSegments = 224;
+  const radialSegments = 12;
+  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 72;
+  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 730;
+  const vertices: number[] = [];
+  const elevs: number[] = [];
+  const indices: number[] = [];
+
+  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
+    const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const broad = noise.fbm(cos * 1.65 + 4.5, sin * 1.65 - 12.0, 4);
+    const grove = noise.fbm(cos * 4.6 - 15.0, sin * 4.6 + 7.0, 4);
+    const shoulder = noise.fbm(cos * 8.5 + 21.0, sin * 8.5 - 8.0, 3);
+
+    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
+      const radial = radialIndex / radialSegments;
+      const innerPoint = getContourPoint(innerOffset, theta);
+      const outerPoint = getContourPoint(outerOffset, theta);
+      const x = innerPoint.x + (outerPoint.x - innerPoint.x) * radial;
+      const z = innerPoint.z + (outerPoint.z - innerPoint.z) * radial;
+      const rise = smoothstep(0.02, 0.96, radial);
+      const backRise = smoothstep(0.42, 1.0, radial);
+      const shelf = smoothstep(0.06, 0.34, radial) * (1 - smoothstep(0.78, 1.0, radial));
+      const rollingCanopy =
+        Math.max(0, Math.sin(theta * 9.0 + radial * 4.1 + 0.8)) *
+        Math.max(0, 1 - Math.abs(radial - 0.68) * 2.2);
+      const y =
+        2.4 +
+        rise * 52 +
+        backRise * 88 +
+        broad * 18 +
+        grove * 18 * shelf +
+        shoulder * 16 * backRise +
+        rollingCanopy * 22;
+      vertices.push(x, Math.max(2.2, y), z);
+      elevs.push(rise);
+    }
+  }
+
+  const columns = radialSegments + 1;
+  for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
+    const nextThetaIndex = (thetaIndex + 1) % thetaSegments;
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      const a = thetaIndex * columns + radialIndex;
+      const b = nextThetaIndex * columns + radialIndex;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("elev", new THREE.Float32BufferAttribute(elevs, 1));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 const createFoothillSealMaterial = (
   shared: {
     sunDir: { value: THREE.Vector3 };
@@ -385,6 +446,88 @@ const createFoothillSealMaterial = (
         color = mix(color, color * vec3(0.74, 0.80, 0.88), uDark * 0.22);
         float haze = 1.0 - exp(-pow(distance(vWorldPos, uCamPos) * uHazeDen, 1.32));
         color = mix(color, uHorizon, clamp(haze, 0.0, 0.24));
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+  });
+
+const createForestedFoothillRiseMaterial = (
+  shared: {
+    sunDir: { value: THREE.Vector3 };
+    sunColor: { value: THREE.Color };
+    horizon: { value: THREE.Color };
+    ambient: { value: THREE.Color };
+    cameraPosition: { value: THREE.Vector3 };
+    hazeDensity: { value: number };
+    fire: { value: number };
+    dark: { value: number };
+  },
+) =>
+  new THREE.ShaderMaterial({
+    uniforms: {
+      uSunDir: shared.sunDir,
+      uSunColor: shared.sunColor,
+      uHorizon: shared.horizon,
+      uAmbient: shared.ambient,
+      uCamPos: shared.cameraPosition,
+      uHazeDen: shared.hazeDensity,
+      uFire: shared.fire,
+      uDark: shared.dark,
+    },
+    vertexShader: `
+      varying vec3 vWorldPos;
+      varying vec3 vNormal;
+      varying float vElev;
+      attribute float elev;
+
+      void main() {
+        vElev = elev;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPosition.xyz;
+        vNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vWorldPos;
+      varying vec3 vNormal;
+      varying float vElev;
+      uniform vec3 uSunDir;
+      uniform vec3 uSunColor;
+      uniform vec3 uHorizon;
+      uniform vec3 uAmbient;
+      uniform vec3 uCamPos;
+      uniform float uHazeDen;
+      uniform float uFire;
+      uniform float uDark;
+      ${GLSL_NOISE}
+
+      void main() {
+        vec3 normal = normalize(vNormal);
+        float slope = clamp(normal.y, 0.0, 1.0);
+        float broad = bl_fbm(vWorldPos.xz * 0.0028 + 9.0);
+        float grassNoise = bl_fbm(vWorldPos.xz * 0.014 + 3.0);
+        float forestNoise = bl_fbm(vWorldPos.xz * 0.007 + 17.0);
+        float contour = smoothstep(0.12, 0.92, vElev);
+        float grove = smoothstep(0.42, 0.80, forestNoise + contour * 0.26);
+        float earthGate = smoothstep(0.52, 0.18, slope) * 0.38;
+        vec3 nearGrass = vec3(0.070, 0.180, 0.058);
+        vec3 moss = vec3(0.034, 0.096, 0.040);
+        vec3 deepForest = vec3(0.010, 0.044, 0.024);
+        vec3 earth = vec3(0.096, 0.074, 0.046);
+        vec3 albedo = mix(nearGrass, moss, contour);
+        albedo = mix(albedo, deepForest, grove * (0.58 + contour * 0.34));
+        albedo = mix(albedo, earth, earthGate * (0.30 + broad * 0.26));
+        albedo *= 0.84 + grassNoise * 0.22 + broad * 0.08;
+        albedo = mix(albedo, vec3(0.006, 0.026, 0.016), smoothstep(0.62, 1.0, contour) * 0.32);
+
+        float diffuse = max(dot(normal, uSunDir), 0.0);
+        vec3 color = albedo * (uAmbient * 0.58 + uSunColor * diffuse * 0.48);
+        color *= 0.78 + slope * 0.28;
+        color += albedo * vec3(1.0, 0.30, 0.07) * uFire * 0.24;
+        color = mix(color, color * vec3(0.76, 0.82, 0.90), uDark * 0.18);
+        float haze = 1.0 - exp(-pow(distance(vWorldPos, uCamPos) * uHazeDen, 1.30));
+        color = mix(color, uHorizon, clamp(haze, 0.0, 0.28));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -561,44 +704,36 @@ export const createTerrainSystem = (): TerrainSystem => {
     }),
     createTerrainMaterial(shared, 1.12, 0.9),
   );
-  const mid = new THREE.Mesh(
-    buildRidgeRing({
-      innerOffset: RIBBON_CAKE_OUTER_OFFSET + 130,
-      outerOffset: RIBBON_CAKE_OUTER_OFFSET + 520,
-      peakMin: 158,
-      peakMax: 430,
-      seed: 53,
-      ridgeFrequency: 3.85,
-      hero: false,
-    }),
-    createTerrainMaterial(shared, 0.42, 0.02),
+  const foothillRise = new THREE.Mesh(
+    buildForestedFoothillRiseRing(),
+    createForestedFoothillRiseMaterial(shared),
   );
   const foothillSeal = new THREE.Mesh(
     buildFoothillSealRing(),
     createFoothillSealMaterial(shared),
   );
   far.name = "Far HashLake ridge";
-  mid.name = "Mid HashLake ridge";
+  foothillRise.name = "Forested foothill rise";
   foothillSeal.name = "Native mountain base foothill seal";
   far.frustumCulled = false;
-  mid.frustumCulled = false;
+  foothillRise.frustumCulled = false;
   foothillSeal.frustumCulled = false;
-  group.add(foothillSeal, far, mid);
+  group.add(foothillSeal, foothillRise, far);
   let scenicBackdropActive = false;
   let nativeMountainsSuppressed = false;
 
   const vertexCount =
     foothillSeal.geometry.attributes.position.count +
-    far.geometry.attributes.position.count +
-    mid.geometry.attributes.position.count;
+    foothillRise.geometry.attributes.position.count +
+    far.geometry.attributes.position.count;
 
   return {
     group,
     update: (weather, camera) => {
       const nativeVisible = !scenicBackdropActive && !nativeMountainsSuppressed;
       foothillSeal.visible = nativeVisible;
+      foothillRise.visible = nativeVisible;
       far.visible = nativeVisible;
-      mid.visible = nativeVisible;
       const palette = getWeatherPalette(weather.stormIndex);
       shared.sunDir.value.set(-0.36, 0.72 - weather.dials.skyDark * 0.28, -0.44).normalize();
       shared.sunColor.value.setHex(palette.sunColor);
