@@ -203,15 +203,9 @@ const buildRidgeRing = ({
           ? peakHeight *
             (1 - smoothstep(0.26, 0.64, radial)) *
             (0.30 + rearArc * 0.28)
-          : peakHeight *
-            (1 - smoothstep(0.12, 0.38, radial)) *
-            (0.18 + rearArc * 0.16);
+          : 0;
       const seatedY = Math.max(0, y - basalCut);
-      const baseSeat = hero
-        ? radial < 0.08
-          ? -18 * (1 - smoothstep(0.0, 0.08, radial))
-          : 0
-        : -38 * (1 - smoothstep(0.0, 0.24, radial));
+      const baseSeat = radial < 0.08 ? -18 * (1 - smoothstep(0.0, 0.08, radial)) : 0;
       vertices.push(x, seatedY + baseSeat, z);
       elevs.push(Math.max(0, seatedY) / peakMax);
     }
@@ -368,6 +362,7 @@ const createFoothillSealMaterial = (
         float cliffFace = smoothstep(0.24, 0.80, 1.0 - normal.y);
         float highFace = smoothstep(0.22, 0.78, vElev);
         float rootRockGate = smoothstep(0.16, 0.38, vElev);
+        float foothillRockGate = smoothstep(185.0, 285.0, vWorldPos.y);
         float rootShadow = 1.0 - smoothstep(0.05, 0.24, vElev);
         vec3 lowForest = vec3(0.010, 0.040, 0.025);
         vec3 moss = vec3(0.038, 0.090, 0.044);
@@ -375,13 +370,14 @@ const createFoothillSealMaterial = (
         vec3 graniteLight = vec3(1.000, 0.960, 0.720);
         vec3 graniteDark = vec3(0.034, 0.056, 0.058);
         vec3 albedo = mix(lowForest, moss, smoothstep(0.10, 0.88, broad));
-        albedo = mix(albedo, granite, clamp((highFace * 1.08 + cliffFace * 0.62) * rootRockGate, 0.0, 0.98));
+        albedo = mix(albedo, granite, clamp((highFace * 1.08 + cliffFace * 0.62) * rootRockGate * foothillRockGate, 0.0, 0.98));
         albedo = mix(albedo, graniteDark, rib * (0.20 + highFace * 0.28));
         albedo = mix(albedo, vec3(0.018, 0.038, 0.042), shadowCrack * cliffFace * (0.14 + highFace * 0.24));
-        albedo = mix(albedo, graniteLight, ledge * rootRockGate * (0.42 + highFace * 0.58) * (0.22 + cliffFace * 0.78));
-        albedo = mix(albedo, vec3(1.00, 0.98, 0.78), brightSlash * rootRockGate * highFace * cliffFace * 0.48);
-        albedo = mix(albedo, vec3(0.88, 0.88, 0.80), narrowSnow * rootRockGate * highFace * cliffFace * 0.10);
+        albedo = mix(albedo, graniteLight, ledge * rootRockGate * foothillRockGate * (0.42 + highFace * 0.58) * (0.22 + cliffFace * 0.78));
+        albedo = mix(albedo, vec3(1.00, 0.98, 0.78), brightSlash * rootRockGate * foothillRockGate * highFace * cliffFace * 0.48);
+        albedo = mix(albedo, vec3(0.88, 0.88, 0.80), narrowSnow * rootRockGate * foothillRockGate * highFace * cliffFace * 0.10);
         albedo = mix(albedo, vec3(0.006, 0.024, 0.015), rootShadow * 0.82);
+        albedo = mix(albedo, vec3(0.008, 0.030, 0.018), (1.0 - foothillRockGate) * 0.72);
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uAmbient * 0.54 + uSunColor * diffuse * 0.56);
         color *= 0.88 + vElev * 0.54;
