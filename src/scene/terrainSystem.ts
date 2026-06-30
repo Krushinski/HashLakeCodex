@@ -299,6 +299,9 @@ const buildForestedFoothillRiseRing = () => {
   const elevs: number[] = [];
   const indices: number[] = [];
   const heroTheta = -Math.PI / 2;
+  const southTheta = Math.PI / 2;
+  const eastTheta = 0;
+  const westTheta = Math.PI;
 
   for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
     const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
@@ -307,6 +310,10 @@ const buildForestedFoothillRiseRing = () => {
     const heroAlignment = Math.cos(angleDiff(theta, heroTheta));
     const heroArc = smoothstep(-0.18, 0.78, heroAlignment);
     const shoulderArc = smoothstep(-0.58, 0.26, heroAlignment);
+    const southArc = Math.exp(-Math.pow(angleDiff(theta, southTheta) / 0.72, 2));
+    const eastArc = Math.exp(-Math.pow(angleDiff(theta, eastTheta) / 0.58, 2));
+    const westArc = Math.exp(-Math.pow(angleDiff(theta, westTheta) / 0.58, 2));
+    const meadowKnollArc = clamp01(southArc * 0.95 + eastArc * 0.42 + westArc * 0.42);
     const broad = noise.fbm(cos * 1.65 + 4.5, sin * 1.65 - 12.0, 4);
     const grove = noise.fbm(cos * 4.6 - 15.0, sin * 4.6 + 7.0, 4);
     const shoulder = noise.fbm(cos * 8.5 + 21.0, sin * 8.5 - 8.0, 3);
@@ -323,13 +330,18 @@ const buildForestedFoothillRiseRing = () => {
       const rollingCanopy =
         Math.max(0, Math.sin(theta * 9.0 + radial * 4.1 + 0.8)) *
         Math.max(0, 1 - Math.abs(radial - 0.68) * 2.2);
+      const meadowKnoll =
+        Math.max(0, Math.sin(theta * 4.0 + 1.2)) *
+        Math.max(0, 1 - Math.abs(radial - 0.72) * 2.0) *
+        meadowKnollArc;
       const rollingLand =
         5.5 +
-        rise * 8.5 +
-        backRise * 9.5 +
+        rise * 10.5 +
+        backRise * (11.5 + meadowKnollArc * 18) +
         broad * 4.5 +
         grove * 3.0 * shelf +
-        rollingCanopy * 2.6;
+        rollingCanopy * 2.6 +
+        meadowKnoll * 24;
       const heroFoothill =
         10 +
         rise * 16 +
@@ -341,7 +353,8 @@ const buildForestedFoothillRiseRing = () => {
       const y =
         rollingLand * (1 - shoulderArc) +
         heroFoothill * shoulderArc +
-        heroArc * backRise * 18;
+        heroArc * backRise * 18 +
+        meadowKnollArc * backRise * (1 - shoulderArc) * 6;
       vertices.push(x, Math.max(4.8, y), z);
       elevs.push(rise * (0.44 + shoulderArc * 0.56));
     }
@@ -591,31 +604,31 @@ const createTerrainMaterial = (
         float facetNoiseB = bl_fbm(vec2(vWorldPos.x * -0.024 + vWorldPos.y * 0.020, vWorldPos.z * 0.018 + vWorldPos.y * 0.030) + 23.0);
         float fractureMask = smoothstep(0.34, 0.76, facetNoiseA) * smoothstep(0.28, 0.76, 1.0 - facetNoiseB);
         float strata = bl_fbm(vec2(vWorldPos.x * 0.004 + vWorldPos.y * 0.010, vWorldPos.z * 0.005 + 31.0));
-        strata = smoothstep(0.44, 0.82, strata) * (0.08 + fractureMask * 0.16);
+        strata = smoothstep(0.50, 0.86, strata) * (0.045 + fractureMask * 0.075);
         float verticalGrain = bl_fbm(vec2(vWorldPos.x * 0.018 + vWorldPos.y * 0.026, vWorldPos.z * 0.010 + vWorldPos.y * 0.018));
         float faceBreakup = bl_fbm(vec2(vWorldPos.x * 0.014 + vWorldPos.y * 0.012, vWorldPos.z * 0.014));
         float alpineRibs = smoothstep(
           0.54,
           0.975,
           sin(vWorldPos.x * 0.088 + vWorldPos.z * 0.038 + vWorldPos.y * 0.150 + faceBreakup * 7.4) * 0.5 + 0.5
-        ) * cliff * (0.34 + fractureMask * 0.66);
+        ) * cliff * (0.16 + fractureMask * 0.30);
         float screeLines = smoothstep(0.66, 0.94, bl_fbm(vec2(vWorldPos.x * -0.010 + vWorldPos.y * 0.022, vWorldPos.z * 0.014 + roughNoise * 1.6)))
-          * cliff * smoothstep(0.42, 0.82, facetNoiseA) * 0.34;
+          * cliff * smoothstep(0.48, 0.86, facetNoiseA) * 0.12;
         float heroEdge = smoothstep(
           0.76,
           0.992,
           sin(vWorldPos.x * 0.130 + vWorldPos.z * -0.060 + vWorldPos.y * 0.192 + faceBreakup * 8.2) * 0.5 + 0.5
-        ) * cliff * smoothstep(0.18, 0.82, vElev) * smoothstep(0.36, 0.82, fractureMask);
+        ) * cliff * smoothstep(0.18, 0.82, vElev) * smoothstep(0.46, 0.88, fractureMask) * 0.72;
         float knifeHighlight = smoothstep(
           0.86,
           0.995,
           sin(vWorldPos.x * 0.172 + vWorldPos.z * -0.084 + vWorldPos.y * 0.236 + faceBreakup * 9.4) * 0.5 + 0.5
-        ) * cliff * smoothstep(0.22, 0.76, vElev) * smoothstep(0.46, 0.88, facetNoiseB);
+        ) * cliff * smoothstep(0.22, 0.76, vElev) * smoothstep(0.54, 0.92, facetNoiseB) * 0.54;
         float verticalCleavage = smoothstep(
           0.54,
           0.985,
           sin(vWorldPos.x * 0.032 + vWorldPos.z * -0.086 + vWorldPos.y * 0.190 + verticalGrain * 4.8) * 0.5 + 0.5
-        ) * cliff * (0.38 + smoothstep(0.42, 0.86, facetNoiseB) * 0.62);
+        ) * cliff * (0.16 + smoothstep(0.48, 0.88, facetNoiseB) * 0.34);
         float facePlane = smoothstep(
           0.48,
           0.94,
@@ -626,14 +639,14 @@ const createTerrainMaterial = (
         vec3 graniteDark = vec3(0.060, 0.105, 0.108);
         vec3 rock = mix(graniteWarm, graniteCool, roughNoise);
         rock = mix(rock, graniteDark, cliff * (0.14 + 0.18 * (1.0 - broadNoise)));
-        rock = mix(rock, rock * vec3(1.10, 1.08, 0.98), strata * cliff * 0.10);
-        rock = mix(rock, rock * vec3(0.66, 0.75, 0.80), verticalGrain * cliff * 0.26);
-        rock = mix(rock, rock * vec3(0.38, 0.48, 0.52), alpineRibs * 0.34);
-        rock = mix(rock, rock * vec3(0.46, 0.54, 0.58), verticalCleavage * 0.28);
-        rock = mix(rock, rock * vec3(1.76, 1.58, 1.20), facePlane * 0.34);
-        rock = mix(rock, rock * vec3(1.38, 1.30, 1.08), screeLines * (1.0 - alpineRibs * 0.55) * 0.18);
-        rock = mix(rock, vec3(1.00, 0.95, 0.70), heroEdge * 0.52);
-        rock = mix(rock, vec3(1.00, 1.00, 0.78), knifeHighlight * 0.56);
+        rock = mix(rock, rock * vec3(1.08, 1.06, 0.98), strata * cliff * 0.06);
+        rock = mix(rock, rock * vec3(0.70, 0.78, 0.82), verticalGrain * cliff * 0.18);
+        rock = mix(rock, rock * vec3(0.48, 0.56, 0.58), alpineRibs * 0.16);
+        rock = mix(rock, rock * vec3(0.58, 0.64, 0.64), verticalCleavage * 0.16);
+        rock = mix(rock, rock * vec3(1.58, 1.44, 1.16), facePlane * 0.28);
+        rock = mix(rock, rock * vec3(1.26, 1.20, 1.04), screeLines * (1.0 - alpineRibs * 0.35) * 0.10);
+        rock = mix(rock, vec3(1.00, 0.95, 0.70), heroEdge * 0.38);
+        rock = mix(rock, vec3(1.00, 1.00, 0.78), knifeHighlight * 0.34);
         rock *= 0.82 + 0.34 * broadNoise + 0.18 * faceBreakup;
         float forest = smoothstep(0.10, 0.026, vElev) * smoothstep(0.58, 0.88, slope) * uForest;
         forest *= 1.0 - smoothstep(0.08, 0.26, cliff);
