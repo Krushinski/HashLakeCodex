@@ -2172,14 +2172,17 @@ const createSlopedStripGeometry = (
   const colors: number[] = [];
   const indices: number[] = [];
   const count = Math.min(inner.length, outer.length);
+  const radialSegments = 5;
+  const columns = radialSegments + 1;
 
   const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
     const mottled =
       Math.sin(point.x * 0.022 + point.z * 0.015 + seed * 0.31) * 0.030 +
       Math.cos(point.x * -0.013 + point.z * 0.026 + seed * 0.17) * 0.020;
-    const elevation = THREE.MathUtils.clamp((y - 0.08) / 1.42, 0, 1);
-    const tone = THREE.MathUtils.clamp(0.86 + bandT * 0.065 + elevation * 0.10 + mottled, 0.72, 1.08);
-    colors.push(tone, tone * (0.985 + bandT * 0.018), tone * (0.92 + elevation * 0.045));
+    const elevation = THREE.MathUtils.clamp((y - 0.06) / 2.10, 0, 1);
+    const centerLight = Math.sin(Math.PI * bandT) * 0.020;
+    const tone = THREE.MathUtils.clamp(0.88 + bandT * 0.038 + elevation * 0.070 + centerLight + mottled, 0.74, 1.08);
+    colors.push(tone, tone * (0.990 + bandT * 0.010), tone * (0.935 + elevation * 0.035));
   };
 
   const getSharedBoundaryNoise = (
@@ -2198,30 +2201,57 @@ const createSlopedStripGeometry = (
     return (broad + fine) * wobble;
   };
 
+  const getInternalRelief = (
+    point: { x: number; z: number },
+    bandT: number,
+    baseY: number,
+    heightDelta: number,
+  ) => {
+    const edgeFade = Math.sin(Math.PI * bandT);
+    if (edgeFade <= 0.0001) {
+      return 0;
+    }
+
+    const rolling =
+      Math.sin(point.x * 0.010 + point.z * 0.007 + seed * 0.43) * 0.52 +
+      Math.cos(point.x * -0.006 + point.z * 0.012 + seed * 0.29) * 0.38;
+    const basin =
+      Math.sin(point.x * 0.004 - point.z * 0.005 + seed * 0.21) * 0.5 + 0.5;
+    const softValley = -Math.pow(basin, 2.2) * 0.055;
+    const bankCrown = Math.pow(edgeFade, 1.7) * Math.max(0, heightDelta) * 0.10;
+    const relief = (rolling * 0.030 + softValley + bankCrown) * edgeFade;
+    return relief + Math.max(0, baseY - 1.2) * edgeFade * 0.012;
+  };
+
   for (let index = 0; index < count; index += 1) {
     const innerPoint = inner[index];
     const outerPoint = outer[index];
     const innerNoise = getSharedBoundaryNoise(innerPoint, innerY);
     const outerNoise = getSharedBoundaryNoise(outerPoint, outerY);
-    positions.push(
-      innerPoint.x,
-      innerY + innerNoise,
-      innerPoint.z,
-      outerPoint.x,
-      outerY + outerNoise,
-      outerPoint.z,
-    );
-    pushTone(innerPoint, 0, innerY + innerNoise);
-    pushTone(outerPoint, 1, outerY + outerNoise);
+
+    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
+      const bandT = radialIndex / radialSegments;
+      const easedT = bandT * bandT * (3 - 2 * bandT);
+      const x = innerPoint.x + (outerPoint.x - innerPoint.x) * bandT;
+      const z = innerPoint.z + (outerPoint.z - innerPoint.z) * bandT;
+      const baseY = innerY + (outerY - innerY) * easedT;
+      const boundaryNoise = innerNoise + (outerNoise - innerNoise) * easedT;
+      const y =
+        baseY +
+        boundaryNoise +
+        getInternalRelief({ x, z }, bandT, baseY, outerY - innerY);
+      positions.push(x, y, z);
+      pushTone({ x, z }, bandT, y);
+    }
   }
 
   for (let index = 0; index < count; index += 1) {
     const next = (index + 1) % count;
-    const innerA = index * 2;
-    const outerA = innerA + 1;
-    const innerB = next * 2;
-    const outerB = innerB + 1;
-    indices.push(innerA, outerA, outerB, innerA, outerB, innerB);
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      const a = index * columns + radialIndex;
+      const b = next * columns + radialIndex;
+      indices.push(a, a + 1, b + 1, a, b + 1, b);
+    }
   }
 
   const topology = orientIndicesUpward(positions, indices);
@@ -2405,10 +2435,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 902,
       size: 128,
-      base: 0x3e5735,
-      accent: 0x7d8653,
-      dark: 0x263421,
-      color: 0xa2ad78,
+      base: 0x4c623a,
+      accent: 0xa2aa66,
+      dark: 0x2c3c27,
+      color: 0xb2bc82,
       roughness: 0.94,
       side: THREE.FrontSide,
     }),
@@ -2416,10 +2446,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 903,
       size: 128,
-      base: 0x54783e,
-      accent: 0xa8b96c,
-      dark: 0x30452a,
-      color: 0xb8c98a,
+      base: 0x5a7d42,
+      accent: 0xb4bf73,
+      dark: 0x334b2d,
+      color: 0xbccb88,
       roughness: 0.93,
       side: THREE.FrontSide,
     }),
@@ -2427,10 +2457,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 904,
       size: 128,
-      base: 0x3b6136,
-      accent: 0x86945a,
-      dark: 0x223524,
-      color: 0x9fb478,
+      base: 0x466c3a,
+      accent: 0x96a660,
+      dark: 0x263b27,
+      color: 0xa9ba78,
       roughness: 0.95,
       side: THREE.FrontSide,
     }),
@@ -2438,10 +2468,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 905,
       size: 128,
-      base: 0x244628,
-      accent: 0x6d7b4d,
-      dark: 0x102416,
-      color: 0x74845f,
+      base: 0x2c512c,
+      accent: 0x788754,
+      dark: 0x142719,
+      color: 0x7a8c5f,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2449,10 +2479,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 907,
       size: 128,
-      base: 0x1e3b22,
-      accent: 0x5d7145,
-      dark: 0x0d1c10,
-      color: 0x607149,
+      base: 0x244629,
+      accent: 0x64784a,
+      dark: 0x102113,
+      color: 0x65784d,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2460,10 +2490,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 906,
       size: 128,
-      base: 0x18351e,
-      accent: 0x52653c,
-      dark: 0x09180d,
-      color: 0x4b5e3b,
+      base: 0x1b3d22,
+      accent: 0x586c42,
+      dark: 0x0a1a0e,
+      color: 0x526641,
       roughness: 1,
       side: THREE.FrontSide,
     }),
