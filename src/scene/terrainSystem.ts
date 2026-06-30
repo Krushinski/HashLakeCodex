@@ -298,11 +298,15 @@ const buildForestedFoothillRiseRing = () => {
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
+  const heroTheta = -Math.PI / 2;
 
   for (let thetaIndex = 0; thetaIndex < thetaSegments; thetaIndex += 1) {
     const theta = (thetaIndex / thetaSegments) * Math.PI * 2;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
+    const heroAlignment = Math.cos(angleDiff(theta, heroTheta));
+    const heroArc = smoothstep(-0.18, 0.78, heroAlignment);
+    const shoulderArc = smoothstep(-0.58, 0.26, heroAlignment);
     const broad = noise.fbm(cos * 1.65 + 4.5, sin * 1.65 - 12.0, 4);
     const grove = noise.fbm(cos * 4.6 - 15.0, sin * 4.6 + 7.0, 4);
     const shoulder = noise.fbm(cos * 8.5 + 21.0, sin * 8.5 - 8.0, 3);
@@ -319,16 +323,27 @@ const buildForestedFoothillRiseRing = () => {
       const rollingCanopy =
         Math.max(0, Math.sin(theta * 9.0 + radial * 4.1 + 0.8)) *
         Math.max(0, 1 - Math.abs(radial - 0.68) * 2.2);
-      const y =
+      const rollingLand =
+        5.5 +
+        rise * 8.5 +
+        backRise * 9.5 +
+        broad * 4.5 +
+        grove * 3.0 * shelf +
+        rollingCanopy * 2.6;
+      const heroFoothill =
         10 +
-        rise * 24 +
-        backRise * 54 +
-        broad * 9 +
-        grove * 8 * shelf +
+        rise * 16 +
+        backRise * (38 + heroArc * 22) +
+        broad * 7 +
+        grove * 6 * shelf +
         shoulder * 8 * backRise +
-        rollingCanopy * 10;
-      vertices.push(x, Math.max(7.0, y), z);
-      elevs.push(rise);
+        rollingCanopy * 8;
+      const y =
+        rollingLand * (1 - shoulderArc) +
+        heroFoothill * shoulderArc +
+        heroArc * backRise * 18;
+      vertices.push(x, Math.max(4.8, y), z);
+      elevs.push(rise * (0.44 + shoulderArc * 0.56));
     }
   }
 
