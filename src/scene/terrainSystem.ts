@@ -293,8 +293,8 @@ const buildForestedFoothillRiseRing = () => {
   const noise = makeNoise2D(137);
   const thetaSegments = 224;
   const radialSegments = 12;
-  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 230;
-  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 800;
+  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 165;
+  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 720;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
@@ -335,17 +335,17 @@ const buildForestedFoothillRiseRing = () => {
         Math.max(0, 1 - Math.abs(radial - 0.72) * 2.0) *
         meadowKnollArc;
       const rollingLand =
-        5.5 +
-        rise * 10.5 +
-        backRise * (11.5 + meadowKnollArc * 18) +
+        4.8 +
+        rise * 9.2 +
+        backRise * (10.0 + meadowKnollArc * 16) +
         broad * 4.5 +
         grove * 3.0 * shelf +
         rollingCanopy * 2.6 +
         meadowKnoll * 24;
       const heroFoothill =
-        10 +
-        rise * 16 +
-        backRise * (38 + heroArc * 22) +
+        8 +
+        rise * 14 +
+        backRise * (34 + heroArc * 18) +
         broad * 7 +
         grove * 6 * shelf +
         shoulder * 8 * backRise +
@@ -382,8 +382,8 @@ const buildDistantAlpineHorizonRing = () => {
   const noise = makeNoise2D(211);
   const thetaSegments = 224;
   const radialSegments = 10;
-  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 760;
-  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 1280;
+  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 690;
+  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 1160;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
@@ -420,7 +420,7 @@ const buildDistantAlpineHorizonRing = () => {
       const outerTaper = 1 - smoothstep(0.82, 1.0, radial) * 0.34;
       const flankNoise = noise.fbm(x * 0.0028 + 7.0, z * 0.0028 - 19.0, 4);
       const terrace = Math.max(0, Math.sin(theta * 11.0 + radial * 5.0)) * 10 * horizonArc;
-      const y = 4.8 + broadRise * peak * outerTaper + flankNoise * 12 * broadRise + terrace * broadRise;
+      const y = 4.4 + broadRise * peak * outerTaper + flankNoise * 10 * broadRise + terrace * broadRise;
       vertices.push(x, Math.max(3.8, y), z);
       elevs.push(clamp01((y - 3.8) / 170));
     }
@@ -501,10 +501,10 @@ const createFoothillSealMaterial = (
         float broad = bl_fbm(vWorldPos.xz * 0.003 + 18.0);
         float forestPatch = smoothstep(0.34, 0.78, bl_fbm(vWorldPos.xz * 0.008 + 23.0));
         float earthPatch = smoothstep(0.58, 0.88, bl_fbm(vWorldPos.xz * 0.014 - 8.0)) * (1.0 - smoothstep(0.72, 1.0, vElev));
-        vec3 lowForest = vec3(0.020, 0.070, 0.034);
-        vec3 moss = vec3(0.068, 0.150, 0.056);
-        vec3 grass = vec3(0.118, 0.220, 0.074);
-        vec3 earth = vec3(0.104, 0.082, 0.046);
+        vec3 lowForest = vec3(0.024, 0.080, 0.040);
+        vec3 moss = vec3(0.082, 0.174, 0.062);
+        vec3 grass = vec3(0.146, 0.252, 0.084);
+        vec3 earth = vec3(0.120, 0.094, 0.052);
         vec3 albedo = mix(moss, grass, smoothstep(0.08, 0.86, broad));
         albedo = mix(albedo, lowForest, forestPatch * (0.34 + vElev * 0.32));
         albedo = mix(albedo, earth, earthPatch * 0.24);
@@ -581,15 +581,15 @@ const createForestedFoothillRiseMaterial = (
         float contour = smoothstep(0.12, 0.92, vElev);
         float grove = smoothstep(0.42, 0.80, forestNoise + contour * 0.26);
         float earthGate = smoothstep(0.52, 0.18, slope) * 0.38;
-        vec3 nearGrass = vec3(0.096, 0.205, 0.066);
-        vec3 moss = vec3(0.052, 0.128, 0.048);
-        vec3 deepForest = vec3(0.022, 0.070, 0.034);
-        vec3 earth = vec3(0.112, 0.088, 0.052);
+        vec3 nearGrass = vec3(0.124, 0.238, 0.074);
+        vec3 moss = vec3(0.068, 0.150, 0.052);
+        vec3 deepForest = vec3(0.026, 0.080, 0.038);
+        vec3 earth = vec3(0.126, 0.102, 0.058);
         vec3 albedo = mix(nearGrass, moss, contour);
         albedo = mix(albedo, deepForest, grove * (0.36 + contour * 0.26));
         albedo = mix(albedo, earth, earthGate * (0.30 + broad * 0.26));
         albedo *= 0.84 + grassNoise * 0.22 + broad * 0.08;
-        albedo = mix(albedo, vec3(0.030, 0.082, 0.036), smoothstep(0.62, 1.0, contour) * 0.18);
+        albedo = mix(albedo, vec3(0.038, 0.100, 0.044), smoothstep(0.62, 1.0, contour) * 0.14);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
         vec3 color = albedo * (uAmbient * 0.76 + uSunColor * diffuse * 0.50);
