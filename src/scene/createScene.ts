@@ -2172,7 +2172,11 @@ const createSlopedStripGeometry = (
   const colors: number[] = [];
   const indices: number[] = [];
   const count = Math.min(inner.length, outer.length);
-  const radialSegments = 12;
+  const isZone2 = label.includes("Zone 2");
+  const isZone3 = label.includes("Zone 3");
+  const isZone4 = label.includes("Zone 4");
+  const isZone5 = label.includes("Zone 5");
+  const radialSegments = isZone4 || isZone5 ? 16 : 14;
   const columns = radialSegments + 1;
 
   const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
@@ -2191,6 +2195,11 @@ const createSlopedStripGeometry = (
     const centerLight = Math.sin(Math.PI * bandT) * 0.014;
     const meadowBreak =
       Math.sin(point.x * 0.0018 + point.z * -0.0024 + seed * 0.81) * 0.5 + 0.5;
+    const meadowWarmth = isZone2 || isZone3 ? 0.018 : isZone4 ? 0.010 : 0;
+    const forestDepth = isZone5 ? 0.105 : isZone4 ? 0.060 : 0;
+    const alpineFade = isZone5
+      ? THREE.MathUtils.clamp((y - 2.85) / 1.45, 0, 1)
+      : 0;
     const tone = THREE.MathUtils.clamp(
       0.962 +
         elevation * 0.046 +
@@ -2200,14 +2209,16 @@ const createSlopedStripGeometry = (
         glade * 0.022 +
         meadowBreak * 0.012 +
         slopeLight * 0.014 -
-        valleyShade * 0.006,
+        valleyShade * 0.006 -
+        forestDepth * 0.080 +
+        meadowWarmth,
       0.905,
       1.120,
     );
     colors.push(
-      tone * (0.988 + broadWarmth * 0.020),
-      tone * (1.000 + bandT * 0.010),
-      tone * (0.940 + elevation * 0.030),
+      tone * (0.990 + broadWarmth * 0.022 + meadowWarmth * 1.45 - alpineFade * 0.036),
+      tone * (1.000 + bandT * 0.012 + meadowWarmth * 0.52 - alpineFade * 0.016),
+      tone * (0.938 + elevation * 0.028 - forestDepth * 0.30 - alpineFade * 0.040),
     );
   };
 
@@ -2272,6 +2283,21 @@ const createSlopedStripGeometry = (
       Math.max(0, heightDelta) *
       0.038 *
       (0.45 + basin * 0.55);
+    const zoneRelief =
+      isZone5
+        ? (0.026 + broadRoll * 0.032 + basin * 0.018) * edgeFade
+        : isZone4
+          ? (0.018 + broadRoll * 0.020 + basin * 0.012) * edgeFade
+          : isZone3
+            ? (0.010 + broadRoll * 0.010) * edgeFade
+            : 0;
+    const naturalTerraces =
+      (isZone4 || isZone5)
+        ? Math.sin(point.x * 0.0015 - point.z * 0.0021 + seed * 1.19) *
+          Math.max(0, heightDelta) *
+          0.018 *
+          edgeFade
+        : 0;
     const relief =
       (rolling * 0.032 +
         broadRoll * 0.036 +
@@ -2282,7 +2308,7 @@ const createSlopedStripGeometry = (
         foothillRise +
         naturalStep) *
       edgeFade;
-    return relief + Math.max(0, baseY - 1.05) * edgeFade * 0.016;
+    return relief + zoneRelief + naturalTerraces + Math.max(0, baseY - 1.05) * edgeFade * 0.018;
   };
 
   for (let index = 0; index < count; index += 1) {
@@ -2497,10 +2523,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 902,
       size: 128,
-      base: 0x81995d,
-      accent: 0xd2dd92,
-      dark: 0x4c653a,
-      color: 0xbdcf82,
+      base: 0x87a262,
+      accent: 0xd7df97,
+      dark: 0x526d3f,
+      color: 0xc5d38b,
       roughness: 0.94,
       side: THREE.FrontSide,
     }),
@@ -2508,10 +2534,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 903,
       size: 128,
-      base: 0x769654,
-      accent: 0xc8d98a,
-      dark: 0x426a35,
-      color: 0xb4cc78,
+      base: 0x7da35a,
+      accent: 0xd2e092,
+      dark: 0x436d36,
+      color: 0xbdcf7c,
       roughness: 0.93,
       side: THREE.FrontSide,
     }),
@@ -2519,10 +2545,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 904,
       size: 128,
-      base: 0x63884d,
-      accent: 0xb4c27c,
-      dark: 0x385f33,
-      color: 0xa0bb70,
+      base: 0x658f4e,
+      accent: 0xbecd7f,
+      dark: 0x365f31,
+      color: 0xa7bf72,
       roughness: 0.95,
       side: THREE.FrontSide,
     }),
@@ -2530,10 +2556,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 905,
       size: 128,
-      base: 0x51794a,
-      accent: 0x99b270,
-      dark: 0x284f2e,
-      color: 0x819d62,
+      base: 0x527c48,
+      accent: 0xa3b976,
+      dark: 0x254c2c,
+      color: 0x879f62,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2541,10 +2567,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 907,
       size: 128,
-      base: 0x426f42,
-      accent: 0x889e63,
-      dark: 0x204629,
-      color: 0x718c58,
+      base: 0x3d6a3d,
+      accent: 0x83975f,
+      dark: 0x1c3f26,
+      color: 0x6d8754,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2552,10 +2578,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 906,
       size: 128,
-      base: 0x376a3a,
-      accent: 0x78925a,
-      dark: 0x1b4123,
-      color: 0x668250,
+      base: 0x315f36,
+      accent: 0x738b58,
+      dark: 0x17361f,
+      color: 0x5f7b4c,
       roughness: 1,
       side: THREE.FrontSide,
     }),

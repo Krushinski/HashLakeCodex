@@ -273,4 +273,4 @@ export const getGroundHeightForShoreClearance = (clearance: number) => {
 export const getGroundHeightAtPoint = (point: LakePoint) =>
   getGroundHeightForShoreClearance(Math.max(0, -distanceToShore(point)));
 
-export const ZONE_BAND_TABLE_VERSION = "phase111-alpine-ecology-gradient";
+export const ZONE_BAND_TABLE_VERSION = "phase112-nested-alpine-ecology";

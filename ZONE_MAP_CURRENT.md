@@ -41,7 +41,7 @@ Going forward, issue reports may use compass plus zone number, such as:
 
 Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
-Phase 111 keeps the single ordered zone table and pushes Zones 2-5 farther toward the reference image ecology read: a stronger foreground-to-background ground ramp; warmer meadow and raised-bank shelves; dedicated lakeside specimen spruce; brighter foreground saplings; fewer pure-black needle silhouettes; and a fuller canopy/understory/foothill mix that visually climbs into the mountain base without creating a separate fake wall. The intent remains foreground, middle ground, background, mountain base, not flat paper bands.
+Phase 112 keeps the single ordered zone table and pushes Zones 2-5 farther toward the reference image ecology read: a stronger foreground-to-background ground ramp; warmer meadow and raised-bank shelves; dedicated lakeside specimen spruce; brighter foreground saplings; meadow specimen grove clusters; fewer pure-black needle silhouettes; and a fuller canopy/understory/foothill mix that visually climbs into the mountain base without creating a separate fake wall. The intent remains foreground, middle ground, background, mountain base, not flat paper bands.
 
 ## Zone 1 - Water / Lake
 
