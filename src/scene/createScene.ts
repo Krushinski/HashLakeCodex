@@ -2188,16 +2188,15 @@ const createSlopedStripGeometry = (
     const elevation = THREE.MathUtils.clamp((y - 0.06) / 2.10, 0, 1);
     const centerLight = Math.sin(Math.PI * bandT) * 0.010;
     const tone = THREE.MathUtils.clamp(
-      0.925 +
-        bandT * 0.004 +
-        elevation * 0.038 +
+      0.930 +
+        elevation * 0.034 +
         centerLight +
         mottled +
         broadWarmth * 0.026 +
         slopeLight * 0.018 -
         valleyShade * 0.014,
-      0.815,
-      1.085,
+      0.825,
+      1.080,
     );
     colors.push(
       tone * (0.988 + broadWarmth * 0.020),
@@ -2257,13 +2256,19 @@ const createSlopedStripGeometry = (
       Math.sin(point.x * 0.0022 + point.z * 0.0036 + seed * 0.47) *
       Math.max(0, heightDelta) *
       0.020;
+    const naturalStep =
+      Math.exp(-Math.pow((bandT - 0.44) / 0.34, 2)) *
+      Math.max(0, heightDelta) *
+      0.030 *
+      (0.45 + basin * 0.55);
     const relief =
       (rolling * 0.024 +
         broadRoll * 0.024 +
         shoreBench +
         middleValley +
         outerCrown +
-        meadowSway) *
+        meadowSway +
+        naturalStep) *
       edgeFade;
     return relief + Math.max(0, baseY - 1.05) * edgeFade * 0.010;
   };
@@ -2480,10 +2485,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 902,
       size: 128,
-      base: 0x657349,
-      accent: 0xb4b770,
+      base: 0x69754b,
+      accent: 0xb5b875,
       dark: 0x39462f,
-      color: 0xaeb775,
+      color: 0xb0b879,
       roughness: 0.94,
       side: THREE.FrontSide,
     }),
@@ -2491,10 +2496,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 903,
       size: 128,
-      base: 0x668249,
-      accent: 0xb8c175,
-      dark: 0x385431,
-      color: 0xaec276,
+      base: 0x667f4a,
+      accent: 0xb4bd74,
+      dark: 0x3a5230,
+      color: 0xa9ba73,
       roughness: 0.93,
       side: THREE.FrontSide,
     }),
@@ -2502,10 +2507,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 904,
       size: 128,
-      base: 0x587743,
-      accent: 0xa3b266,
-      dark: 0x2d4329,
-      color: 0x96ae69,
+      base: 0x5a7444,
+      accent: 0x9cab62,
+      dark: 0x30452b,
+      color: 0x90a864,
       roughness: 0.95,
       side: THREE.FrontSide,
     }),
@@ -2513,10 +2518,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 905,
       size: 128,
-      base: 0x426338,
-      accent: 0x819058,
+      base: 0x46643b,
+      accent: 0x7e8d58,
       dark: 0x1a301c,
-      color: 0x728a57,
+      color: 0x708756,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2524,10 +2529,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 907,
       size: 128,
-      base: 0x314f32,
-      accent: 0x66774c,
+      base: 0x345033,
+      accent: 0x63744a,
       dark: 0x142616,
-      color: 0x5f754d,
+      color: 0x5c714b,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2535,10 +2540,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 906,
       size: 128,
-      base: 0x1a3d22,
-      accent: 0x586f45,
-      dark: 0x0b1b0f,
-      color: 0x526a43,
+      base: 0x1f4428,
+      accent: 0x596f45,
+      dark: 0x0f2414,
+      color: 0x536b43,
       roughness: 1,
       side: THREE.FrontSide,
     }),
