@@ -199,7 +199,7 @@ const getBandRange = (band: PlacementBand) => {
     return { min: 106, max: 264, jitter: 82 };
   }
   if (band === "far") {
-    return { min: 168, max: ZONE_TRUTH.farForestMaxShoreClearance, jitter: 172 };
+    return { min: 168, max: ZONE_TRUTH.farForestMaxShoreClearance + 88, jitter: 190 };
   }
   if (band === "cove") {
     return { min: 86, max: 230, jitter: 48 };
@@ -458,10 +458,10 @@ export const createForestSystem = (): ForestSystem => {
     const forestOwned =
       isMainlandForestZone(instance.point, range.min, range.max) &&
       shoreClearance >= ZONE_TRUTH.forestTreeMinShoreClearance &&
-      shoreClearance <= ZONE_TRUTH.farForestMaxShoreClearance + 1;
+      shoreClearance <= ZONE_TRUTH.farForestMaxShoreClearance + 90;
     const mountainOwned =
-      shoreClearance > ZONE_TRUTH.farForestMaxShoreClearance + 1 ||
-      instance.point.x > LAKE_MAP.mapBounds.maxX + ZONE_TRUTH.farForestMaxShoreClearance + 96;
+      shoreClearance > ZONE_TRUTH.farForestMaxShoreClearance + 90 ||
+      instance.point.x > LAKE_MAP.mapBounds.maxX + ZONE_TRUTH.farForestMaxShoreClearance + 132;
 
     return {
       grounded,
