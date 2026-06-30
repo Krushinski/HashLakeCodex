@@ -41,7 +41,7 @@ Going forward, issue reports may use compass plus zone number, such as:
 
 Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
-Phase 81 adds `ZONE_BAND_TABLE.md`. Zones 1-7 now have a single ordered table for offsets, heights, materials, owners, and water permission. Zones 2-5 have one visible ground owner per band, shared boundary elevations, upward-facing generated triangles, and no arbitrary opaque stacking.
+Phase 104 keeps the single ordered zone table and tunes Zones 2-5 toward the reference image depth read: softer near-bank land, smoother green-to-forest transitions, more foreground shoreline tree punctuation, and a darker far-forest belt that can climb into the mountain base without creating a separate fake wall.
 
 ## Zone 1 - Water / Lake
 
@@ -55,7 +55,7 @@ Phase 81 adds `ZONE_BAND_TABLE.md`. Zones 1-7 now have a single ordered table fo
 ## Zone 2 - Shore / Wet Edge
 
 - Visible ground owner: `createShoreline()` wet sand and bank-toe strips.
-- Expected elevation: `0.09 -> 0.72`.
+- Expected elevation: `0.055 -> 0.42`.
 - Overlap: none for opaque ground; reeds and rocks may sit above the owned surface only where validated.
 - Allowed geometry: opaque wet edge, narrow sand/wet transition, reeds only in `isReedWetlandZone`, small wet rocks where validated.
 - Forbidden geometry: gray triangle halos, detached island/sandbar rings, broad full-shore beach bands, conifer trees in wet edge, transparent shallow cards.
@@ -67,7 +67,7 @@ Phase 81 adds `ZONE_BAND_TABLE.md`. Zones 1-7 now have a single ordered table fo
 ## Zone 3 - Raised Bank
 
 - Visible ground owner: `createShoreline()` grass transition and raised bank strips.
-- Expected elevation: `0.72 -> 1.44`.
+- Expected elevation: `0.42 -> 1.12`.
 - Overlap: none for opaque ground; shoreline rocks and future roots may sit above it.
 - Allowed geometry: raised grass/earth shelf, shoreline rocks, bushes, future roots, dock/cove land attachments.
 - Forbidden geometry: water overlays, sand halos, mountain bases, far-forest walls, hidden under-lake platforms.
@@ -79,7 +79,7 @@ Phase 81 adds `ZONE_BAND_TABLE.md`. Zones 1-7 now have a single ordered table fo
 ## Zone 4 - Near / Mid Forest Shelf
 
 - Visible ground owner: `createShoreline()` forest shelf and mid forest shelf strips.
-- Expected elevation: `1.44 -> 2.24`.
+- Expected elevation: `1.12 -> 1.90`.
 - Overlap: no second floor; `forestSystem` trees, rocks, canopy, and understory may sit on the owned surface.
 - Allowed geometry: native instanced trees, rocks, bushes, understory masses, cabin/dock props only where destination zones allow.
 - Forbidden geometry: trees in water, trees on island/sandbar unless hand-authored later, debug triangles, unvalidated asset clones.
@@ -91,7 +91,7 @@ Phase 81 adds `ZONE_BAND_TABLE.md`. Zones 1-7 now have a single ordered table fo
 ## Zone 5 - Far Forest Wall
 
 - Visible ground owner: `createShoreline()` outer land ring; forest mass is owned by `forestSystem`.
-- Expected elevation: `2.24 -> 2.42+`.
+- Expected elevation: `1.90 -> 2.38+`, with validated tree/canopy instances allowed to climb higher into the mountain-base transition.
 - Overlap: canopy/tree instances only; no opaque terrain overlay, reflection plane, or hidden scenic layer.
 - Allowed geometry: dense native instanced silhouette trees and canopy mass on validated far mainland forest shelf.
 - Forbidden geometry: transparent reflection strips, billboard panes crossing water, unvalidated 80k instance experiments, forest walls in the lake.
