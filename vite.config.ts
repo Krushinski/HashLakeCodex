@@ -4,7 +4,7 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
-const phaseName = "Hashlake Phase 105";
+const phaseName = "Hashlake Phase 106";
 const buildCommit =
   process.env.HASHLAKE_BUILD_SHA?.slice(0, 7) ??
   process.env.GITHUB_SHA?.slice(0, 7) ??

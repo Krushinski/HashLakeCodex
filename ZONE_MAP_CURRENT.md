@@ -41,7 +41,7 @@ Going forward, issue reports may use compass plus zone number, such as:
 
 Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
-Phase 105 keeps the single ordered zone table and tunes Zones 2-5 toward the reference image depth read: softer near-bank land, smoother green-to-forest transitions, more foreground shoreline tree punctuation, and a darker far-forest belt that can climb into the mountain base without creating a separate fake wall. It also closes a small far-forest band discontinuity and gives the land strips a smoother hill/valley profile so the terrain reads more like natural foreground, middle ground, and background instead of a stack of lane markers.
+Phase 106 keeps the single ordered zone table and pushes Zones 2-5 toward the reference image depth read: a warmer, raised foreground shore; visible but smoother hill/valley terrain on the green land; fuller 3D spruce/canopy forms along the shore and mid forest; and a denser far-forest belt that can visually climb into the mountain base without creating a separate fake wall. The intent is foreground, middle ground, background, mountain base, not flat paper bands.
 
 ## Zone 1 - Water / Lake
 
@@ -67,7 +67,7 @@ Phase 105 keeps the single ordered zone table and tunes Zones 2-5 toward the ref
 ## Zone 3 - Raised Bank
 
 - Visible ground owner: `createShoreline()` grass transition and raised bank strips.
-- Expected elevation: `0.42 -> 1.12`.
+- Expected elevation: `0.42 -> 1.22`.
 - Overlap: none for opaque ground; shoreline rocks and future roots may sit above it.
 - Allowed geometry: raised grass/earth shelf, shoreline rocks, bushes, future roots, dock/cove land attachments.
 - Forbidden geometry: water overlays, sand halos, mountain bases, far-forest walls, hidden under-lake platforms.
@@ -79,7 +79,7 @@ Phase 105 keeps the single ordered zone table and tunes Zones 2-5 toward the ref
 ## Zone 4 - Near / Mid Forest Shelf
 
 - Visible ground owner: `createShoreline()` forest shelf and mid forest shelf strips.
-- Expected elevation: `1.12 -> 1.90`.
+- Expected elevation: `1.22 -> 2.04`.
 - Overlap: no second floor; `forestSystem` trees, rocks, canopy, and understory may sit on the owned surface.
 - Allowed geometry: native instanced trees, rocks, bushes, understory masses, cabin/dock props only where destination zones allow.
 - Forbidden geometry: trees in water, trees on island/sandbar unless hand-authored later, debug triangles, unvalidated asset clones.
@@ -91,7 +91,7 @@ Phase 105 keeps the single ordered zone table and tunes Zones 2-5 toward the ref
 ## Zone 5 - Far Forest Wall
 
 - Visible ground owner: `createShoreline()` outer land ring; forest mass is owned by `forestSystem`.
-- Expected elevation: `1.90 -> 2.38+`, with validated tree/canopy instances allowed to climb higher into the mountain-base transition.
+- Expected elevation: `2.04 -> 2.56+`, with validated tree/canopy instances allowed to climb higher into the mountain-base transition.
 - Overlap: canopy/tree instances only; no opaque terrain overlay, reflection plane, or hidden scenic layer.
 - Allowed geometry: dense native instanced silhouette trees and canopy mass on validated far mainland forest shelf.
 - Forbidden geometry: transparent reflection strips, billboard panes crossing water, unvalidated 80k instance experiments, forest walls in the lake.
