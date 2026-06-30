@@ -232,9 +232,9 @@ const buildRidgeRing = ({
 const buildFoothillSealRing = () => {
   const noise = makeNoise2D(89);
   const thetaSegments = 224;
-  const radialSegments = 8;
-  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 8;
-  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 420;
+  const radialSegments = 10;
+  const innerOffset = RIBBON_CAKE_OUTER_OFFSET;
+  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 470;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
@@ -252,21 +252,21 @@ const buildFoothillSealRing = () => {
       const outerPoint = getContourPoint(outerOffset, theta);
       const x = innerPoint.x + (outerPoint.x - innerPoint.x) * radial;
       const z = innerPoint.z + (outerPoint.z - innerPoint.z) * radial;
-      const baseRise = smoothstep(0.05, 0.84, radial);
+      const baseRise = smoothstep(0.02, 0.98, radial);
       const crease =
-        Math.max(0, Math.sin(theta * 18.0 + radial * 4.0 + 1.7)) *
-        Math.max(0, 1 - Math.abs(radial - 0.72) * 2.4);
+        Math.max(0, Math.sin(theta * 14.0 + radial * 3.2 + 1.7)) *
+        Math.max(0, 1 - Math.abs(radial - 0.76) * 2.8);
       const bench =
-        Math.max(0, Math.sin(theta * 11.0 + radial * 5.2 + 0.9)) *
-        Math.max(0, 1 - Math.abs(radial - 0.60) * 2.8);
+        Math.max(0, Math.sin(theta * 7.0 + radial * 4.4 + 0.9)) *
+        Math.max(0, 1 - Math.abs(radial - 0.52) * 2.4);
       const y =
-        1.9 +
-        baseRise * 146 +
-        lowRoll * 14 +
-        ridgeRoll * 27 * baseRise +
-        crease * 42 +
-        bench * 24;
-      vertices.push(x, Math.max(1.8, y), z);
+        2.45 +
+        baseRise * 25 +
+        lowRoll * 4.5 +
+        ridgeRoll * 5.5 * baseRise +
+        crease * 4.0 +
+        bench * 3.2;
+      vertices.push(x, Math.max(2.32, y), z);
       elevs.push(baseRise);
     }
   }
@@ -293,8 +293,8 @@ const buildForestedFoothillRiseRing = () => {
   const noise = makeNoise2D(137);
   const thetaSegments = 224;
   const radialSegments = 12;
-  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 72;
-  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 730;
+  const innerOffset = RIBBON_CAKE_OUTER_OFFSET + 320;
+  const outerOffset = RIBBON_CAKE_OUTER_OFFSET + 920;
   const vertices: number[] = [];
   const elevs: number[] = [];
   const indices: number[] = [];
@@ -313,21 +313,21 @@ const buildForestedFoothillRiseRing = () => {
       const outerPoint = getContourPoint(outerOffset, theta);
       const x = innerPoint.x + (outerPoint.x - innerPoint.x) * radial;
       const z = innerPoint.z + (outerPoint.z - innerPoint.z) * radial;
-      const rise = smoothstep(0.02, 0.96, radial);
-      const backRise = smoothstep(0.42, 1.0, radial);
+      const rise = smoothstep(0.02, 0.98, radial);
+      const backRise = smoothstep(0.48, 1.0, radial);
       const shelf = smoothstep(0.06, 0.34, radial) * (1 - smoothstep(0.78, 1.0, radial));
       const rollingCanopy =
         Math.max(0, Math.sin(theta * 9.0 + radial * 4.1 + 0.8)) *
         Math.max(0, 1 - Math.abs(radial - 0.68) * 2.2);
       const y =
-        2.4 +
-        rise * 52 +
-        backRise * 88 +
-        broad * 18 +
-        grove * 18 * shelf +
-        shoulder * 16 * backRise +
-        rollingCanopy * 22;
-      vertices.push(x, Math.max(2.2, y), z);
+        10 +
+        rise * 24 +
+        backRise * 54 +
+        broad * 9 +
+        grove * 8 * shelf +
+        shoulder * 8 * backRise +
+        rollingCanopy * 10;
+      vertices.push(x, Math.max(7.0, y), z);
       elevs.push(rise);
     }
   }
@@ -405,47 +405,23 @@ const createFoothillSealMaterial = (
         vec3 normal = normalize(vNormal);
         float grain = bl_fbm(vWorldPos.xz * 0.018);
         float broad = bl_fbm(vWorldPos.xz * 0.003 + 18.0);
-        float fractureA = bl_fbm(vec2(vWorldPos.x * 0.020 + vWorldPos.y * 0.012, vWorldPos.z * 0.024 - vWorldPos.y * 0.018));
-        float fractureB = bl_fbm(vec2(vWorldPos.x * -0.030 + vWorldPos.y * 0.018, vWorldPos.z * 0.014 + vWorldPos.y * 0.026));
-        float chipMask = smoothstep(0.36, 0.78, fractureA) * smoothstep(0.26, 0.72, 1.0 - fractureB);
-        float rib = smoothstep(0.54, 0.92, bl_fbm(vec2(vWorldPos.x * 0.012 + vWorldPos.y * 0.018, vWorldPos.z * 0.014 + grain * 1.4)))
-          * (0.12 + chipMask * 0.28);
-        float shadowCrack = smoothstep(
-          0.66,
-          0.994,
-          sin(vWorldPos.x * -0.104 + vWorldPos.z * 0.062 + vWorldPos.y * 0.236 + grain * 8.8) * 0.5 + 0.5
-        ) * smoothstep(0.44, 0.84, fractureB);
-        float ledge = smoothstep(0.58, 0.90, bl_fbm(vec2(vWorldPos.x * -0.010 + vWorldPos.y * 0.016, vWorldPos.z * 0.015 + broad * 1.8)))
-          * smoothstep(0.38, 0.82, fractureA) * 0.36;
-        float brightSlash = smoothstep(0.78, 0.96, bl_fbm(vec2(vWorldPos.x * 0.018 + vWorldPos.y * 0.018, vWorldPos.z * -0.012 + grain * 2.1)))
-          * smoothstep(0.54, 0.92, chipMask) * 0.28;
-        float narrowSnow = smoothstep(0.84, 0.98, bl_fbm(vec2(vWorldPos.x * 0.010 + vWorldPos.y * 0.020, vWorldPos.z * 0.012 + broad * 1.5)));
-        float cliffFace = smoothstep(0.24, 0.80, 1.0 - normal.y);
-        float highFace = smoothstep(0.22, 0.78, vElev);
-        float rootRockGate = smoothstep(0.16, 0.38, vElev);
-        float foothillRockGate = smoothstep(185.0, 285.0, vWorldPos.y);
-        float rootShadow = 1.0 - smoothstep(0.05, 0.24, vElev);
-        vec3 lowForest = vec3(0.010, 0.040, 0.025);
-        vec3 moss = vec3(0.038, 0.090, 0.044);
-        vec3 granite = vec3(0.660, 0.650, 0.570);
-        vec3 graniteLight = vec3(1.000, 0.960, 0.720);
-        vec3 graniteDark = vec3(0.034, 0.056, 0.058);
-        vec3 albedo = mix(lowForest, moss, smoothstep(0.10, 0.88, broad));
-        albedo = mix(albedo, granite, clamp((highFace * 1.08 + cliffFace * 0.62) * rootRockGate * foothillRockGate, 0.0, 0.98));
-        albedo = mix(albedo, graniteDark, rib * (0.20 + highFace * 0.28));
-        albedo = mix(albedo, vec3(0.018, 0.038, 0.042), shadowCrack * cliffFace * (0.14 + highFace * 0.24));
-        albedo = mix(albedo, graniteLight, ledge * rootRockGate * foothillRockGate * (0.42 + highFace * 0.58) * (0.22 + cliffFace * 0.78));
-        albedo = mix(albedo, vec3(1.00, 0.98, 0.78), brightSlash * rootRockGate * foothillRockGate * highFace * cliffFace * 0.48);
-        albedo = mix(albedo, vec3(0.88, 0.88, 0.80), narrowSnow * rootRockGate * foothillRockGate * highFace * cliffFace * 0.10);
-        albedo = mix(albedo, vec3(0.006, 0.024, 0.015), rootShadow * 0.82);
-        albedo = mix(albedo, vec3(0.008, 0.030, 0.018), (1.0 - foothillRockGate) * 0.72);
+        float forestPatch = smoothstep(0.34, 0.78, bl_fbm(vWorldPos.xz * 0.008 + 23.0));
+        float earthPatch = smoothstep(0.58, 0.88, bl_fbm(vWorldPos.xz * 0.014 - 8.0)) * (1.0 - smoothstep(0.72, 1.0, vElev));
+        vec3 lowForest = vec3(0.020, 0.070, 0.034);
+        vec3 moss = vec3(0.068, 0.150, 0.056);
+        vec3 grass = vec3(0.118, 0.220, 0.074);
+        vec3 earth = vec3(0.104, 0.082, 0.046);
+        vec3 albedo = mix(moss, grass, smoothstep(0.08, 0.86, broad));
+        albedo = mix(albedo, lowForest, forestPatch * (0.34 + vElev * 0.32));
+        albedo = mix(albedo, earth, earthPatch * 0.24);
+        albedo *= 0.88 + grain * 0.16;
         float diffuse = max(dot(normal, uSunDir), 0.0);
-        vec3 color = albedo * (uAmbient * 0.54 + uSunColor * diffuse * 0.56);
-        color *= 0.88 + vElev * 0.54;
+        vec3 color = albedo * (uAmbient * 0.74 + uSunColor * diffuse * 0.44);
+        color *= 0.92 + clamp(normal.y, 0.0, 1.0) * 0.22;
         color += albedo * vec3(1.0, 0.28, 0.06) * uFire * 0.30;
-        color = mix(color, color * vec3(0.74, 0.80, 0.88), uDark * 0.22);
+        color = mix(color, color * vec3(0.82, 0.88, 0.94), uDark * 0.12);
         float haze = 1.0 - exp(-pow(distance(vWorldPos, uCamPos) * uHazeDen, 1.32));
-        color = mix(color, uHorizon, clamp(haze, 0.0, 0.24));
+        color = mix(color, uHorizon, clamp(haze, 0.0, 0.18));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -511,21 +487,21 @@ const createForestedFoothillRiseMaterial = (
         float contour = smoothstep(0.12, 0.92, vElev);
         float grove = smoothstep(0.42, 0.80, forestNoise + contour * 0.26);
         float earthGate = smoothstep(0.52, 0.18, slope) * 0.38;
-        vec3 nearGrass = vec3(0.070, 0.180, 0.058);
-        vec3 moss = vec3(0.034, 0.096, 0.040);
-        vec3 deepForest = vec3(0.010, 0.044, 0.024);
-        vec3 earth = vec3(0.096, 0.074, 0.046);
+        vec3 nearGrass = vec3(0.096, 0.205, 0.066);
+        vec3 moss = vec3(0.052, 0.128, 0.048);
+        vec3 deepForest = vec3(0.022, 0.070, 0.034);
+        vec3 earth = vec3(0.112, 0.088, 0.052);
         vec3 albedo = mix(nearGrass, moss, contour);
-        albedo = mix(albedo, deepForest, grove * (0.58 + contour * 0.34));
+        albedo = mix(albedo, deepForest, grove * (0.36 + contour * 0.26));
         albedo = mix(albedo, earth, earthGate * (0.30 + broad * 0.26));
         albedo *= 0.84 + grassNoise * 0.22 + broad * 0.08;
-        albedo = mix(albedo, vec3(0.006, 0.026, 0.016), smoothstep(0.62, 1.0, contour) * 0.32);
+        albedo = mix(albedo, vec3(0.030, 0.082, 0.036), smoothstep(0.62, 1.0, contour) * 0.18);
 
         float diffuse = max(dot(normal, uSunDir), 0.0);
-        vec3 color = albedo * (uAmbient * 0.58 + uSunColor * diffuse * 0.48);
-        color *= 0.78 + slope * 0.28;
+        vec3 color = albedo * (uAmbient * 0.76 + uSunColor * diffuse * 0.50);
+        color *= 0.90 + slope * 0.20;
         color += albedo * vec3(1.0, 0.30, 0.07) * uFire * 0.24;
-        color = mix(color, color * vec3(0.76, 0.82, 0.90), uDark * 0.18);
+        color = mix(color, color * vec3(0.82, 0.88, 0.94), uDark * 0.12);
         float haze = 1.0 - exp(-pow(distance(vWorldPos, uCamPos) * uHazeDen, 1.30));
         color = mix(color, uHorizon, clamp(haze, 0.0, 0.28));
         gl_FragColor = vec4(color, 1.0);
