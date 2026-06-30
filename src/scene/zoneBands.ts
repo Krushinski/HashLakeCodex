@@ -175,7 +175,7 @@ export const ZONE_BAND_TABLE: readonly ZoneBandSpec[] = [
     key: "farForestGroundMid",
     zone: 5,
     zoneName: "Far Forest Wall",
-    startOffset: 376,
+    startOffset: 372,
     endOffset: 408,
     startY: 2.12,
     endY: 2.26,
@@ -273,4 +273,4 @@ export const getGroundHeightForShoreClearance = (clearance: number) => {
 export const getGroundHeightAtPoint = (point: LakePoint) =>
   getGroundHeightForShoreClearance(Math.max(0, -distanceToShore(point)));
 
-export const ZONE_BAND_TABLE_VERSION = "phase104-organic-depth-forest-rebalance";
+export const ZONE_BAND_TABLE_VERSION = "phase105-reference-shore-slope-profile";

@@ -2172,23 +2172,32 @@ const createSlopedStripGeometry = (
   const colors: number[] = [];
   const indices: number[] = [];
   const count = Math.min(inner.length, outer.length);
-  const radialSegments = 5;
+  const radialSegments = 8;
   const columns = radialSegments + 1;
 
   const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
     const mottled =
-      Math.sin(point.x * 0.018 + point.z * 0.012 + seed * 0.31) * 0.020 +
-      Math.cos(point.x * -0.010 + point.z * 0.020 + seed * 0.17) * 0.014;
+      Math.sin(point.x * 0.014 + point.z * 0.010 + seed * 0.31) * 0.018 +
+      Math.cos(point.x * -0.008 + point.z * 0.017 + seed * 0.17) * 0.012;
     const broadWarmth =
       Math.sin(point.x * 0.0038 - point.z * 0.0046 + seed * 0.23) * 0.5 + 0.5;
     const valleyShade =
       Math.cos(point.x * 0.0062 + point.z * 0.0042 + seed * 0.19) * 0.5 + 0.5;
+    const slopeLight =
+      Math.sin(point.x * 0.0048 + point.z * -0.0031 + seed * 0.37) * 0.5 + 0.5;
     const elevation = THREE.MathUtils.clamp((y - 0.06) / 2.10, 0, 1);
-    const centerLight = Math.sin(Math.PI * bandT) * 0.014;
+    const centerLight = Math.sin(Math.PI * bandT) * 0.010;
     const tone = THREE.MathUtils.clamp(
-      0.90 + bandT * 0.024 + elevation * 0.050 + centerLight + mottled + broadWarmth * 0.026 - valleyShade * 0.018,
-      0.78,
-      1.08,
+      0.91 +
+        bandT * 0.014 +
+        elevation * 0.043 +
+        centerLight +
+        mottled +
+        broadWarmth * 0.022 +
+        slopeLight * 0.018 -
+        valleyShade * 0.014,
+      0.80,
+      1.075,
     );
     colors.push(
       tone * (0.988 + broadWarmth * 0.020),
@@ -2225,14 +2234,33 @@ const createSlopedStripGeometry = (
     }
 
     const rolling =
-      Math.sin(point.x * 0.010 + point.z * 0.007 + seed * 0.43) * 0.52 +
-      Math.cos(point.x * -0.006 + point.z * 0.012 + seed * 0.29) * 0.38;
+      Math.sin(point.x * 0.008 + point.z * 0.006 + seed * 0.43) * 0.48 +
+      Math.cos(point.x * -0.005 + point.z * 0.010 + seed * 0.29) * 0.36;
+    const broadRoll =
+      Math.sin(point.x * 0.0045 + point.z * -0.0035 + seed * 0.61) * 0.5 +
+      Math.cos(point.x * -0.0030 + point.z * 0.0048 + seed * 0.53) * 0.5;
     const basin =
       Math.sin(point.x * 0.004 - point.z * 0.005 + seed * 0.21) * 0.5 + 0.5;
-    const softValley = -Math.pow(basin, 2.2) * 0.055;
-    const bankCrown = Math.pow(edgeFade, 1.7) * Math.max(0, heightDelta) * 0.10;
-    const relief = (rolling * 0.030 + softValley + bankCrown) * edgeFade;
-    return relief + Math.max(0, baseY - 1.2) * edgeFade * 0.012;
+    const shoreBench =
+      Math.exp(-Math.pow((bandT - 0.30) / 0.22, 2)) *
+      Math.max(0, heightDelta) *
+      0.055;
+    const middleValley =
+      -Math.exp(-Math.pow((bandT - 0.58) / 0.24, 2)) *
+      (0.030 + Math.max(0, baseY - 0.70) * 0.015) *
+      (0.60 + basin * 0.40);
+    const outerCrown =
+      Math.exp(-Math.pow((bandT - 0.82) / 0.20, 2)) *
+      Math.max(0, heightDelta) *
+      0.072;
+    const relief =
+      (rolling * 0.024 +
+        broadRoll * 0.024 +
+        shoreBench +
+        middleValley +
+        outerCrown) *
+      edgeFade;
+    return relief + Math.max(0, baseY - 1.05) * edgeFade * 0.010;
   };
 
   for (let index = 0; index < count; index += 1) {
@@ -2480,10 +2508,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 905,
       size: 128,
-      base: 0x335831,
-      accent: 0x738952,
-      dark: 0x15291a,
-      color: 0x6f8958,
+      base: 0x385e34,
+      accent: 0x7f9057,
+      dark: 0x172c1a,
+      color: 0x738c59,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2491,10 +2519,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 907,
       size: 128,
-      base: 0x284a2d,
-      accent: 0x5f7448,
-      dark: 0x102113,
-      color: 0x5e744c,
+      base: 0x2d4f30,
+      accent: 0x66794b,
+      dark: 0x112313,
+      color: 0x647a4e,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),

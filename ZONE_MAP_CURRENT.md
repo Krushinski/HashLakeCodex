@@ -41,7 +41,7 @@ Going forward, issue reports may use compass plus zone number, such as:
 
 Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
-Phase 104 keeps the single ordered zone table and tunes Zones 2-5 toward the reference image depth read: softer near-bank land, smoother green-to-forest transitions, more foreground shoreline tree punctuation, and a darker far-forest belt that can climb into the mountain base without creating a separate fake wall.
+Phase 105 keeps the single ordered zone table and tunes Zones 2-5 toward the reference image depth read: softer near-bank land, smoother green-to-forest transitions, more foreground shoreline tree punctuation, and a darker far-forest belt that can climb into the mountain base without creating a separate fake wall. It also closes a small far-forest band discontinuity and gives the land strips a smoother hill/valley profile so the terrain reads more like natural foreground, middle ground, and background instead of a stack of lane markers.
 
 ## Zone 1 - Water / Lake
 

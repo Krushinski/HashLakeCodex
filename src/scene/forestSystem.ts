@@ -211,10 +211,10 @@ const getTreeGroundHeightAt = (point: LakePoint, band: PlacementBand) => {
 
 const getBandRange = (band: PlacementBand) => {
   if (band === "near") {
-    return { min: 30, max: 138, jitter: 48 };
+    return { min: 38, max: 152, jitter: 58 };
   }
   if (band === "mid") {
-    return { min: 82, max: 304, jitter: 108 };
+    return { min: 78, max: 316, jitter: 118 };
   }
   if (band === "far") {
     return { min: 148, max: ZONE_TRUTH.farForestMaxShoreClearance + 156, jitter: 232 };
@@ -290,12 +290,13 @@ const sampleTreeInstance = (
 
   const point = { x: shore.x, z: shore.z };
   const inland = THREE.MathUtils.clamp((-distanceToShore(point) - 38) / 300, 0, 1);
-  const lightness = baseLightness - inland * 0.088 + (rng() - 0.5) * 0.058;
+  const nearShore = 1 - THREE.MathUtils.clamp((-distanceToShore(point) - 38) / 130, 0, 1);
+  const lightness = baseLightness - inland * 0.088 + nearShore * 0.018 + (rng() - 0.5) * 0.058;
   return {
     point,
     groundY: getTreeGroundHeightAt(point, band),
     yaw: rng() * Math.PI * 2,
-    heightScale: 0.70 + rng() * 0.70 + inland * 0.68,
+    heightScale: 0.76 + rng() * 0.72 + inland * 0.68 + nearShore * 0.08,
     widthScale: 0.68 + rng() * 0.76 + inland * 0.34,
     color: new THREE.Color().setHSL(baseHue + (rng() - 0.5) * 0.072, 0.22 + rng() * 0.24, lightness),
     band,
@@ -565,10 +566,10 @@ export const createForestSystem = (): ForestSystem => {
     treeBuilds.push({ key, meshes: [canopy, trunks], baseCount: instances.length });
   };
 
-  addSimpleTreeType("tallNarrowPine", 320, ["near", "near", "mid", "far", "far", "alpineBase", "cove"], tallCanopy, foliageMaterial, 5.2, 1.0, 13.1, 0.96, 1.04, 0.35, 0.205);
-  addSimpleTreeType("shortPine", 190, ["near", "near", "near", "dock", "mid", "cove"], shortCanopy, foliageMaterial, 3.0, 0.86, 7.4, 0.96, 0.96, 0.34, 0.235);
-  addSimpleTreeType("mediumConifer", 330, ["near", "mid", "mid", "far", "far", "alpineBase"], mediumCanopy, foliageMaterial, 4.0, 0.96, 10.0, 1.02, 1.02, 0.35, 0.205);
-  addSimpleTreeType("youngPine", 180, ["near", "near", "dock", "mid", "cove"], youngCanopy, foliageMaterial, 1.7, 0.58, 4.2, 0.86, 0.94, 0.34, 0.255);
+  addSimpleTreeType("tallNarrowPine", 340, ["near", "near", "mid", "far", "far", "alpineBase", "cove"], tallCanopy, foliageMaterial, 5.2, 1.0, 13.1, 0.96, 1.04, 0.35, 0.205);
+  addSimpleTreeType("shortPine", 220, ["near", "near", "near", "dock", "mid", "cove"], shortCanopy, foliageMaterial, 3.0, 0.86, 7.4, 0.96, 0.96, 0.34, 0.235);
+  addSimpleTreeType("mediumConifer", 350, ["near", "mid", "mid", "far", "far", "alpineBase"], mediumCanopy, foliageMaterial, 4.0, 0.96, 10.0, 1.02, 1.02, 0.35, 0.205);
+  addSimpleTreeType("youngPine", 220, ["near", "near", "dock", "mid", "cove"], youngCanopy, foliageMaterial, 1.7, 0.58, 4.2, 0.86, 0.94, 0.34, 0.255);
 
   const layeredInstances = makeInstances(300, "layeredConifer", ["mid", "far", "far", "alpineBase", "alpineBase", "cove"], 0.35, 0.182);
   const layeredTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, layeredInstances.length, "Native tree type - layeredConifer trunks");
