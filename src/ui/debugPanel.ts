@@ -1265,7 +1265,7 @@ export const createDebugPanel = (
       telemetry.visualMode.mountainExperimentValid
         ? "--"
         : telemetry.visualMode.mountainExperimentReason,
-      telemetry.visualMode.mountainExperimentValid ? "muted" : "bad",
+      telemetry.visualMode.mountainExperimentValid || !experimentArtLoaded ? "muted" : "bad",
     );
     setMetric(
       "Mountain verts",
@@ -1294,33 +1294,81 @@ export const createDebugPanel = (
     );
     setMetric(
       "Foothill anchor",
-      telemetry.visualMode.mountainFoothillAnchor ? "yes" : "no",
-      telemetry.visualMode.mountainFoothillAnchor ? "good" : "bad",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainFoothillAnchor
+          ? "yes"
+          : "no"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainFoothillAnchor
+          ? "good"
+          : "bad"
+        : "muted",
     );
     setMetric(
       "Base seated",
-      telemetry.visualMode.mountainBaseTouchesFoothill ? "yes" : "no",
-      telemetry.visualMode.mountainBaseTouchesFoothill ? "good" : "bad",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainBaseTouchesFoothill
+          ? "yes"
+          : "no"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainBaseTouchesFoothill
+          ? "good"
+          : "bad"
+        : "muted",
     );
     setMetric(
       "Grounded",
-      telemetry.visualMode.mountainGrounded ? "yes" : "no",
-      telemetry.visualMode.mountainGrounded ? "good" : "bad",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainGrounded
+          ? "yes"
+          : "no"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainGrounded
+          ? "good"
+          : "bad"
+        : "muted",
     );
     setMetric(
       "Floating gap",
-      telemetry.visualMode.mountainFloatingGapDetected ? "yes" : "no",
-      telemetry.visualMode.mountainFloatingGapDetected ? "bad" : "good",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainFloatingGapDetected
+          ? "yes"
+          : "no"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainFloatingGapDetected
+          ? "bad"
+          : "good"
+        : "muted",
     );
     setMetric(
       "Bottom silhouette",
-      telemetry.visualMode.mountainBottomSilhouetteValid ? "valid" : "invalid",
-      telemetry.visualMode.mountainBottomSilhouetteValid ? "good" : "bad",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainBottomSilhouetteValid
+          ? "valid"
+          : "invalid"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainBottomSilhouetteValid
+          ? "good"
+          : "bad"
+        : "muted",
     );
     setMetric(
       "Forest occlusion",
-      telemetry.visualMode.mountainForestOcclusionValid ? "yes" : "no",
-      telemetry.visualMode.mountainForestOcclusionValid ? "good" : "bad",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainForestOcclusionValid
+          ? "yes"
+          : "no"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainForestOcclusionValid
+          ? "good"
+          : "bad"
+        : "muted",
     );
     setMetric(
       "Stage order",
@@ -1329,13 +1377,29 @@ export const createDebugPanel = (
     );
     setMetric(
       "Artifact check",
-      telemetry.visualMode.mountainArtifactFree ? "pass" : "failed",
-      telemetry.visualMode.mountainArtifactFree ? "good" : "bad",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainArtifactFree
+          ? "pass"
+          : "failed"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainArtifactFree
+          ? "good"
+          : "bad"
+        : "muted",
     );
     setMetric(
       "Camera check",
-      telemetry.visualMode.mountainCameraCheckValid ? "pass" : "unproven",
-      telemetry.visualMode.mountainCameraCheckValid ? "good" : "warn",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainCameraCheckValid
+          ? "pass"
+          : "unproven"
+        : "--",
+      experimentArtLoaded
+        ? telemetry.visualMode.mountainCameraCheckValid
+          ? "good"
+          : "warn"
+        : "muted",
     );
     setMetric(
       "Lake overlap",

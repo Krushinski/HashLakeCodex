@@ -2287,15 +2287,22 @@ const createSlopedStripGeometry = (
       isZone5
         ? (0.026 + broadRoll * 0.032 + basin * 0.018) * edgeFade
         : isZone4
-          ? (0.018 + broadRoll * 0.020 + basin * 0.012) * edgeFade
+          ? (0.024 + broadRoll * 0.024 + basin * 0.016) * edgeFade
           : isZone3
-            ? (0.010 + broadRoll * 0.010) * edgeFade
+            ? (0.014 + broadRoll * 0.014) * edgeFade
             : 0;
     const naturalTerraces =
       (isZone4 || isZone5)
         ? Math.sin(point.x * 0.0015 - point.z * 0.0021 + seed * 1.19) *
           Math.max(0, heightDelta) *
           0.018 *
+          edgeFade
+        : 0;
+    const shoreUndulation =
+      (isZone2 || isZone3)
+        ? Math.sin(point.x * 0.0066 + point.z * 0.0048 + seed * 0.91) *
+          Math.max(0, heightDelta) *
+          0.020 *
           edgeFade
         : 0;
     const relief =
@@ -2308,7 +2315,13 @@ const createSlopedStripGeometry = (
         foothillRise +
         naturalStep) *
       edgeFade;
-    return relief + zoneRelief + naturalTerraces + Math.max(0, baseY - 1.05) * edgeFade * 0.018;
+    return (
+      relief +
+      zoneRelief +
+      naturalTerraces +
+      shoreUndulation +
+      Math.max(0, baseY - 1.05) * edgeFade * 0.018
+    );
   };
 
   for (let index = 0; index < count; index += 1) {
