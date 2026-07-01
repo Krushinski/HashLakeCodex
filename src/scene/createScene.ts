@@ -2176,7 +2176,7 @@ const createSlopedStripGeometry = (
   const isZone3 = label.includes("Zone 3");
   const isZone4 = label.includes("Zone 4");
   const isZone5 = label.includes("Zone 5");
-  const radialSegments = isZone4 || isZone5 ? 16 : 14;
+  const radialSegments = isZone5 ? 22 : isZone4 ? 20 : 14;
   const columns = radialSegments + 1;
 
   const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
@@ -2261,6 +2261,13 @@ const createSlopedStripGeometry = (
       Math.exp(-Math.pow((bandT - 0.30) / 0.22, 2)) *
       Math.max(0, heightDelta) *
       0.082;
+    const riparianRidge =
+      (isZone2 || isZone3)
+        ? Math.exp(-Math.pow((bandT - 0.62) / 0.26, 2)) *
+          Math.max(0, heightDelta) *
+          0.052 *
+          (0.54 + basin * 0.46)
+        : 0;
     const middleValley =
       -Math.exp(-Math.pow((bandT - 0.58) / 0.24, 2)) *
       (0.030 + Math.max(0, baseY - 0.70) * 0.014) *
@@ -2278,18 +2285,44 @@ const createSlopedStripGeometry = (
       Math.max(0, heightDelta) *
       0.054 *
       (0.55 + broadRoll * 0.45);
+    const alpineShoulder =
+      isZone5
+        ? Math.exp(-Math.pow((bandT - 0.76) / 0.30, 2)) *
+          Math.max(0, heightDelta) *
+          0.094 *
+          (0.58 + broadRoll * 0.42)
+        : isZone4
+          ? Math.exp(-Math.pow((bandT - 0.82) / 0.26, 2)) *
+            Math.max(0, heightDelta) *
+            0.038 *
+            (0.58 + basin * 0.42)
+          : 0;
     const naturalStep =
       Math.exp(-Math.pow((bandT - 0.44) / 0.34, 2)) *
       Math.max(0, heightDelta) *
       0.038 *
       (0.45 + basin * 0.55);
+    const ecologicalMounds =
+      (isZone3 || isZone4)
+        ? Math.sin(point.x * 0.0032 - point.z * 0.0041 + seed * 0.67) *
+          Math.max(0, heightDelta) *
+          0.036 *
+          edgeFade
+        : 0;
+    const forestRootLifts =
+      (isZone4 || isZone5)
+        ? Math.sin(point.x * 0.0068 + point.z * 0.0039 + seed * 0.34) *
+          Math.sin(point.x * -0.0027 + point.z * 0.0046 + seed * 0.58) *
+          0.056 *
+          edgeFade
+        : 0;
     const zoneRelief =
       isZone5
-        ? (0.026 + broadRoll * 0.032 + basin * 0.018) * edgeFade
+        ? (0.032 + broadRoll * 0.038 + basin * 0.024) * edgeFade
         : isZone4
-          ? (0.024 + broadRoll * 0.024 + basin * 0.016) * edgeFade
+          ? (0.030 + broadRoll * 0.030 + basin * 0.020) * edgeFade
           : isZone3
-            ? (0.014 + broadRoll * 0.014) * edgeFade
+            ? (0.018 + broadRoll * 0.018) * edgeFade
             : 0;
     const naturalTerraces =
       (isZone4 || isZone5)
@@ -2309,10 +2342,12 @@ const createSlopedStripGeometry = (
       (rolling * 0.032 +
         broadRoll * 0.036 +
         shoreBench +
+        riparianRidge +
         middleValley +
         outerCrown +
         meadowSway +
         foothillRise +
+        alpineShoulder +
         naturalStep) *
       edgeFade;
     return (
@@ -2320,6 +2355,8 @@ const createSlopedStripGeometry = (
       zoneRelief +
       naturalTerraces +
       shoreUndulation +
+      ecologicalMounds +
+      forestRootLifts +
       Math.max(0, baseY - 1.05) * edgeFade * 0.018
     );
   };

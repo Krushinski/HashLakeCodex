@@ -44,7 +44,9 @@ export type NativeTreeTypeKey =
   | "foothillClimberSpruce"
   | "meadowSpecimenGrove"
   | "shorelineHeroSpruce"
-  | "riparianShrubTuft";
+  | "riparianShrubTuft"
+  | "shorelineSentinelPine"
+  | "alpineSlopeSpruce";
 
 export type NativeTreeTypeCounts = Record<NativeTreeTypeKey, number>;
 
@@ -116,6 +118,8 @@ const TREE_TYPE_KEYS: NativeTreeTypeKey[] = [
   "meadowSpecimenGrove",
   "shorelineHeroSpruce",
   "riparianShrubTuft",
+  "shorelineSentinelPine",
+  "alpineSlopeSpruce",
 ];
 
 const emptyTypeCounts = (): NativeTreeTypeCounts => ({
@@ -140,6 +144,8 @@ const emptyTypeCounts = (): NativeTreeTypeCounts => ({
   meadowSpecimenGrove: 0,
   shorelineHeroSpruce: 0,
   riparianShrubTuft: 0,
+  shorelineSentinelPine: 0,
+  alpineSlopeSpruce: 0,
 });
 
 const outlinePosition = (index: number, offset: number, jitter: number) => {
@@ -470,6 +476,12 @@ export const createForestSystem = (): ForestSystem => {
   const shorelineHeroLower = new THREE.ConeGeometry(5.1, 9.2, 10, 1);
   const shorelineHeroMiddle = new THREE.ConeGeometry(3.7, 9.6, 9, 1);
   const shorelineHeroTop = new THREE.ConeGeometry(2.2, 8.4, 8, 1);
+  const sentinelLower = new THREE.ConeGeometry(3.2, 10.8, 8, 1);
+  const sentinelMiddle = new THREE.ConeGeometry(2.25, 10.2, 8, 1);
+  const sentinelTop = new THREE.ConeGeometry(1.24, 9.4, 7, 1);
+  const slopeSpruceLower = new THREE.ConeGeometry(3.4, 8.6, 8, 1);
+  const slopeSpruceMiddle = new THREE.ConeGeometry(2.45, 7.8, 8, 1);
+  const slopeSpruceTop = new THREE.ConeGeometry(1.54, 6.9, 7, 1);
   const broadCanopy = new THREE.DodecahedronGeometry(3.75, 1);
   const canopyMoundGeometry = new THREE.DodecahedronGeometry(4.4, 1);
   const backgroundCanopyGeometry = new THREE.DodecahedronGeometry(5.8, 1);
@@ -665,7 +677,7 @@ export const createForestSystem = (): ForestSystem => {
     baseCount: lakesideSpecimens.length,
   });
 
-  const shorelineHeroInstances = makeInstances(300, "shorelineHeroSpruce", ["near", "near", "dock", "cove", "mid"], 0.338, 0.486);
+  const shorelineHeroInstances = makeInstances(380, "shorelineHeroSpruce", ["near", "near", "near", "dock", "cove", "mid"], 0.338, 0.488);
   const shorelineHeroTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, shorelineHeroInstances.length, "Native tree type - shorelineHeroSpruce trunks");
   const shorelineHeroLowMesh = makeInstancedMesh(shorelineHeroLower, foliageMaterial, shorelineHeroInstances.length, "Native tree type - shorelineHeroSpruce lower canopy");
   const shorelineHeroMidMesh = makeInstancedMesh(shorelineHeroMiddle, foliageMaterial, shorelineHeroInstances.length, "Native tree type - shorelineHeroSpruce middle canopy");
@@ -687,6 +699,30 @@ export const createForestSystem = (): ForestSystem => {
     key: "shorelineHeroSpruce",
     meshes: [shorelineHeroTrunks, shorelineHeroLowMesh, shorelineHeroMidMesh, shorelineHeroTopMesh],
     baseCount: shorelineHeroInstances.length,
+  });
+
+  const shorelineSentinels = makeInstances(300, "shorelineSentinelPine", ["near", "near", "near", "dock", "cove", "mid"], 0.342, 0.510);
+  const sentinelTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, shorelineSentinels.length, "Native tree type - shorelineSentinelPine trunks");
+  const sentinelLowMesh = makeInstancedMesh(sentinelLower, foliageMaterial, shorelineSentinels.length, "Native tree type - shorelineSentinelPine lower canopy");
+  const sentinelMidMesh = makeInstancedMesh(sentinelMiddle, foliageMaterial, shorelineSentinels.length, "Native tree type - shorelineSentinelPine middle canopy");
+  const sentinelTopMesh = makeInstancedMesh(sentinelTop, foliageMaterial, shorelineSentinels.length, "Native tree type - shorelineSentinelPine top canopy");
+  shorelineSentinels.forEach((instance, index) => {
+    const clearance = Math.max(0, -distanceToShore(instance.point));
+    const openEdge = 1 - THREE.MathUtils.clamp((clearance - 50) / 150, 0, 1);
+    const sentinelScale = 0.94 + rng() * 0.74 + openEdge * 0.30;
+    fillTrunk(sentinelTrunks, instance, index, 9.2 * instance.heightScale * sentinelScale, 0.58 * instance.widthScale);
+    fillCone(sentinelLowMesh, instance, index, 12.5 * instance.heightScale * sentinelScale, 0.92 * instance.widthScale, 1.10 * instance.heightScale * sentinelScale, 0.82 + rng() * 0.16);
+    fillCone(sentinelMidMesh, instance, index, 16.7 * instance.heightScale * sentinelScale, 0.70 * instance.widthScale, 1.04 * instance.heightScale * sentinelScale, 0.80 + rng() * 0.14);
+    fillCone(sentinelTopMesh, instance, index, 21.0 * instance.heightScale * sentinelScale, 0.46 * instance.widthScale, 1.02 * instance.heightScale * sentinelScale, 0.78 + rng() * 0.12);
+  });
+  [sentinelTrunks, sentinelLowMesh, sentinelMidMesh, sentinelTopMesh].forEach((mesh) =>
+    finalizeMesh(mesh, shorelineSentinels.length),
+  );
+  group.add(sentinelTrunks, sentinelLowMesh, sentinelMidMesh, sentinelTopMesh);
+  treeBuilds.push({
+    key: "shorelineSentinelPine",
+    meshes: [sentinelTrunks, sentinelLowMesh, sentinelMidMesh, sentinelTopMesh],
+    baseCount: shorelineSentinels.length,
   });
 
   const meadowSpecimens = makeInstances(760, "meadowSpecimenGrove", ["near", "near", "near", "near", "mid", "dock", "cove"], 0.286, 0.522);
@@ -983,6 +1019,30 @@ export const createForestSystem = (): ForestSystem => {
     baseCount: foothillClimberInstances.length,
   });
 
+  const alpineSlopeSpruces = makeInstances(1160, "alpineSlopeSpruce", ["far", "far", "alpineBase", "alpineBase", "alpineBase", "alpineBase", "mid"], 0.336, 0.376);
+  const slopeTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, alpineSlopeSpruces.length, "Native tree type - alpineSlopeSpruce trunks");
+  const slopeLowMesh = makeInstancedMesh(slopeSpruceLower, darkFoliageMaterial, alpineSlopeSpruces.length, "Native tree type - alpineSlopeSpruce lower canopy");
+  const slopeMidMesh = makeInstancedMesh(slopeSpruceMiddle, darkFoliageMaterial, alpineSlopeSpruces.length, "Native tree type - alpineSlopeSpruce middle canopy");
+  const slopeTopMesh = makeInstancedMesh(slopeSpruceTop, darkFoliageMaterial, alpineSlopeSpruces.length, "Native tree type - alpineSlopeSpruce top canopy");
+  alpineSlopeSpruces.forEach((instance, index) => {
+    const clearance = Math.max(0, -distanceToShore(instance.point));
+    const climb = THREE.MathUtils.clamp((clearance - 220) / 430, 0, 1);
+    const slopeScale = 0.78 + rng() * 0.62 + climb * 0.46;
+    fillTrunk(slopeTrunks, instance, index, 6.0 * instance.heightScale * slopeScale, 0.52 * instance.widthScale);
+    fillCone(slopeLowMesh, instance, index, 8.4 * instance.heightScale * slopeScale, 1.18 * instance.widthScale, 0.96 * instance.heightScale * slopeScale, 0.80 + rng() * 0.18);
+    fillCone(slopeMidMesh, instance, index, 12.0 * instance.heightScale * slopeScale, 0.92 * instance.widthScale, 0.94 * instance.heightScale * slopeScale, 0.78 + rng() * 0.16);
+    fillCone(slopeTopMesh, instance, index, 15.4 * instance.heightScale * slopeScale, 0.62 * instance.widthScale, 0.94 * instance.heightScale * slopeScale, 0.76 + rng() * 0.14);
+  });
+  [slopeTrunks, slopeLowMesh, slopeMidMesh, slopeTopMesh].forEach((mesh) =>
+    finalizeMesh(mesh, alpineSlopeSpruces.length),
+  );
+  group.add(slopeTrunks, slopeLowMesh, slopeMidMesh, slopeTopMesh);
+  treeBuilds.push({
+    key: "alpineSlopeSpruce",
+    meshes: [slopeTrunks, slopeLowMesh, slopeMidMesh, slopeTopMesh],
+    baseCount: alpineSlopeSpruces.length,
+  });
+
   const wallInstances = makeInstances(960, "forestWallCanopy", ["far", "far", "alpineBase", "alpineBase", "far", "mid"], 0.338, 0.286);
   const forestWall = makeInstancedMesh(forestWallGeometry, clusterMaterial, wallInstances.length, "Native tree type - forestWallCanopy living wall");
   wallInstances.forEach((instance, index) => {
@@ -1143,7 +1203,9 @@ export const createForestSystem = (): ForestSystem => {
         key === "foothillClimberSpruce" ||
         key === "meadowSpecimenGrove" ||
         key === "shorelineHeroSpruce" ||
-        key === "riparianShrubTuft"
+        key === "riparianShrubTuft" ||
+        key === "shorelineSentinelPine" ||
+        key === "alpineSlopeSpruce"
         ? 1
         : 0.98;
     }
@@ -1154,7 +1216,9 @@ export const createForestSystem = (): ForestSystem => {
       key === "shorelineSignatureSpruce" ||
       key === "lakesideSpecimenSpruce" ||
       key === "foothillClimberSpruce" ||
-      key === "meadowSpecimenGrove"
+      key === "meadowSpecimenGrove" ||
+      key === "shorelineSentinelPine" ||
+      key === "alpineSlopeSpruce"
     ) {
       return 0.94;
     }
@@ -1189,9 +1253,9 @@ export const createForestSystem = (): ForestSystem => {
       const darken = Math.max(0.52, 1 - weather.dials.skyDark * 0.30);
       foliageMaterial.color.setHex(palette.shorelineGrass);
       foliageMaterial.color.multiplyScalar(darken * 1.20);
-      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x456f45 : 0x73975b);
-      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x3f693f : 0x74985d);
-      meadowFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x647f49 : 0x94b966);
+      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x456f45 : 0x809d62);
+      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x3f693f : 0x829d66);
+      meadowFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x647f49 : 0x9fbe70);
       reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x687246 : 0xa9bd68);
       rockMaterial.color.setHex(palette.rock);
       rockMaterial.color.lerp(new THREE.Color(0x9aa08f), 0.18);
