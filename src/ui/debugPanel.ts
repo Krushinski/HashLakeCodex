@@ -442,6 +442,7 @@ const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
     `F${counts.distantSilhouetteTree}`,
     `Y${counts.youngPine}`,
     `A${counts.assetSpruceSpecimen}`,
+    `Q${counts.branchingLakePine}`,
     `R${counts.foothillFirStand}`,
   ].join(" ");
 

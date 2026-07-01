@@ -2176,7 +2176,7 @@ const createSlopedStripGeometry = (
   const isZone3 = label.includes("Zone 3");
   const isZone4 = label.includes("Zone 4");
   const isZone5 = label.includes("Zone 5");
-  const radialSegments = isZone5 ? 22 : isZone4 ? 20 : 14;
+  const radialSegments = isZone5 ? 26 : isZone4 ? 24 : isZone3 ? 18 : 16;
   const columns = radialSegments + 1;
 
   const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
@@ -2213,6 +2213,15 @@ const createSlopedStripGeometry = (
       Math.sin(point.x * 0.0108 + point.z * 0.0074 + seed * 1.91) * 0.5 + 0.5;
     const gladeVeil =
       Math.sin(point.x * 0.0012 - point.z * 0.0017 + seed * 0.44) * 0.5 + 0.5;
+    const landFold =
+      Math.sin(point.x * 0.0054 + point.z * 0.0037 + seed * 1.11) *
+        Math.cos(point.x * -0.0021 + point.z * 0.0044 + seed * 0.38) *
+        0.5 +
+      0.5;
+    const bankHighlight =
+      Math.exp(-Math.pow((bandT - 0.28) / 0.22, 2)) * (isZone2 || isZone3 ? 1 : 0);
+    const woodlandShelf =
+      Math.exp(-Math.pow((bandT - 0.62) / 0.34, 2)) * (isZone4 || isZone5 ? 1 : 0);
     const meadowWarmth = isZone2 || isZone3 ? 0.018 : isZone4 ? 0.010 : 0;
     const forestDepth = isZone5 ? 0.105 : isZone4 ? 0.060 : 0;
     const alpineFade = isZone5
@@ -2256,6 +2265,8 @@ const createSlopedStripGeometry = (
         slopeLight * 0.014 -
         valleyShade * 0.006 -
         forestDepth * 0.080 +
+        bankHighlight * 0.018 +
+        woodlandShelf * landFold * 0.020 -
         meadowWarmth +
         nearEcology -
         midForestEcology +
@@ -2266,9 +2277,9 @@ const createSlopedStripGeometry = (
       1.120,
     );
     colors.push(
-      tone * (0.982 + broadWarmth * 0.024 + meadowWarmth * 1.34 + nearEcology * 1.40 + meadowGladeLift * 0.72 - alpineFade * 0.042 - forestFloorDepth * 0.32),
-      tone * (1.006 + bandT * 0.014 + meadowWarmth * 0.58 + mossLift * 1.25 + meadowGladeLift * 0.58 - alpineFade * 0.018 - forestFloorDepth * 0.20),
-      tone * (0.932 + elevation * 0.030 - forestDepth * 0.27 - alpineFade * 0.044 - midForestEcology * 0.72 - forestFloorDepth * 0.92),
+      tone * (0.982 + broadWarmth * 0.024 + meadowWarmth * 1.34 + nearEcology * 1.40 + meadowGladeLift * 0.72 + bankHighlight * 0.055 - alpineFade * 0.042 - forestFloorDepth * 0.32 - woodlandShelf * 0.020),
+      tone * (1.006 + bandT * 0.014 + meadowWarmth * 0.58 + mossLift * 1.25 + meadowGladeLift * 0.58 + bankHighlight * 0.035 + woodlandShelf * 0.018 - alpineFade * 0.018 - forestFloorDepth * 0.20),
+      tone * (0.932 + elevation * 0.030 - forestDepth * 0.27 - alpineFade * 0.044 - midForestEcology * 0.72 - forestFloorDepth * 0.92 - woodlandShelf * 0.050),
     );
   };
 
@@ -2380,6 +2391,35 @@ const createSlopedStripGeometry = (
           0.042 *
           (0.48 + broadRoll * 0.52)
         : 0;
+    const bankShoulder =
+      (isZone2 || isZone3)
+        ? Math.exp(-Math.pow((bandT - 0.36) / 0.20, 2)) *
+          Math.max(0, heightDelta) *
+          0.125 *
+          (0.55 + basin * 0.45)
+        : 0;
+    const meadowHummocks =
+      (isZone3 || isZone4)
+        ? Math.exp(-Math.pow((bandT - 0.54) / 0.32, 2)) *
+          Math.max(0, heightDelta) *
+          0.070 *
+          (0.45 + broadRoll * 0.55) *
+          (0.75 + edgeFade * 0.25)
+        : 0;
+    const woodlandRootShelf =
+      (isZone4 || isZone5)
+        ? Math.exp(-Math.pow((bandT - 0.76) / 0.30, 2)) *
+          Math.max(0, heightDelta) *
+          0.125 *
+          (0.44 + broadRoll * 0.36 + basin * 0.20)
+        : 0;
+    const contourSaddle =
+      (isZone4 || isZone5)
+        ? -Math.exp(-Math.pow((bandT - 0.42) / 0.22, 2)) *
+          Math.max(0, heightDelta) *
+          0.040 *
+          (0.50 + basin * 0.50)
+        : 0;
     const zoneRelief =
       isZone5
         ? (0.032 + broadRoll * 0.038 + basin * 0.024) * edgeFade
@@ -2423,6 +2463,10 @@ const createSlopedStripGeometry = (
       forestRootLifts +
       gladeSwells +
       forestFloorKnolls +
+      bankShoulder +
+      meadowHummocks +
+      woodlandRootShelf +
+      contourSaddle +
       Math.max(0, baseY - 1.05) * edgeFade * 0.018
     );
   };
