@@ -443,6 +443,8 @@ const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
     `Y${counts.youngPine}`,
     `A${counts.assetSpruceSpecimen}`,
     `Q${counts.branchingLakePine}`,
+    `H${counts.shorelineTowerSpruce}`,
+    `O${counts.understoryEvergreenPatch}`,
     `R${counts.foothillFirStand}`,
   ].join(" ");
 

@@ -2222,6 +2222,13 @@ const createSlopedStripGeometry = (
       Math.exp(-Math.pow((bandT - 0.28) / 0.22, 2)) * (isZone2 || isZone3 ? 1 : 0);
     const woodlandShelf =
       Math.exp(-Math.pow((bandT - 0.62) / 0.34, 2)) * (isZone4 || isZone5 ? 1 : 0);
+    const soilBreak =
+      Math.sin(point.x * 0.012 + point.z * -0.009 + seed * 2.21) *
+        Math.cos(point.x * -0.007 + point.z * 0.011 + seed * 1.88) *
+        0.5 +
+      0.5;
+    const rootMat =
+      Math.exp(-Math.pow((bandT - 0.74) / 0.28, 2)) * (isZone4 || isZone5 ? 1 : 0);
     const meadowWarmth = isZone2 || isZone3 ? 0.018 : isZone4 ? 0.010 : 0;
     const forestDepth = isZone5 ? 0.105 : isZone4 ? 0.060 : 0;
     const alpineFade = isZone5
@@ -2267,6 +2274,7 @@ const createSlopedStripGeometry = (
         forestDepth * 0.080 +
         bankHighlight * 0.018 +
         woodlandShelf * landFold * 0.020 -
+        rootMat * soilBreak * 0.032 -
         meadowWarmth +
         nearEcology -
         midForestEcology +
@@ -2277,9 +2285,9 @@ const createSlopedStripGeometry = (
       1.120,
     );
     colors.push(
-      tone * (0.982 + broadWarmth * 0.024 + meadowWarmth * 1.34 + nearEcology * 1.40 + meadowGladeLift * 0.72 + bankHighlight * 0.055 - alpineFade * 0.042 - forestFloorDepth * 0.32 - woodlandShelf * 0.020),
-      tone * (1.006 + bandT * 0.014 + meadowWarmth * 0.58 + mossLift * 1.25 + meadowGladeLift * 0.58 + bankHighlight * 0.035 + woodlandShelf * 0.018 - alpineFade * 0.018 - forestFloorDepth * 0.20),
-      tone * (0.932 + elevation * 0.030 - forestDepth * 0.27 - alpineFade * 0.044 - midForestEcology * 0.72 - forestFloorDepth * 0.92 - woodlandShelf * 0.050),
+      tone * (0.982 + broadWarmth * 0.024 + meadowWarmth * 1.34 + nearEcology * 1.40 + meadowGladeLift * 0.72 + bankHighlight * 0.055 - alpineFade * 0.042 - forestFloorDepth * 0.32 - woodlandShelf * 0.020 - rootMat * soilBreak * 0.055),
+      tone * (1.006 + bandT * 0.014 + meadowWarmth * 0.58 + mossLift * 1.25 + meadowGladeLift * 0.58 + bankHighlight * 0.035 + woodlandShelf * 0.018 - alpineFade * 0.018 - forestFloorDepth * 0.20 - rootMat * soilBreak * 0.030),
+      tone * (0.932 + elevation * 0.030 - forestDepth * 0.27 - alpineFade * 0.044 - midForestEcology * 0.72 - forestFloorDepth * 0.92 - woodlandShelf * 0.050 - rootMat * soilBreak * 0.090),
     );
   };
 
@@ -2420,6 +2428,21 @@ const createSlopedStripGeometry = (
           0.040 *
           (0.50 + basin * 0.50)
         : 0;
+    const forestRiseVeins =
+      (isZone4 || isZone5)
+        ? Math.sin(point.x * 0.010 + point.z * -0.006 + seed * 0.77) *
+          Math.cos(point.x * 0.005 + point.z * 0.012 + seed * 1.31) *
+          Math.max(0, heightDelta) *
+          0.040 *
+          Math.exp(-Math.pow((bandT - 0.68) / 0.34, 2))
+        : 0;
+    const shorePocketDips =
+      (isZone2 || isZone3)
+        ? -Math.exp(-Math.pow((bandT - 0.18) / 0.18, 2)) *
+          Math.max(0, heightDelta) *
+          0.036 *
+          (0.42 + basin * 0.58)
+        : 0;
     const zoneRelief =
       isZone5
         ? (0.032 + broadRoll * 0.038 + basin * 0.024) * edgeFade
@@ -2467,6 +2490,8 @@ const createSlopedStripGeometry = (
       meadowHummocks +
       woodlandRootShelf +
       contourSaddle +
+      forestRiseVeins +
+      shorePocketDips +
       Math.max(0, baseY - 1.05) * edgeFade * 0.018
     );
   };

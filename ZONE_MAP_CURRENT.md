@@ -41,7 +41,7 @@ Going forward, issue reports may use compass plus zone number, such as:
 
 Debug and Legend both expose the Zone 6 relationship. `V` is now a truth toggle: it switches between the native baseline mountains and a no-mountains / zone-proof view. A future experiment can enter the cycle only after it passes placement, grounding, occlusion, artifact, and camera proof gates.
 
-Phase 118 keeps the single ordered zone table and treats the old cone/spike forest as placeholder art rather than final vegetation. Placement and zone ownership remain intact, but the rendering layer now adds a branchy lakeside pine family with visible limbs and offset crowns, while continuing to scale down the old narrow-cone/debug-proxy tree types. Zones 2-5 also receive stronger native landform relief: raised bank shoulders, meadow hummocks, woodland root shelves, and darker forest floor saddles. The intent remains foreground, middle ground, background, mountain base, with more 3D terrain character instead of flat paper bands.
+Phase 119 keeps the single ordered zone table and treats the old cone/spike forest as placeholder art rather than final vegetation. Placement and zone ownership remain intact, but the rendering layer now adds taller shoreline tower spruces and low understory evergreen patches so Zones 2-5 have a foreground tree line, middle forest body, and darker forest floor rather than repeated toy cones. The ground ribbons also receive richer terrain texture: shore pocket dips, root-mat darkening, forest rise veins, meadow hummocks, and woodland shelves. The intent remains foreground, middle ground, background, mountain base, with more 3D terrain character instead of flat paper bands.
 
 ## Zone 1 - Water / Lake
 
