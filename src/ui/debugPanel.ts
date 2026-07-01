@@ -441,6 +441,8 @@ const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
     `P${counts.fullSpruceCluster}`,
     `F${counts.distantSilhouetteTree}`,
     `Y${counts.youngPine}`,
+    `A${counts.assetSpruceSpecimen}`,
+    `R${counts.foothillFirStand}`,
   ].join(" ");
 
 const createMetricCards = (group: MetricTile["group"]) =>
