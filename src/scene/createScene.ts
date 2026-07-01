@@ -2195,11 +2195,35 @@ const createSlopedStripGeometry = (
     const centerLight = Math.sin(Math.PI * bandT) * 0.014;
     const meadowBreak =
       Math.sin(point.x * 0.0018 + point.z * -0.0024 + seed * 0.81) * 0.5 + 0.5;
+    const spruceShadow =
+      Math.sin(point.x * 0.0046 + point.z * 0.0033 + seed * 1.37) *
+        Math.cos(point.x * -0.0028 + point.z * 0.0049 + seed * 0.92) *
+        0.5 +
+      0.5;
+    const mossPocket =
+      Math.cos(point.x * 0.0068 - point.z * 0.0046 + seed * 1.71) * 0.5 + 0.5;
+    const sunlitBank =
+      Math.sin(point.x * 0.0026 + point.z * -0.0019 + seed * 0.58) * 0.5 + 0.5;
     const meadowWarmth = isZone2 || isZone3 ? 0.018 : isZone4 ? 0.010 : 0;
     const forestDepth = isZone5 ? 0.105 : isZone4 ? 0.060 : 0;
     const alpineFade = isZone5
       ? THREE.MathUtils.clamp((y - 2.85) / 1.45, 0, 1)
       : 0;
+    const nearEcology = isZone2
+      ? 0.032 * sunlitBank
+      : isZone3
+        ? 0.022 * sunlitBank
+        : 0;
+    const midForestEcology = isZone4
+      ? 0.030 * spruceShadow
+      : isZone5
+        ? 0.050 * spruceShadow
+        : 0;
+    const mossLift = (isZone3 || isZone4)
+      ? 0.020 * mossPocket
+      : isZone5
+        ? 0.014 * mossPocket
+        : 0;
     const tone = THREE.MathUtils.clamp(
       0.962 +
         elevation * 0.046 +
@@ -2211,14 +2235,17 @@ const createSlopedStripGeometry = (
         slopeLight * 0.014 -
         valleyShade * 0.006 -
         forestDepth * 0.080 +
-        meadowWarmth,
+        meadowWarmth +
+        nearEcology -
+        midForestEcology +
+        mossLift,
       0.905,
       1.120,
     );
     colors.push(
-      tone * (0.990 + broadWarmth * 0.022 + meadowWarmth * 1.45 - alpineFade * 0.036),
-      tone * (1.000 + bandT * 0.012 + meadowWarmth * 0.52 - alpineFade * 0.016),
-      tone * (0.938 + elevation * 0.028 - forestDepth * 0.30 - alpineFade * 0.040),
+      tone * (0.982 + broadWarmth * 0.024 + meadowWarmth * 1.34 + nearEcology * 1.40 - alpineFade * 0.042),
+      tone * (1.006 + bandT * 0.014 + meadowWarmth * 0.58 + mossLift * 1.25 - alpineFade * 0.018),
+      tone * (0.932 + elevation * 0.030 - forestDepth * 0.27 - alpineFade * 0.044 - midForestEcology * 0.72),
     );
   };
 

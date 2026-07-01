@@ -46,7 +46,8 @@ export type NativeTreeTypeKey =
   | "shorelineHeroSpruce"
   | "riparianShrubTuft"
   | "shorelineSentinelPine"
-  | "alpineSlopeSpruce";
+  | "alpineSlopeSpruce"
+  | "shorelineSunlitSpruce";
 
 export type NativeTreeTypeCounts = Record<NativeTreeTypeKey, number>;
 
@@ -120,6 +121,7 @@ const TREE_TYPE_KEYS: NativeTreeTypeKey[] = [
   "riparianShrubTuft",
   "shorelineSentinelPine",
   "alpineSlopeSpruce",
+  "shorelineSunlitSpruce",
 ];
 
 const emptyTypeCounts = (): NativeTreeTypeCounts => ({
@@ -146,6 +148,7 @@ const emptyTypeCounts = (): NativeTreeTypeCounts => ({
   riparianShrubTuft: 0,
   shorelineSentinelPine: 0,
   alpineSlopeSpruce: 0,
+  shorelineSunlitSpruce: 0,
 });
 
 const outlinePosition = (index: number, offset: number, jitter: number) => {
@@ -402,16 +405,16 @@ const makeFoliageMaterial = (
       kind: "grass",
       seed: color & 0xfff,
       size: 96,
-      base: 0x83b36a,
-      accent: 0xdaeaa4,
-      dark: 0x386b3b,
+      base: 0x8cbb6d,
+      accent: 0xe7efac,
+      dark: 0x456f3f,
     }),
     roughnessMap: createProceduralRoughnessTexture("grass", (color & 0xfff) + 13, 96),
     vertexColors: true,
     roughness: 0.96,
     metalness: 0,
     emissive: 0x071108,
-    emissiveIntensity: 0.018,
+    emissiveIntensity: 0.026,
   });
   installWindShader(material, windUniforms);
   return material;
@@ -468,6 +471,7 @@ export const createForestSystem = (): ForestSystem => {
   const clusterMaterial = makeFoliageMaterial(0x74985d, windUniforms) as THREE.MeshStandardMaterial;
   const silhouetteMaterial = makeFoliageMaterial(0x5c7350, windUniforms) as THREE.MeshStandardMaterial;
   const meadowFoliageMaterial = makeFoliageMaterial(0x94b966, windUniforms) as THREE.MeshStandardMaterial;
+  const sunlitFoliageMaterial = makeFoliageMaterial(0xa5c978, windUniforms) as THREE.MeshStandardMaterial;
 
   const tallCanopy = new THREE.ConeGeometry(2.55, 18.0, 9, 2);
   const shortCanopy = new THREE.ConeGeometry(2.9, 10.5, 8, 2);
@@ -723,6 +727,30 @@ export const createForestSystem = (): ForestSystem => {
     key: "shorelineSentinelPine",
     meshes: [sentinelTrunks, sentinelLowMesh, sentinelMidMesh, sentinelTopMesh],
     baseCount: shorelineSentinels.length,
+  });
+
+  const sunlitShoreSpruces = makeInstances(460, "shorelineSunlitSpruce", ["near", "near", "near", "dock", "cove", "mid"], 0.318, 0.548);
+  const sunlitTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, sunlitShoreSpruces.length, "Native tree type - shorelineSunlitSpruce trunks");
+  const sunlitLowMesh = makeInstancedMesh(fullSpruceLow, sunlitFoliageMaterial, sunlitShoreSpruces.length, "Native tree type - shorelineSunlitSpruce lower boughs");
+  const sunlitMidMesh = makeInstancedMesh(fullSpruceMid, sunlitFoliageMaterial, sunlitShoreSpruces.length, "Native tree type - shorelineSunlitSpruce middle boughs");
+  const sunlitTopMesh = makeInstancedMesh(fullSpruceTop, sunlitFoliageMaterial, sunlitShoreSpruces.length, "Native tree type - shorelineSunlitSpruce top boughs");
+  sunlitShoreSpruces.forEach((instance, index) => {
+    const clearance = Math.max(0, -distanceToShore(instance.point));
+    const lakeside = 1 - THREE.MathUtils.clamp((clearance - 72) / 190, 0, 1);
+    const spruceScale = 0.68 + rng() * 0.42 + lakeside * 0.22;
+    fillTrunk(sunlitTrunks, instance, index, 4.7 * instance.heightScale * spruceScale, 0.56 * instance.widthScale);
+    fillCone(sunlitLowMesh, instance, index, 7.0 * instance.heightScale * spruceScale, 1.16 * instance.widthScale, 0.94 * instance.heightScale * spruceScale, 0.80 + rng() * 0.18);
+    fillCone(sunlitMidMesh, instance, index, 10.0 * instance.heightScale * spruceScale, 0.94 * instance.widthScale, 0.94 * instance.heightScale * spruceScale, 0.78 + rng() * 0.16);
+    fillCone(sunlitTopMesh, instance, index, 13.1 * instance.heightScale * spruceScale, 0.70 * instance.widthScale, 0.96 * instance.heightScale * spruceScale, 0.76 + rng() * 0.14);
+  });
+  [sunlitTrunks, sunlitLowMesh, sunlitMidMesh, sunlitTopMesh].forEach((mesh) =>
+    finalizeMesh(mesh, sunlitShoreSpruces.length),
+  );
+  group.add(sunlitTrunks, sunlitLowMesh, sunlitMidMesh, sunlitTopMesh);
+  treeBuilds.push({
+    key: "shorelineSunlitSpruce",
+    meshes: [sunlitTrunks, sunlitLowMesh, sunlitMidMesh, sunlitTopMesh],
+    baseCount: sunlitShoreSpruces.length,
   });
 
   const meadowSpecimens = makeInstances(760, "meadowSpecimenGrove", ["near", "near", "near", "near", "mid", "dock", "cove"], 0.286, 0.522);
@@ -1205,7 +1233,8 @@ export const createForestSystem = (): ForestSystem => {
         key === "shorelineHeroSpruce" ||
         key === "riparianShrubTuft" ||
         key === "shorelineSentinelPine" ||
-        key === "alpineSlopeSpruce"
+        key === "alpineSlopeSpruce" ||
+        key === "shorelineSunlitSpruce"
         ? 1
         : 0.98;
     }
@@ -1218,7 +1247,8 @@ export const createForestSystem = (): ForestSystem => {
       key === "foothillClimberSpruce" ||
       key === "meadowSpecimenGrove" ||
       key === "shorelineSentinelPine" ||
-      key === "alpineSlopeSpruce"
+      key === "alpineSlopeSpruce" ||
+      key === "shorelineSunlitSpruce"
     ) {
       return 0.94;
     }
@@ -1256,6 +1286,7 @@ export const createForestSystem = (): ForestSystem => {
       darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x456f45 : 0x809d62);
       clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x3f693f : 0x829d66);
       meadowFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x647f49 : 0x9fbe70);
+      sunlitFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x6f8f55 : 0xb0ca7a);
       reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x687246 : 0xa9bd68);
       rockMaterial.color.setHex(palette.rock);
       rockMaterial.color.lerp(new THREE.Color(0x9aa08f), 0.18);
