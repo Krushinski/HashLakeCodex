@@ -2176,7 +2176,7 @@ const createSlopedStripGeometry = (
   const isZone3 = label.includes("Zone 3");
   const isZone4 = label.includes("Zone 4");
   const isZone5 = label.includes("Zone 5");
-  const radialSegments = isZone5 ? 26 : isZone4 ? 24 : isZone3 ? 18 : 16;
+  const radialSegments = isZone5 ? 32 : isZone4 ? 30 : isZone3 ? 22 : 18;
   const columns = radialSegments + 1;
 
   const pushTone = (point: { x: number; z: number }, bandT: number, y: number) => {
@@ -2396,7 +2396,7 @@ const createSlopedStripGeometry = (
       (isZone4 || isZone5)
         ? Math.sin(point.x * 0.0068 + point.z * 0.0039 + seed * 0.34) *
           Math.sin(point.x * -0.0027 + point.z * 0.0046 + seed * 0.58) *
-          0.072 *
+          0.088 *
           edgeFade
         : 0;
     const gladeSwells =
@@ -2410,7 +2410,7 @@ const createSlopedStripGeometry = (
       (isZone4 || isZone5)
         ? Math.exp(-Math.pow((bandT - 0.64) / 0.36, 2)) *
           Math.max(0, heightDelta) *
-          0.058 *
+          0.074 *
           (0.48 + broadRoll * 0.52)
         : 0;
     const bankShoulder =
@@ -2424,7 +2424,7 @@ const createSlopedStripGeometry = (
       (isZone3 || isZone4)
         ? Math.exp(-Math.pow((bandT - 0.54) / 0.32, 2)) *
           Math.max(0, heightDelta) *
-          0.090 *
+          0.112 *
           (0.45 + broadRoll * 0.55) *
           (0.75 + edgeFade * 0.25)
         : 0;
@@ -2432,7 +2432,7 @@ const createSlopedStripGeometry = (
       (isZone4 || isZone5)
         ? Math.exp(-Math.pow((bandT - 0.76) / 0.30, 2)) *
           Math.max(0, heightDelta) *
-          0.150 *
+          0.178 *
           (0.44 + broadRoll * 0.36 + basin * 0.20)
         : 0;
     const contourSaddle =
@@ -2454,14 +2454,14 @@ const createSlopedStripGeometry = (
       (isZone2 || isZone3 || isZone4)
         ? Math.exp(-Math.pow((bandT - 0.52) / 0.30, 2)) *
           Math.max(0, heightDelta) *
-          0.130 *
+          0.160 *
           (0.44 + basin * 0.36 + broadRoll * 0.20)
         : 0;
     const forestClimbRoll =
       (isZone4 || isZone5)
         ? Math.exp(-Math.pow((bandT - 0.70) / 0.38, 2)) *
           Math.max(0, heightDelta) *
-          0.140 *
+          0.172 *
           (0.48 + broadRoll * 0.36 + Math.max(0, rolling) * 0.16)
         : 0;
     const shorePocketDips =
@@ -2475,21 +2475,21 @@ const createSlopedStripGeometry = (
       (isZone4 || isZone5)
         ? Math.max(0, Math.sin(point.x * 0.014 - point.z * 0.009 + seed * 0.68)) *
           Math.max(0, heightDelta) *
-          0.052 *
+          0.068 *
           Math.exp(-Math.pow((bandT - 0.72) / 0.24, 2))
         : 0;
     const specimenTreePads =
       (isZone3 || isZone4)
         ? Math.exp(-Math.pow((bandT - 0.58) / 0.28, 2)) *
           Math.max(0, heightDelta) *
-          0.235 *
+          0.280 *
           (0.34 + basin * 0.34 + Math.max(0, broadRoll) * 0.32)
         : 0;
     const slopeEcologyBenches =
       (isZone4 || isZone5)
         ? Math.exp(-Math.pow((bandT - 0.66) / 0.38, 2)) *
           Math.max(0, heightDelta) *
-          0.116 *
+          0.142 *
           (0.38 + broadRoll * 0.38 + basin * 0.24)
         : 0;
     const mountainBaseToeRise =
@@ -2510,7 +2510,7 @@ const createSlopedStripGeometry = (
       (isZone3 || isZone4)
         ? Math.max(0, Math.sin(point.x * 0.0108 - point.z * 0.0072 + seed * 1.54)) *
           Math.max(0, heightDelta) *
-          0.182 *
+          0.215 *
           Math.exp(-Math.pow((bandT - 0.62) / 0.30, 2)) *
           (0.42 + basin * 0.30 + broadRoll * 0.28)
         : 0;
@@ -2518,7 +2518,7 @@ const createSlopedStripGeometry = (
       (isZone4 || isZone5)
         ? Math.exp(-Math.pow((bandT - 0.78) / 0.26, 2)) *
           Math.max(0, heightDelta) *
-          0.198 *
+          0.238 *
           (0.36 + Math.max(0, broadRoll) * 0.34 + basin * 0.30)
         : 0;
     const forestFloorDrainageCuts =
@@ -2811,10 +2811,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 902,
       size: 128,
-      base: 0x91aa67,
-      accent: 0xe0e79d,
-      dark: 0x5c7345,
-      color: 0xcbd98d,
+      base: 0x8faa61,
+      accent: 0xe4eba3,
+      dark: 0x546f40,
+      color: 0xc9db8a,
       roughness: 0.94,
       side: THREE.FrontSide,
     }),
@@ -2822,10 +2822,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 903,
       size: 128,
-      base: 0x86ad5e,
-      accent: 0xe1e99e,
-      dark: 0x4c7638,
-      color: 0xc9d986,
+      base: 0x7fa958,
+      accent: 0xdbe89a,
+      dark: 0x446e36,
+      color: 0xbfd382,
       roughness: 0.93,
       side: THREE.FrontSide,
     }),
@@ -2833,10 +2833,10 @@ const createShoreline = () => {
       kind: "grass",
       seed: 904,
       size: 128,
-      base: 0x719b52,
-      accent: 0xd0dc91,
-      dark: 0x3c6733,
-      color: 0xb7c97b,
+      base: 0x6f9a4f,
+      accent: 0xc6d887,
+      dark: 0x365f31,
+      color: 0xaec374,
       roughness: 0.95,
       side: THREE.FrontSide,
     }),
@@ -2844,10 +2844,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 905,
       size: 128,
-      base: 0x5e8c4e,
-      accent: 0xb4c982,
-      dark: 0x2e542f,
-      color: 0x96ad6a,
+      base: 0x5b884c,
+      accent: 0xabc37c,
+      dark: 0x294f2d,
+      color: 0x8fa765,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2855,10 +2855,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 907,
       size: 128,
-      base: 0x49743f,
-      accent: 0x92a86d,
-      dark: 0x22482a,
-      color: 0x78925a,
+      base: 0x436f3c,
+      accent: 0x879f66,
+      dark: 0x1e4327,
+      color: 0x6f8b55,
       roughness: 0.99,
       side: THREE.FrontSide,
     }),
@@ -2866,10 +2866,10 @@ const createShoreline = () => {
       kind: "forestFloor",
       seed: 906,
       size: 128,
-      base: 0x386a39,
-      accent: 0x80965d,
-      dark: 0x193920,
-      color: 0x647f4b,
+      base: 0x315f34,
+      accent: 0x718b55,
+      dark: 0x15351d,
+      color: 0x5b7646,
       roughness: 1,
       side: THREE.FrontSide,
     }),

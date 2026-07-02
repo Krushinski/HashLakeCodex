@@ -133,3 +133,10 @@ Phase 124 is a focused native vegetation/material upgrade. It adds larger hero l
 - Experiment owner: `src/scene/zone6MountainExperiment.ts` owns an empty, non-rendering experiment slot until a future experiment passes all gates. Debug separates `Experiment slot` from `Experiment art valid`.
 - Validity: Debug reports mountain owner, native mountain visibility, experiment mountain visibility, zone proof state, slot readiness, bounds, active back arc, side fadeout, invalid vertices, foothill anchor, base seated, grounded yes/no, floating gap yes/no, bottom silhouette, forest occlusion, stage order, artifact check, camera check, lake overlap, second-lake risk, pane/banner risk, and invalid reason.
 - WebGPU scenic: quarantined; not part of the active mode contract and never activated by `V`.
+
+## Phase 125 Terrain / Tree Depth Note
+
+- Purpose: move the existing valid Zone 2-5 land outward from flat painted ribbons toward readable alpine shore, meadow, woodland, and foothill depth without changing water ownership or mountain ownership.
+- Runtime change: native tree render language adds larger shoreline larch/spruce specimens and mixed foothill groves so the shore and slopes read as 3D vegetation instead of a dotted toy-tree fence.
+- Terrain change: Zone 3-5 internal relief and material tone are strengthened while the official zone boundaries stay unchanged.
+- Guardrail: no new water surface, mountain experiment, hidden ground sheet, external asset, or selector/debug clutter was introduced.
