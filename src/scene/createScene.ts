@@ -2450,11 +2450,25 @@ const createSlopedStripGeometry = (
           0.040 *
           Math.exp(-Math.pow((bandT - 0.68) / 0.34, 2))
         : 0;
+    const specimenRootRise =
+      (isZone2 || isZone3 || isZone4)
+        ? Math.exp(-Math.pow((bandT - 0.52) / 0.30, 2)) *
+          Math.max(0, heightDelta) *
+          0.096 *
+          (0.44 + basin * 0.36 + broadRoll * 0.20)
+        : 0;
+    const forestClimbRoll =
+      (isZone4 || isZone5)
+        ? Math.exp(-Math.pow((bandT - 0.70) / 0.38, 2)) *
+          Math.max(0, heightDelta) *
+          0.112 *
+          (0.48 + broadRoll * 0.36 + Math.max(0, rolling) * 0.16)
+        : 0;
     const shorePocketDips =
       (isZone2 || isZone3)
         ? -Math.exp(-Math.pow((bandT - 0.18) / 0.18, 2)) *
           Math.max(0, heightDelta) *
-          0.036 *
+          0.046 *
           (0.42 + basin * 0.58)
         : 0;
     const rootButtressRidges =
@@ -2519,6 +2533,8 @@ const createSlopedStripGeometry = (
       woodlandRootShelf +
       contourSaddle +
       forestRiseVeins +
+      specimenRootRise +
+      forestClimbRoll +
       shorePocketDips +
       rootButtressRidges +
       bankMeadowUndercut +

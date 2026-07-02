@@ -449,6 +449,8 @@ const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
     `X${counts.mountainBaseMixedSpruce}`,
     `Z${counts.alphaPineSilhouette}`,
     `R${counts.foothillFirStand}`,
+    `J${counts.inspirationShorePine}`,
+    `D${counts.mountainClimbFir}`,
   ].join(" ");
 
 const createMetricCards = (group: MetricTile["group"]) =>
