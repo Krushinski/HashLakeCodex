@@ -450,6 +450,8 @@ const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
     `Z${counts.alphaPineSilhouette}`,
     `R${counts.foothillFirStand}`,
     `J${counts.inspirationShorePine}`,
+    `E${counts.lakefrontAlpinePine}`,
+    `Gv${counts.slopeGroveSpruce}`,
     `D${counts.mountainClimbFir}`,
   ].join(" ");
 

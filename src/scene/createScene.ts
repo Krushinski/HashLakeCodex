@@ -2478,6 +2478,34 @@ const createSlopedStripGeometry = (
           0.036 *
           Math.exp(-Math.pow((bandT - 0.72) / 0.24, 2))
         : 0;
+    const specimenTreePads =
+      (isZone3 || isZone4)
+        ? Math.exp(-Math.pow((bandT - 0.58) / 0.28, 2)) *
+          Math.max(0, heightDelta) *
+          0.118 *
+          (0.34 + basin * 0.34 + Math.max(0, broadRoll) * 0.32)
+        : 0;
+    const slopeEcologyBenches =
+      (isZone4 || isZone5)
+        ? Math.exp(-Math.pow((bandT - 0.66) / 0.38, 2)) *
+          Math.max(0, heightDelta) *
+          0.094 *
+          (0.38 + broadRoll * 0.38 + basin * 0.24)
+        : 0;
+    const mountainBaseToeRise =
+      isZone5
+        ? Math.exp(-Math.pow((bandT - 0.86) / 0.22, 2)) *
+          Math.max(0, heightDelta) *
+          0.162 *
+          (0.44 + broadRoll * 0.34 + basin * 0.22)
+        : 0;
+    const rootHollows =
+      (isZone3 || isZone4 || isZone5)
+        ? -Math.abs(Math.sin(point.x * 0.0082 + point.z * -0.0064 + seed * 1.37)) *
+          Math.max(0, heightDelta) *
+          0.026 *
+          Math.exp(-Math.pow((bandT - 0.48) / 0.30, 2))
+        : 0;
     const bankMeadowUndercut =
       (isZone2 || isZone3)
         ? Math.sin(point.x * 0.009 + point.z * 0.008 + seed * 1.12) *
@@ -2537,6 +2565,10 @@ const createSlopedStripGeometry = (
       forestClimbRoll +
       shorePocketDips +
       rootButtressRidges +
+      specimenTreePads +
+      slopeEcologyBenches +
+      mountainBaseToeRise +
+      rootHollows +
       bankMeadowUndercut +
       Math.max(0, baseY - 1.05) * edgeFade * 0.018
     );

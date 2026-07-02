@@ -58,6 +58,8 @@ export type NativeTreeTypeKey =
   | "alphaPineSilhouette"
   | "foothillFirStand"
   | "inspirationShorePine"
+  | "lakefrontAlpinePine"
+  | "slopeGroveSpruce"
   | "mountainClimbFir";
 
 export type NativeTreeTypeCounts = Record<NativeTreeTypeKey, number>;
@@ -143,6 +145,8 @@ const TREE_TYPE_KEYS: NativeTreeTypeKey[] = [
   "alphaPineSilhouette",
   "foothillFirStand",
   "inspirationShorePine",
+  "lakefrontAlpinePine",
+  "slopeGroveSpruce",
   "mountainClimbFir",
 ];
 
@@ -181,6 +185,8 @@ const emptyTypeCounts = (): NativeTreeTypeCounts => ({
   alphaPineSilhouette: 0,
   foothillFirStand: 0,
   inspirationShorePine: 0,
+  lakefrontAlpinePine: 0,
+  slopeGroveSpruce: 0,
   mountainClimbFir: 0,
 });
 
@@ -450,8 +456,8 @@ const makeFoliageMaterial = (
     vertexColors: true,
     roughness: 0.96,
     metalness: 0,
-    emissive: 0x071108,
-    emissiveIntensity: 0.026,
+    emissive: 0x0b1709,
+    emissiveIntensity: 0.052,
   });
   installWindShader(material, windUniforms);
   return material;
@@ -574,6 +580,8 @@ export const createForestSystem = (): ForestSystem => {
   const matureFirMaterial = makeFoliageMaterial(0x91b36c, windUniforms) as THREE.MeshStandardMaterial;
   const mountainBaseFoliageMaterial = makeFoliageMaterial(0x657c55, windUniforms) as THREE.MeshStandardMaterial;
   const inspirationShorePineMaterial = makeFoliageMaterial(0xb0cc80, windUniforms) as THREE.MeshStandardMaterial;
+  const lakefrontAlpinePineMaterial = makeFoliageMaterial(0xbadf91, windUniforms) as THREE.MeshStandardMaterial;
+  const slopeGroveSpruceMaterial = makeFoliageMaterial(0x789b5f, windUniforms) as THREE.MeshStandardMaterial;
   const mountainClimbFirMaterial = makeFoliageMaterial(0x8ea96f, windUniforms) as THREE.MeshStandardMaterial;
 
   const tallCanopy = new THREE.ConeGeometry(2.55, 18.0, 9, 2);
@@ -612,6 +620,8 @@ export const createForestSystem = (): ForestSystem => {
   const assetSpruceBough = new THREE.DodecahedronGeometry(1.55, 1);
   const branchPineCrown = new THREE.DodecahedronGeometry(2.35, 1);
   const branchPineBough = new THREE.DodecahedronGeometry(1.42, 1);
+  const lakefrontPinePad = new THREE.DodecahedronGeometry(1.85, 1);
+  const lakefrontPineCrown = new THREE.DodecahedronGeometry(2.15, 1);
   const branchSegmentGeometry = new THREE.CylinderGeometry(0.12, 0.20, 1, 6, 1);
   const towerSpruceBough = new THREE.DodecahedronGeometry(1.75, 1);
   const towerSpruceTip = new THREE.ConeGeometry(1.05, 5.2, 8, 1);
@@ -624,6 +634,8 @@ export const createForestSystem = (): ForestSystem => {
   const foothillFirMiddle = new THREE.ConeGeometry(2.35, 4.6, 8, 1);
   const foothillFirTop = new THREE.ConeGeometry(1.38, 4.2, 8, 1);
   const foothillFirBough = new THREE.DodecahedronGeometry(1.85, 1);
+  const slopeGrovePad = new THREE.DodecahedronGeometry(2.45, 1);
+  const slopeGroveTop = new THREE.ConeGeometry(1.05, 4.4, 8, 1);
   const silhouetteCanopy = new THREE.ConeGeometry(4.9, 17.4, 7, 1);
   const layerLow = new THREE.ConeGeometry(3.7, 7.5, 8, 1);
   const layerMid = new THREE.ConeGeometry(2.8, 6.8, 8, 1);
@@ -1327,6 +1339,112 @@ export const createForestSystem = (): ForestSystem => {
     baseCount: inspirationShorePines.length,
   });
 
+  const lakefrontAlpinePines = makeInstances(
+    680,
+    "lakefrontAlpinePine",
+    ["near", "near", "near", "near", "dock", "cove", "mid"],
+    0.312,
+    0.574,
+  );
+  const lakefrontPineTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine trunks");
+  const lakefrontPineBranchA = makeInstancedMesh(branchSegmentGeometry, trunkMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine low limbs");
+  const lakefrontPineBranchB = makeInstancedMesh(branchSegmentGeometry, trunkMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine mid limbs");
+  const lakefrontPineBranchC = makeInstancedMesh(branchSegmentGeometry, trunkMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine high limbs");
+  const lakefrontPineBranchD = makeInstancedMesh(branchSegmentGeometry, trunkMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine broken side limbs");
+  const lakefrontPinePadA = makeInstancedMesh(lakefrontPinePad, lakefrontAlpinePineMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine low foliage pads");
+  const lakefrontPinePadB = makeInstancedMesh(lakefrontPinePad, lakefrontAlpinePineMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine middle foliage pads");
+  const lakefrontPinePadC = makeInstancedMesh(lakefrontPinePad, lakefrontAlpinePineMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine upper foliage pads");
+  const lakefrontPineCrownMesh = makeInstancedMesh(lakefrontPineCrown, lakefrontAlpinePineMaterial, lakefrontAlpinePines.length, "Native tree type - lakefrontAlpinePine asymmetric crowns");
+  lakefrontAlpinePines.forEach((instance, index) => {
+    const clearance = Math.max(0, -distanceToShore(instance.point));
+    const openWater = 1 - THREE.MathUtils.clamp((clearance - 76) / 210, 0, 1);
+    const meadowRise = THREE.MathUtils.clamp((clearance - 112) / 300, 0, 1);
+    const pineScale = 0.76 + rng() * 0.36 + openWater * 0.34 + meadowRise * 0.14;
+    const trunkHeight = 14.4 * instance.heightScale * pineScale;
+    const trunkWidth = (0.30 + rng() * 0.12) * instance.widthScale;
+    fillTrunk(lakefrontPineTrunks, instance, index, trunkHeight, trunkWidth);
+    fillBranch(lakefrontPineBranchA, instance, index, trunkHeight * 0.34, 3.05, -0.28, 5.20 * instance.widthScale * pineScale, 0.13 * instance.widthScale, 0.08);
+    fillBranch(lakefrontPineBranchB, instance, index, trunkHeight * 0.52, -2.42, 0.78, 4.55 * instance.widthScale * pineScale, 0.12 * instance.widthScale, 0.17);
+    fillBranch(lakefrontPineBranchC, instance, index, trunkHeight * 0.70, 1.58, 1.20, 3.72 * instance.widthScale * pineScale, 0.10 * instance.widthScale, 0.26);
+    fillBranch(lakefrontPineBranchD, instance, index, trunkHeight * 0.84, -0.76, -1.32, 2.95 * instance.widthScale * pineScale, 0.09 * instance.widthScale, 0.34);
+    fillOffsetCrown(lakefrontPinePadA, instance, index, trunkHeight * 0.42, 2.34, -0.34, 1.42 * instance.widthScale, 0.44 * instance.heightScale, 0.88 * instance.widthScale, 0.34, 0.044);
+    fillOffsetCrown(lakefrontPinePadB, instance, index, trunkHeight * 0.60, -1.64, 0.78, 1.22 * instance.widthScale, 0.38 * instance.heightScale, 0.80 * instance.widthScale, -0.32, 0.034);
+    fillOffsetCrown(lakefrontPinePadC, instance, index, trunkHeight * 0.76, 0.86, -1.02, 1.04 * instance.widthScale, 0.34 * instance.heightScale, 0.68 * instance.widthScale, 0.44, 0.026);
+    fillOffsetCrown(lakefrontPineCrownMesh, instance, index, trunkHeight * 0.94, -0.18, 0.22, 0.88 * instance.widthScale, 0.36 * instance.heightScale, 0.62 * instance.widthScale, -0.12, 0.060);
+  });
+  [
+    lakefrontPineTrunks,
+    lakefrontPineBranchA,
+    lakefrontPineBranchB,
+    lakefrontPineBranchC,
+    lakefrontPineBranchD,
+    lakefrontPinePadA,
+    lakefrontPinePadB,
+    lakefrontPinePadC,
+    lakefrontPineCrownMesh,
+  ].forEach((mesh) => finalizeMesh(mesh, lakefrontAlpinePines.length));
+  group.add(
+    lakefrontPineTrunks,
+    lakefrontPineBranchA,
+    lakefrontPineBranchB,
+    lakefrontPineBranchC,
+    lakefrontPineBranchD,
+    lakefrontPinePadA,
+    lakefrontPinePadB,
+    lakefrontPinePadC,
+    lakefrontPineCrownMesh,
+  );
+  treeBuilds.push({
+    key: "lakefrontAlpinePine",
+    meshes: [
+      lakefrontPineTrunks,
+      lakefrontPineBranchA,
+      lakefrontPineBranchB,
+      lakefrontPineBranchC,
+      lakefrontPineBranchD,
+      lakefrontPinePadA,
+      lakefrontPinePadB,
+      lakefrontPinePadC,
+      lakefrontPineCrownMesh,
+    ],
+    baseCount: lakefrontAlpinePines.length,
+  });
+
+  const slopeGroveSpruces = makeInstances(
+    1850,
+    "slopeGroveSpruce",
+    ["mid", "far", "far", "alpineBase", "alpineBase", "alpineBase", "cove"],
+    0.334,
+    0.426,
+  );
+  const slopeGroveTrunks = makeInstancedMesh(trunkGeometry, trunkMaterial, slopeGroveSpruces.length, "Native tree type - slopeGroveSpruce trunks");
+  const slopeGrovePadA = makeInstancedMesh(slopeGrovePad, slopeGroveSpruceMaterial, slopeGroveSpruces.length, "Native tree type - slopeGroveSpruce lower grove mass");
+  const slopeGrovePadB = makeInstancedMesh(slopeGrovePad, slopeGroveSpruceMaterial, slopeGroveSpruces.length, "Native tree type - slopeGroveSpruce middle grove mass");
+  const slopeGrovePadC = makeInstancedMesh(slopeGrovePad, slopeGroveSpruceMaterial, slopeGroveSpruces.length, "Native tree type - slopeGroveSpruce upper grove mass");
+  const slopeGrovePadD = makeInstancedMesh(lakefrontPinePad, slopeGroveSpruceMaterial, slopeGroveSpruces.length, "Native tree type - slopeGroveSpruce side bough masses");
+  const slopeGroveTopMesh = makeInstancedMesh(slopeGroveTop, slopeGroveSpruceMaterial, slopeGroveSpruces.length, "Native tree type - slopeGroveSpruce pointed tops");
+  slopeGroveSpruces.forEach((instance, index) => {
+    const clearance = Math.max(0, -distanceToShore(instance.point));
+    const climb = THREE.MathUtils.clamp((clearance - 170) / 540, 0, 1);
+    const groveScale = 0.78 + rng() * 0.42 + climb * 0.48;
+    const trunkHeight = 8.4 * instance.heightScale * groveScale;
+    fillTrunk(slopeGroveTrunks, instance, index, trunkHeight, (0.42 + rng() * 0.14) * instance.widthScale);
+    fillOffsetCrown(slopeGrovePadA, instance, index, trunkHeight * 0.58, 0.24, -0.10, (1.32 + climb * 0.24) * instance.widthScale, 0.44 * instance.heightScale, 0.90 * instance.widthScale, 0.14, -0.006);
+    fillOffsetCrown(slopeGrovePadB, instance, index, trunkHeight * 0.78, -0.72, 0.50, (1.06 + climb * 0.20) * instance.widthScale, 0.38 * instance.heightScale, 0.78 * instance.widthScale, -0.28, 0.010);
+    fillOffsetCrown(slopeGrovePadC, instance, index, trunkHeight * 0.98, 0.48, -0.62, (0.86 + climb * 0.14) * instance.widthScale, 0.34 * instance.heightScale, 0.62 * instance.widthScale, 0.38, 0.020);
+    fillOffsetCrown(slopeGrovePadD, instance, index, trunkHeight * 0.68, 1.34, 0.34, (0.88 + climb * 0.12) * instance.widthScale, 0.34 * instance.heightScale, 0.66 * instance.widthScale, 0.52, 0.014);
+    fillCone(slopeGroveTopMesh, instance, index, trunkHeight * 1.16, (0.40 + climb * 0.08) * instance.widthScale, 0.70 * instance.heightScale * groveScale, 0.66 + rng() * 0.18);
+  });
+  [slopeGroveTrunks, slopeGrovePadA, slopeGrovePadB, slopeGrovePadC, slopeGrovePadD, slopeGroveTopMesh].forEach((mesh) =>
+    finalizeMesh(mesh, slopeGroveSpruces.length),
+  );
+  group.add(slopeGroveTrunks, slopeGrovePadA, slopeGrovePadB, slopeGrovePadC, slopeGrovePadD, slopeGroveTopMesh);
+  treeBuilds.push({
+    key: "slopeGroveSpruce",
+    meshes: [slopeGroveTrunks, slopeGrovePadA, slopeGrovePadB, slopeGrovePadC, slopeGrovePadD, slopeGroveTopMesh],
+    baseCount: slopeGroveSpruces.length,
+  });
+
   const mountainClimbFirs = makeInstances(
     1900,
     "mountainClimbFir",
@@ -1941,6 +2059,8 @@ export const createForestSystem = (): ForestSystem => {
     "shorelineSunlitSpruce",
     "meadowSpecimenGrove",
     "inspirationShorePine",
+    "lakefrontAlpinePine",
+    "slopeGroveSpruce",
     "mountainClimbFir",
   ]);
   const legacySpireTypes = new Set<NativeTreeTypeKey>([
@@ -1964,28 +2084,28 @@ export const createForestSystem = (): ForestSystem => {
   const presetScale = (preset: ForestQualityPreset, key: NativeTreeTypeKey) => {
     if (preset === "Performance") {
       if (placeholderProxyTypes.has(key)) {
-        return key === "distantSilhouetteTree" ? 0.015 : 0.02;
+        return key === "distantSilhouetteTree" ? 0.01 : 0.014;
       }
       if (replacementTreeTypes.has(key)) {
-        return key === "alphaPineSilhouette" ? 0.10 : 0.64;
+        return key === "alphaPineSilhouette" ? 0 : 0.58;
       }
       if (legacySpireTypes.has(key)) {
-        return 0.026;
+        return 0.014;
       }
       if (canopyProxyTypes.has(key)) {
-        return key === "understoryShrubMass" ? 0.42 : 0.28;
+        return key === "understoryShrubMass" ? 0.34 : key === "forestWallCanopy" ? 0.08 : 0.16;
       }
       return 0.46;
     }
     if (preset === "Scenic") {
       if (placeholderProxyTypes.has(key)) {
-        return key === "distantSilhouetteTree" ? 0.025 : 0.03;
+        return key === "distantSilhouetteTree" ? 0.014 : 0.018;
       }
       if (legacySpireTypes.has(key)) {
-        return 0.034;
+        return 0.018;
       }
       if (canopyProxyTypes.has(key)) {
-        return key === "understoryShrubMass" ? 0.72 : 0.46;
+        return key === "understoryShrubMass" ? 0.50 : key === "forestWallCanopy" ? 0.10 : 0.22;
       }
       return key === "distantSilhouetteTree" ||
         key === "broadEvergreenCluster" ||
@@ -2010,23 +2130,25 @@ export const createForestSystem = (): ForestSystem => {
         key === "mountainBaseMixedSpruce" ||
         key === "foothillFirStand" ||
         key === "inspirationShorePine" ||
+        key === "lakefrontAlpinePine" ||
+        key === "slopeGroveSpruce" ||
         key === "mountainClimbFir"
         ? 1
         : key === "alphaPineSilhouette"
-          ? 0.22
+          ? 0
           : 0.84;
     }
     if (placeholderProxyTypes.has(key)) {
-      return key === "distantSilhouetteTree" ? 0.018 : 0.024;
+      return key === "distantSilhouetteTree" ? 0.012 : 0.016;
     }
     if (replacementTreeTypes.has(key)) {
-      return key === "alphaPineSilhouette" ? 0.18 : 1;
+      return key === "alphaPineSilhouette" ? 0 : 1;
     }
     if (legacySpireTypes.has(key)) {
-      return 0.028;
+      return 0.016;
     }
     if (canopyProxyTypes.has(key)) {
-      return key === "understoryShrubMass" ? 0.62 : 0.34;
+      return key === "understoryShrubMass" ? 0.46 : key === "forestWallCanopy" ? 0.09 : 0.18;
     }
     if (
       key === "fullSpruceCluster" ||
@@ -2045,6 +2167,8 @@ export const createForestSystem = (): ForestSystem => {
       key === "mountainBaseMixedSpruce" ||
       key === "foothillFirStand" ||
       key === "inspirationShorePine" ||
+      key === "lakefrontAlpinePine" ||
+      key === "slopeGroveSpruce" ||
       key === "mountainClimbFir"
     ) {
       return 0.82;
@@ -2080,19 +2204,21 @@ export const createForestSystem = (): ForestSystem => {
       const darken = Math.max(0.52, 1 - weather.dials.skyDark * 0.30);
       foliageMaterial.color.setHex(palette.shorelineGrass);
       foliageMaterial.color.multiplyScalar(darken * 1.20);
-      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x4d6f48 : 0x78915d);
-      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x4c6845 : 0x7f9862);
-      meadowFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x647f49 : 0x9fbe70);
-      sunlitFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x6f8f55 : 0xb0ca7a);
-      assetFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x5f7a4d : 0x89a969);
-      branchFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x657e50 : 0x9fbe74);
-      towerFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x6f8e55 : 0xa8c67a);
-      understoryPatchMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x445b3c : 0x5f7e4b);
-      matureFirMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x6d8955 : 0x9fbe72);
-      mountainBaseFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x4f6847 : 0x789261);
-      inspirationShorePineMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x88a967 : 0xb8d589);
-      mountainClimbFirMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x627d55 : 0x91ad70);
-      alphaPineMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x465842 : 0x667a58);
+      darkFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x5f7e51 : 0x82a46a);
+      clusterMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x5a774e : 0x88a96e);
+      meadowFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x789858 : 0xaac879);
+      sunlitFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x86a765 : 0xb8d181);
+      assetFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x729158 : 0x96b877);
+      branchFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x78945d : 0xa9c97e);
+      towerFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x84a363 : 0xb4d083);
+      understoryPatchMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x536f47 : 0x6f9256);
+      matureFirMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x809f63 : 0xa9c97b);
+      mountainBaseFoliageMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x607d52 : 0x86a46d);
+      inspirationShorePineMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x9aba75 : 0xc4df96);
+      lakefrontAlpinePineMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x9abd78 : 0xc5e39a);
+      slopeGroveSpruceMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x688653 : 0x92b36f);
+      mountainClimbFirMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x78975e : 0xa2c27a);
+      alphaPineMaterial.color.setHex(weather.dials.skyDark > 0.52 ? 0x526b4a : 0x748961);
       reedMaterial.color.setHex(weather.dials.skyDark > 0.55 ? 0x687246 : 0xa9bd68);
       rockMaterial.color.setHex(palette.rock);
       rockMaterial.color.lerp(new THREE.Color(0x9aa08f), 0.18);
