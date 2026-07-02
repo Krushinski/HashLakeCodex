@@ -140,3 +140,17 @@ Phase 124 is a focused native vegetation/material upgrade. It adds larger hero l
 - Runtime change: native tree render language adds larger shoreline larch/spruce specimens and mixed foothill groves so the shore and slopes read as 3D vegetation instead of a dotted toy-tree fence.
 - Terrain change: Zone 3-5 internal relief and material tone are strengthened while the official zone boundaries stay unchanged.
 - Guardrail: no new water surface, mountain experiment, hidden ground sheet, external asset, or selector/debug clutter was introduced.
+
+## Phase 126 Native Tree Render Reset Note
+
+- Purpose: keep the Phase 125 valid placement and zone ownership, but move the rendered tree language away from toy cone/spike silhouettes.
+- Runtime change: adds asset-like shoreline layered firs and foothill layered firs with visible trunks, long branches, asymmetric foliage pads, and warmer green tone variation.
+- Cleanup change: older larch/grove shapes are softened from cone stacks into rounded foliage masses and reduced to support weight behind the newer tree families.
+- Guardrail: tree placement still uses `lakeMap`/zone validation only; no water, mountain, external asset, or hidden scenery ownership changed.
+
+## Phase 127 Terrain / Tree Depth Tune Note
+
+- Purpose: resume the inspiration-driven forest/terrain goal by making Zones 3-5 feel less like painted flat ribbons and more like planted alpine ground.
+- Terrain change: land ribbons keep the same contour ownership but receive higher subdivision, broader interior swells, planted forest pads, and meadow-to-forest saddles that fade to zero at official band edges.
+- Tree change: the most toy-like tall support read is lowered again; Phase 126 layered firs carry more of the visible forest mass while older needle-heavy support layers stay quiet.
+- Guardrail: no zone bounds, water ownership, mountain ownership, external assets, or selector/debug modes changed.

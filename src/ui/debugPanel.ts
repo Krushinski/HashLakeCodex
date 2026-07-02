@@ -457,6 +457,8 @@ const formatTreeTypeCounts = (counts: NativeTreeTypeCounts) =>
     `FC${counts.foothillCanopyPine}`,
     `SL${counts.shorelineLarchSpecimen}`,
     `MG${counts.foothillMixedGrove}`,
+    `LF${counts.shorelineLayeredFir}`,
+    `FF${counts.foothillLayeredFir}`,
     `Gv${counts.slopeGroveSpruce}`,
     `D${counts.mountainClimbFir}`,
   ].join(" ");
