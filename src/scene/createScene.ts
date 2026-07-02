@@ -2482,7 +2482,7 @@ const createSlopedStripGeometry = (
       (isZone3 || isZone4)
         ? Math.exp(-Math.pow((bandT - 0.58) / 0.28, 2)) *
           Math.max(0, heightDelta) *
-          0.118 *
+          0.174 *
           (0.34 + basin * 0.34 + Math.max(0, broadRoll) * 0.32)
         : 0;
     const slopeEcologyBenches =
@@ -2496,7 +2496,7 @@ const createSlopedStripGeometry = (
       isZone5
         ? Math.exp(-Math.pow((bandT - 0.86) / 0.22, 2)) *
           Math.max(0, heightDelta) *
-          0.162 *
+          0.198 *
           (0.44 + broadRoll * 0.34 + basin * 0.22)
         : 0;
     const rootHollows =
@@ -2505,6 +2505,28 @@ const createSlopedStripGeometry = (
           Math.max(0, heightDelta) *
           0.026 *
           Math.exp(-Math.pow((bandT - 0.48) / 0.30, 2))
+        : 0;
+    const alpineMeadowRootSwells =
+      (isZone3 || isZone4)
+        ? Math.max(0, Math.sin(point.x * 0.0108 - point.z * 0.0072 + seed * 1.54)) *
+          Math.max(0, heightDelta) *
+          0.132 *
+          Math.exp(-Math.pow((bandT - 0.62) / 0.30, 2)) *
+          (0.42 + basin * 0.30 + broadRoll * 0.28)
+        : 0;
+    const mixedForestToeRoll =
+      (isZone4 || isZone5)
+        ? Math.exp(-Math.pow((bandT - 0.78) / 0.26, 2)) *
+          Math.max(0, heightDelta) *
+          0.152 *
+          (0.36 + Math.max(0, broadRoll) * 0.34 + basin * 0.30)
+        : 0;
+    const forestFloorDrainageCuts =
+      (isZone3 || isZone4 || isZone5)
+        ? -Math.max(0, Math.sin(point.x * 0.0068 + point.z * 0.0104 + seed * 2.10)) *
+          Math.max(0, heightDelta) *
+          0.038 *
+          Math.exp(-Math.pow((bandT - 0.54) / 0.38, 2))
         : 0;
     const bankMeadowUndercut =
       (isZone2 || isZone3)
@@ -2569,6 +2591,9 @@ const createSlopedStripGeometry = (
       slopeEcologyBenches +
       mountainBaseToeRise +
       rootHollows +
+      alpineMeadowRootSwells +
+      mixedForestToeRoll +
+      forestFloorDrainageCuts +
       bankMeadowUndercut +
       Math.max(0, baseY - 1.05) * edgeFade * 0.018
     );
